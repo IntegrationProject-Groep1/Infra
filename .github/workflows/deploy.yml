@@ -1,0 +1,35 @@
+on:
+  push:
+    tags:
+      - 'v*' # Trigger bij een nieuwe release tag (bijv. v1.0.1)
+    branches:
+      - main # Of bij een push op main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          # Gebruikt de automatische token van de organisatie/repo
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          # Slaat image op onder organisatie naam
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/heartbeat-demo:latest
+            ghcr.io/${{ github.repository_owner }}/heartbeat-demo:${{ github.ref_name }}
