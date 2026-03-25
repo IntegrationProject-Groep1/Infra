@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*' # Trigger bij een nieuwe release tag (bijv. v1.0.1)
-    branches:
-      - main # Of bij een push op main
 
 jobs:
   build-and-push:
