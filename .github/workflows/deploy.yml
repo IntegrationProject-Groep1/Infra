@@ -4,9 +4,16 @@ on:
   push:
     tags:
       - 'v*' # Trigger bij een nieuwe release tag (bijv. v1.0.1)
+    branches:
+      - main
+      - master
+      - prod
+      - production # Trigger bij een push of merge naar een van deze productie-branches
 
 jobs:
   build-and-push:
+    name: Build and Push Docker Image
+    needs: [] # Placeholder: Vul hier de namen in van test-jobs als die aan deze file worden toegevoegd
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,7 +40,7 @@ jobs:
         with:
           context: .
           push: true
-          # Geven automatisch tags op basis van de repository naam en de git tag
+          # Geef automatisch tags op basis van de repository naam en de git tag/branch
           tags: |
             ghcr.io/${{ env.REPO_LOWER }}:latest
             ghcr.io/${{ env.REPO_LOWER }}:${{ github.ref_name }}
