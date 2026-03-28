@@ -39,7 +39,7 @@ Willen jullie je applicatie live zetten op de VM? Zorg dan dat jullie repository
 - [ ] **Poort (`EXPOSE`)**: Vermeld duidelijk op welke interne poort jullie app draait (gebruik `EXPOSE [poort]` in de Dockerfile of zet het in je `.env.example`). Wij hebben dit nodig voor de routing op de VM.
 - [ ] **.env.example**: Zorg voor een duidelijke `.env.example` file met daarin alle benodigde variabelen, maar **zonder** echte wachtwoorden.
 - [ ] **.gitignore & .dockerignore**: Zorg dat gevoelige bestanden (`.env`, `node_modules`, `.git`) worden genegeerd.
-- [ ] **CI Pipeline**: Voorzie zelf een test/linting pipeline die draait op jullie repo.
-- [ ] **Deploy Pipeline**: Kopieer simpelweg onze `deploy.yml` naar jullie `.github/workflows/` map. Je hoeft zelf **geen** labels of servicenamen aan te passen, dit gaat automatisch.
+- [ ] **CI Pipeline**: Voorzie zelf een test/linting pipeline die draait op jullie repo. (In de deploy.yml is er dan een need: [] placeholder, voeg hier jullie test pipelines in!)
+- [ ] **Deploy Pipeline**: Kopieer simpelweg onze `deploy.yml` naar jullie `.github/workflows/` map. Je hoeft zelf **geen** labels of servicenamen aan te passen, dit gaat automatisch. (Ik heb dit gedaan voor sommige mensen maar indien het toch mistdoe dit!)
 
 Hebben jullie speciale configuraties nodig (zoals extra volumes, sidecars of een database)? Bezorg ons dan jullie lokale `docker-compose.yml`, dan verwerken wij dit in de master file op de VM.
