@@ -1,0 +1,74 @@
+services:
+  # ==========================================
+  # CORE INFRASTRUCTUUR
+  # ==========================================
+  dozzle:
+    container_name: dozzle
+    image: amir20/dozzle:latest
+    restart: unless-stopped
+    # Dozzle draait intern op 8080, Nginx spreekt deze poort aan
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - shift_net
+
+  dozzle-proxy:
+    container_name: dozzle_proxy
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      # Mapping van de open Azure poort 30002 naar de SSL poort 443 van Nginx
+      - "30002:443"
+    volumes:
+      # Certificaten voor de HTTPS verbinding
+      - ./certs:/certs:ro
+      # Koppeling naar de Nginx configuratie file
+      - ./dozzle-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - dozzle
+    networks:
+      - shift_net
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: rabbitmq_broker
+    hostname: my-rabbit
+    restart: unless-stopped
+    ports:
+      # AMQP poort voor dataverkeer van applicaties
+      - "5672:5672"
+      # RabbitMQ Management via SSL op poort 30001
+      - "30001:15671"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./certs:/etc/rabbitmq/certs:ro
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    networks:
+      - shift_net
+
+  # ==========================================
+  # AUTOMATISERING
+  # ==========================================
+  watchtower:
+    image: containrrr/watchtower
+    container_name: watchtower
+    restart: unless-stopped
+    environment:
+      # Oplossing voor de Docker API versie mismatch
+      - DOCKER_API_VERSION=1.40
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 --cleanup
+
+networks:
+  shift_net:
+    name: shiftfestival_network
+
+volumes:
+  rabbitmq_data:
+    # Gebruik het bestaande externe volume voor data-persistentie
+    external: true
+    name: shiftfestival_rabbitmq_data

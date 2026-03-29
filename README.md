@@ -6,26 +6,32 @@
 ![Nginx](https://img.shields.io/badge/nginx-%23009639.svg?style=for-the-badge&logo=nginx&logoColor=white)
 ![RabbitMQ](https://img.shields.io/badge/Rabbitmq-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white)
 
-Welkom in de centrale repository van Team Infrastructuur. Deze repository bevat geen applicatiecode, maar is de ruggengraat van ons project. Hier beheren we de deployment flows, server configuraties en documentatie voor alle development teams.
+Welkom in de centrale repository van Team Infrastructuur. Deze repository bevat de centrale configuratie voor de productie-VM en de universele deployment flows voor alle teams.
 
-## Wat zit er in deze repository?
+## Centrale Dashboards
 
-* **`.github/workflows/deploy.yml`**: Onze universele CI/CD pipeline. Dit is de master-template die alle teams gebruiken om hun code naar de GitHub Container Registry (GHCR) te pushen.
-* **Server Configuraties**: De centrale `docker-compose.yml` en configuraties voor onze core-infrastructuur (zoals RabbitMQ, Nginx en Dozzle) die op de productie-VM draaien.
+* **Log Viewer (Dozzle):** [https://integrationproject-2526s2-dag01.westeurope.cloudapp.azure.com:30002](https://integrationproject-2526s2-dag01.westeurope.cloudapp.azure.com:30002)
+* **RabbitMQ Management:** [https://integrationproject-2526s2-dag01.westeurope.cloudapp.azure.com:30001](https://integrationproject-2526s2-dag01.westeurope.cloudapp.azure.com:30001)
 
 ---
 
-## De Deployment Flow (Hoe het werkt)
+## Wat zit er in deze repository?
 
-Om het voor alle teams zo makkelijk mogelijk te maken, hebben we het deployment proces volledig geautomatiseerd:
+* **`docker-compose.yml`**: De master orchestratie file die alle team-containers aanstuurt.
+* **`dozzle-nginx.conf`**: Configuratie voor de centrale log-viewer via HTTPS.
+* **`rabbitmq.conf`**: Centrale broker instellingen inclusief SSL-beheer.
+* **`pipelines/deploy.yml + ci.yml`**: De universele CI/CD pipeline template voor alle teams.
 
-1. **Push & Tag**: Een team pusht hun code en maakt een GitHub Release (Tag) aan.
-2. **Build**: Onze `deploy.yml` pipeline pakt dit op, leest de lokale `Dockerfile` en bouwt een image.
-3. **Registry**: De image wordt als *Internal* package opgeslagen in onze GHCR (`ghcr.io/integrationproject-groep1/[servicenaam]`).
-4. **Productie**: Onze Linux VM pullt de nieuwste images en beheert de containers via onze centrale Docker Compose file.
+---
+
+## De Deployment Flow
+
+1.  **Push & Tag**: Een team pusht hun code en maakt een GitHub Release (Tag) aan.
+2.  **Build**: Onze `deploy.yml` pipeline bouwt een image en pusht deze naar de GHCR (`ghcr.io/integrationproject-groep1/[servicenaam]`).
+3.  **Productie**: De VM detecteert nieuwe versies via **Watchtower** en herstart de container automatisch.
 
 ### Hoe maak je een Tagged Release?
-Om de pipeline te triggeren, hoef je alleen maar een nieuwe Tag/Release aan te maken in GitHub. Bekijk de onderstaande demo:
+Om de pipeline te triggeren, maak je een nieuwe Tag/Release aan in GitHub:
 
 ![Demo: Hoe maak je een Tagged Release](assets/tag-release.gif)
 
@@ -35,11 +41,39 @@ Om de pipeline te triggeren, hoef je alleen maar een nieuwe Tag/Release aan te m
 
 Willen jullie je applicatie live zetten op de VM? Zorg dan dat jullie repository aan de volgende eisen voldoet:
 
-- [ ] **Dockerfile**: Plaats een werkende `Dockerfile` in de root van jullie project. Test lokaal of deze succesvol bouwt!
-- [ ] **Poort (`EXPOSE`)**: Vermeld duidelijk op welke interne poort jullie app draait (gebruik `EXPOSE [poort]` in de Dockerfile of zet het in je `.env.example`). Wij hebben dit nodig voor de routing op de VM.
-- [ ] **.env.example**: Zorg voor een duidelijke `.env.example` file met daarin alle benodigde variabelen, maar **zonder** echte wachtwoorden.
-- [ ] **.gitignore & .dockerignore**: Zorg dat gevoelige bestanden (`.env`, `node_modules`, `.git`) worden genegeerd.
-- [ ] **CI Pipeline**: Voorzie zelf een test/linting pipeline die draait op jullie repo. (In de deploy.yml is er dan een need: [] placeholder, voeg hier jullie test pipelines in!)
-- [ ] **Deploy Pipeline**: Kopieer simpelweg onze `deploy.yml` naar jullie `.github/workflows/` map. Je hoeft zelf **geen** labels of servicenamen aan te passen, dit gaat automatisch. (Ik heb dit gedaan voor sommige mensen maar indien het toch mistdoe dit!)
+### 1. RabbitMQ Naming Convention (Verplicht)
+Alle teams maken gebruik van de gedeelde **'/'** (default) Virtual Host. Om conflicten te voorkomen hanteren we een strikte naamgeving:
 
-Hebben jullie speciale configuraties nodig (zoals extra volumes, sidecars of een database)? Bezorg ons dan jullie lokale `docker-compose.yml`, dan verwerken wij dit in de master file op de VM.
+* **Prefix**: Gebruik altijd je teamnaam als prefix voor elke queue of exchange.
+* **Voorbeelden**: `kassa.orders`, `crm.customers`.
+* **Uitzondering**: De `heartbeat` queue voor Team Monitoring is de enige gedeelde queue zonder team-prefix.
+* **Host**: Gebruik `rabbitmq_broker` als hostname binnen het Docker netwerk.
+
+### 2. Repository Eisen
+- [ ] **Dockerfile**: Plaats een werkende file in de root. Test lokaal of deze succesvol bouwt!
+- [ ] **Poort (`EXPOSE`)**: Vermeld duidelijk op welke interne poort jullie app draait. Wij hebben dit nodig voor de routing.
+- [ ] **.env.example**: Zorg voor een duidelijke file met alle benodigde variabelen, maar **zonder** echte wachtwoorden.
+- [ ] **.gitignore & .dockerignore**: Zorg dat gevoelige bestanden (`.env`, `node_modules`, `.git`) worden genegeerd.
+- [ ] **Deploy Pipeline**: Kopieer onze `deploy.yml` naar jullie `.github/workflows/` map.
+
+---
+
+## Poortallocatie (Service Inventory)
+
+Elk team heeft een specifiek blok aan poorten toegewezen gekregen. Gebruik enkel poorten binnen jouw toegewezen reeks:
+
+| Team / Service | Poortreeks |
+| :--- | :--- |
+| **Team Infra** | 30000 - 30009 |
+| **Team Facturatie** | 30010 - 30019 |
+| **Team Frontend** | 30020 - 30029 |
+| **Team Kassa** | 30030 - 30039 |
+| **Team CRM** | 30040 - 30049 |
+| **Team Planning** | 30050 - 30059 |
+| **Team Monitoring** | 30060 - 30069 |
+| **Buffer** | 30070 - 30100 |
+
+---
+
+## Beheer & Onderhoud
+Wijzigingen aan de centrale infrastructuur worden eerst gepusht naar deze repository. Wijzig nooit handmatig instellingen op de VM zonder overleg met Team Infra.
