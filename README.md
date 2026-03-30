@@ -72,6 +72,7 @@ Elk team heeft een specifiek blok aan poorten toegewezen gekregen. Gebruik enkel
 | **Team Planning** | 30050 - 30059 |
 | **Team Monitoring** | 30060 - 30069 |
 | **Buffer** | 30070 - 30100 |
+[Port Allocation](https://ehb-my.sharepoint.com/:x:/g/personal/nguyen_dang_student_ehb_be/IQAQcHP-Zmq5SYh-HKAu5JOtAbvbD1Bntkzn1AS5BYP1GRc)
 
 ---
 
