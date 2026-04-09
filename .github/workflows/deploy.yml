@@ -19,6 +19,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
           source: "./*"
           target: "/opt/shiftfestival/"
 
@@ -28,6 +29,7 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
           script: |
             cd /opt/shiftfestival
             docker compose up -d --remove-orphans
