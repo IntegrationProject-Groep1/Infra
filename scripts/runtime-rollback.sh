@@ -633,7 +633,7 @@ main() {
             
             # 4. Alleen exporteren als de regel begint met een geldige KEY=VALUE structuur
             if [[ "${line}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
-                export "${line}"
+                export "${line?}"
             fi
         done < "${BASE_DIR}/.env"
         log ".env loaded and sanitized."
