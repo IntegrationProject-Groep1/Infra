@@ -5,6 +5,7 @@ on:
     workflows: ["CI Pipeline"] # Must match the 'name' of your CI workflow exactly
     types:
       - completed
+  workflow_dispatch:    
 
 jobs:
   build-and-push:
