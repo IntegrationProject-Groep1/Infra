@@ -181,6 +181,7 @@ jobs:
               "kassa_integratie:running"
               "crm_receiver:running"
               "planning_service:running"
+              "identity-service:running"
             )
 
             MAX_RETRIES=3

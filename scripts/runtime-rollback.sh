@@ -620,17 +620,24 @@ main() {
     log "Base dir       : ${BASE_DIR}"
     log "======================================================"
 
-    # Load .env if it exists (for local testing without exporting env vars)
+    # Load .env if it exists (robust version)
     if [[ -f "${BASE_DIR}/.env" ]]; then
-    while IFS= read -r line || [[ -n "${line}" ]]; do
-        # Skip comments and empty lines
-        [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${line}" ]] && continue
-        # Export raw value without bash interpolation
-        export "${line?}"
-    done < "${BASE_DIR}/.env"
-    log ".env loaded."
-fi
+        while IFS= read -r line || [[ -n "${line}" ]]; do
+            # 1. Verwijder trailing carriage returns (voor files gemaakt op Windows)
+            line="${line%$'\r'}"
+            # 2. Trim leading/trailing whitespace
+            line=$(echo "${line}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            
+            # 3. Sla lege regels of comments over
+            [[ -z "${line}" || "${line}" == \#* ]] && continue
+            
+            # 4. Alleen exporteren als de regel begint met een geldige KEY=VALUE structuur
+            if [[ "${line}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
+                export "${line}"
+            fi
+        done < "${BASE_DIR}/.env"
+        log ".env loaded and sanitized."
+    fi
 
     # Ensure state files exist so subsequent reads never fail
     touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}"
