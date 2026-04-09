@@ -1,3 +1,19 @@
+# =============================================================================
+# ci.yml
+# ShiftFestival – Infra Team
+#
+# PURPOSE:
+#   Validates the Infra repository on every push and pull request.
+#   Catches configuration errors, security issues, and bad practices
+#   BEFORE they reach the VM.
+#
+# JOBS:
+#   1. validate    – Syntax checks for docker-compose, YAML, nginx configs
+#   2. lint        – Bash script linting with shellcheck
+#   3. security    – Secret scanning, hardcoded credential detection
+#   4. docker-scan – Docker Compose security best-practice checks
+# =============================================================================
+
 name: CI Pipeline
 
 on:
@@ -6,17 +22,475 @@ on:
     tags: [ "v*" ]
   pull_request:
     branches: [ "main", "dev", "prod" ]
-  workflow_dispatch:  
+  workflow_dispatch:
 
 jobs:
-  test:
+
+  # ===========================================================================
+  # JOB 1: VALIDATE
+  # Checks syntax of all configuration files before anything is deployed.
+  # A broken docker-compose.yml or nginx config would take down the VM.
+  # ===========================================================================
+  validate:
+    name: Validate configuration files
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Tests (Placeholder)
+      # -----------------------------------------------------------------------
+      # Docker Compose syntax validation
+      # "docker compose config" parses the file and exits non-zero on errors.
+      # We use a dummy .env so variable substitution does not fail in CI.
+      # -----------------------------------------------------------------------
+      - name: Validate docker-compose.yml syntax
         run: |
-          echo "Beste teams: Zet hier jullie eigen test-commando's!"
-          echo "Als deze falen, zal Infra de image NIET bouwen."
-          exit 0
+          echo "Validating docker-compose.yml..."
+
+          # Create a dummy .env with placeholder values so compose does not
+          # complain about missing variables during syntax validation.
+          # This does NOT expose real secrets — it only satisfies the parser.
+          cat > .env.ci << 'EOF'
+          RABBITMQ_DEFAULT_USER=ci_placeholder
+          RABBITMQ_DEFAULT_PASS=ci_placeholder
+          DB_USER=ci_placeholder
+          DB_PASSWORD=ci_placeholder
+          DB_NAME=ci_placeholder
+          EXTERNAL_DB_PORT=30004
+          PGADMIN_EMAIL=ci@placeholder.com
+          PGADMIN_PASSWORD=ci_placeholder
+          DRUPAL_DB_ROOT_PASS=ci_placeholder
+          DRUPAL_DB_NAME=drupal
+          DRUPAL_DB_USER=drupal_user
+          DRUPAL_DB_PASS=ci_placeholder
+          DRUPAL_BASE_URL=https://ci.placeholder.com
+          RABBITMQFRONTEND_USER=ci_placeholder
+          RABBITMQFRONTEND_PASS=ci_placeholder
+          RABBITMQMONITORING_USER=ci_placeholder
+          RABBITMQMONITORING_PASS=ci_placeholder
+          RABBITMQFACTURATIE_USER=ci_placeholder
+          RABBITMQFACTURATIE_PASS=ci_placeholder
+          RABBITMQKASSA_USER=ci_placeholder
+          RABBITMQKASSA_PASS=ci_placeholder
+          RABBITMQCRM_USER=ci_placeholder
+          RABBITMQCRM_PASSRAW=ci_placeholder
+          RABBITMQPLANNING_USER=ci_placeholder
+          RABBITMQPLANNING_PASS=ci_placeholder
+          FOSSBILLING_DB_NAME=ci_placeholder
+          FOSSBILLING_DB_USER=ci_placeholder
+          FOSSBILLING_DB_PASS=ci_placeholder
+          POSTGRES_DB=ci_placeholder
+          POSTGRES_PASSWORD=ci_placeholder
+          POSTGRES_USER=ci_placeholder
+          ODOO_URL=http://ci.placeholder.com
+          ODOO_DB=ci_placeholder
+          ODOO_USER=ci_placeholder
+          ODOO_PASS=ci_placeholder
+          ODOO_MASTER_PASS=ci_placeholder
+          RABBIT_HOST=ci_placeholder
+          RABBIT_PORT=5672
+          RABBIT_VHOST=/
+          RABBIT_AUTO_SETUP_TOPOLOGY=false
+          RABBIT_EXCHANGE=ci_placeholder
+          RABBIT_INCOMING_QUEUE=ci_placeholder
+          POLL_INTERVAL=10
+          SF_INSTANCE_URL=https://ci.placeholder.com
+          SF_CLIENT_ID=ci_placeholder
+          SF_CLIENT_SECRET=ci_placeholder
+          SF_REFRESH_TOKEN=ci_placeholder
+          MYSQL_HOST=ci_placeholder
+          MYSQL_PORT=3306
+          MYSQL_DATABASE=ci_placeholder
+          MYSQL_USER=ci_placeholder
+          MYSQL_PASSWORD=ci_placeholder
+          ES_ADMIN_USER=ci_placeholder
+          ES_ADMIN_PASS=ci_placeholder
+          ES_MEM_LIMIT=512m
+          KIBANA_SYSTEM_PASS=ci_placeholder
+          IDENTITY_RABBIT_USER=ci_placeholder
+          IDENTITY_RABBIT_PASS=ci_placeholder
+          EOF
+
+          cp .env.ci .env
+          docker compose config --quiet && echo "✅ docker-compose.yml is valid" \
+            || { echo "❌ docker-compose.yml has syntax errors"; exit 1; }
+
+      # -----------------------------------------------------------------------
+      # YAML lint – catches indentation errors, trailing spaces, etc.
+      # -----------------------------------------------------------------------
+      - name: Install yamllint
+        run: pip install yamllint --quiet
+
+      - name: Lint all YAML files
+        run: |
+          echo "Linting YAML files..."
+          # We use relaxed rules since docker-compose uses some non-standard patterns.
+          # The key checks are: syntax errors, duplicate keys, wrong indentation.
+          yamllint -d "{
+            extends: relaxed,
+            rules: {
+              line-length: {max: 200},
+              truthy: disable,
+              comments: disable
+            }
+          }" docker-compose.yml \
+            && echo "✅ docker-compose.yml YAML is clean" \
+            || { echo "❌ YAML lint errors found"; exit 1; }
+
+          # Also lint GitHub Actions workflow files
+          find .github/workflows -name "*.yml" -exec \
+            yamllint -d "{extends: relaxed, rules: {line-length: {max: 200}, truthy: disable, comments: disable}}" {} \; \
+            && echo "✅ GitHub Actions workflows are valid YAML" \
+            || { echo "❌ Workflow YAML lint errors found"; exit 1; }
+
+      # -----------------------------------------------------------------------
+      # Nginx config validation
+      # We spin up a temporary nginx container to run nginx -t on each config.
+      # -----------------------------------------------------------------------
+      - name: Validate nginx configurations
+        run: |
+          echo "Validating nginx config files..."
+          NGINX_ERRORS=0
+
+          for conf in *.conf; do
+            if [[ ! -f "${conf}" ]]; then
+              echo "No .conf files found – skipping nginx validation."
+              break
+            fi
+
+            echo "  Checking: ${conf}"
+            # nginx -t requires valid SSL cert paths – we use a minimal test config
+            docker run --rm \
+              -v "$(pwd)/${conf}:/etc/nginx/conf.d/test.conf:ro" \
+              nginx:alpine \
+              nginx -t 2>&1 || {
+                echo "  ❌ ${conf} has errors"
+                NGINX_ERRORS=$((NGINX_ERRORS + 1))
+              }
+          done
+
+          if [[ ${NGINX_ERRORS} -gt 0 ]]; then
+            echo "❌ ${NGINX_ERRORS} nginx config(s) failed validation"
+            exit 1
+          fi
+          echo "✅ All nginx configs are valid"
+
+  # ===========================================================================
+  # JOB 2: LINT
+  # Bash script linting with shellcheck.
+  # Catches common bash mistakes before they cause silent failures on the VM.
+  # ===========================================================================
+  lint:
+    name: Lint bash scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck on all bash scripts
+        run: |
+          echo "Running shellcheck on scripts/..."
+          ERRORS=0
+
+          # Find all shell scripts recursively
+          while IFS= read -r script; do
+            echo "  Checking: ${script}"
+            # SC2034: unused variables (common in config files, disable)
+            # SC1091: not following sourced files (can't follow .env in CI)
+            shellcheck \
+              --exclude=SC2034,SC1091 \
+              --severity=warning \
+              "${script}" \
+              && echo "  ✅ ${script}" \
+              || {
+                echo "  ❌ ${script} has shellcheck warnings/errors"
+                ERRORS=$((ERRORS + 1))
+              }
+          done < <(find scripts/ -name "*.sh" -type f 2>/dev/null)
+
+          if [[ ${ERRORS} -gt 0 ]]; then
+            echo "❌ ${ERRORS} script(s) failed shellcheck"
+            exit 1
+          fi
+          echo "✅ All scripts passed shellcheck"
+
+  # ===========================================================================
+  # JOB 3: SECURITY
+  # Scans for secrets, hardcoded credentials, and security misconfigurations.
+  # This is critical — a leaked password in git is a serious incident.
+  # ===========================================================================
+  security:
+    name: Security scanning
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so secret scanners can check all commits
+          fetch-depth: 0
+
+      # -----------------------------------------------------------------------
+      # Gitleaks – scans git history for accidentally committed secrets.
+      # Catches API keys, passwords, tokens before they spread.
+      # -----------------------------------------------------------------------
+      - name: Scan for secrets with Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+      # -----------------------------------------------------------------------
+      # Manual checks for common Infra-specific security mistakes.
+      # These catch things gitleaks might miss in config files.
+      # -----------------------------------------------------------------------
+      - name: Check for hardcoded credentials in config files
+        run: |
+          echo "Checking for hardcoded credentials..."
+          ERRORS=0
+
+          # Patterns that should NEVER appear in committed files
+          # We check all files except .env.example and CI configs
+          DANGEROUS_PATTERNS=(
+            "password\s*=\s*['\"][^${\{]"   # password = "literal" (not a variable)
+            "POSTGRES_PASSWORD\s*=\s*[a-zA-Z0-9]"  # hardcoded postgres password
+            "MYSQL_PASSWORD\s*=\s*[a-zA-Z0-9]"     # hardcoded mysql password
+            "secret_key\s*=\s*['\"][^$]"            # hardcoded secret key
+          )
+
+          for pattern in "${DANGEROUS_PATTERNS[@]}"; do
+            # Exclude example files, this workflow file, and test fixtures
+            matches=$(grep -rEi "${pattern}" \
+              --include="*.yml" \
+              --include="*.yaml" \
+              --include="*.conf" \
+              --include="*.php" \
+              --exclude="*.example" \
+              --exclude-dir=".github" \
+              --exclude-dir="test-environment" \
+              . 2>/dev/null || true)
+
+            if [[ -n "${matches}" ]]; then
+              echo "❌ Potentially hardcoded credential found:"
+              echo "${matches}"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done
+
+          if [[ ${ERRORS} -gt 0 ]]; then
+            echo "❌ Security check failed: hardcoded credentials detected"
+            exit 1
+          fi
+          echo "✅ No hardcoded credentials found"
+
+      # -----------------------------------------------------------------------
+      # Verify that .env files are not committed to the repository.
+      # A real .env with production passwords must NEVER be in git.
+      # -----------------------------------------------------------------------
+      - name: Verify .env files are not committed
+        run: |
+          echo "Checking for committed .env files..."
+
+          # Find any .env files that are tracked by git (not just present on disk)
+          COMMITTED_ENV=$(git ls-files | grep -E "^\.env$|/\.env$" || true)
+
+          if [[ -n "${COMMITTED_ENV}" ]]; then
+            echo "❌ CRITICAL: .env file is committed to the repository!"
+            echo "   Files found: ${COMMITTED_ENV}"
+            echo "   Remove with: git rm --cached .env"
+            exit 1
+          fi
+          echo "✅ No .env files are committed"
+
+      # -----------------------------------------------------------------------
+      # Trivy – scans docker-compose.yml for security misconfigurations.
+      # Catches: containers running as root, privileged mode, exposed secrets.
+      # -----------------------------------------------------------------------
+      - name: Scan docker-compose for misconfigurations with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: config
+          scan-ref: .
+          trivy-config: .trivy.yaml
+          exit-code: 0   # Warn only for now – set to 1 to enforce
+          severity: HIGH,CRITICAL
+          format: table
+
+      # -----------------------------------------------------------------------
+      # Check that no container in docker-compose runs in privileged mode.
+      # Privileged containers can escape to the host – never acceptable.
+      # -----------------------------------------------------------------------
+      - name: Check for privileged containers
+        run: |
+          echo "Checking for privileged containers in docker-compose.yml..."
+
+          if grep -i "privileged:\s*true" docker-compose.yml; then
+            echo "❌ CRITICAL: Privileged container found in docker-compose.yml!"
+            echo "   Privileged containers can escape to the host OS."
+            exit 1
+          fi
+          echo "✅ No privileged containers found"
+
+      # -----------------------------------------------------------------------
+      # Check that no container exposes port 22 (SSH) externally.
+      # Accidentally exposing SSH on a public port is a serious risk.
+      # -----------------------------------------------------------------------
+      - name: Check for dangerous port exposures
+        run: |
+          echo "Checking for dangerous port exposures..."
+          ERRORS=0
+
+          # Port 22 should never be exposed via docker (the VM itself uses 60022)
+          if grep -E '"\d+:22"' docker-compose.yml; then
+            echo "❌ Port 22 (SSH) is exposed via docker-compose!"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          # Port 5432 (PostgreSQL) should not be exposed on 0.0.0.0
+          # (it uses a custom port 30004 intentionally, so we just warn)
+          if grep -E '"0\.0\.0\.0:5432"' docker-compose.yml; then
+            echo "⚠️  PostgreSQL port 5432 is exposed on all interfaces"
+          fi
+
+          if [[ ${ERRORS} -gt 0 ]]; then
+            exit 1
+          fi
+          echo "✅ No dangerous port exposures found"
+
+  # ===========================================================================
+  # JOB 4: DOCKER-COMPOSE BEST PRACTICES
+  # Checks that the compose file follows ShiftFestival team conventions.
+  # ===========================================================================
+  docker-compose-checks:
+    name: Docker Compose best-practice checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # Verify every Watchtower-enabled service uses a versioned image tag
+      # (not just :latest) in .stable_tags — enforced by deploy.yml,
+      # but we can check the compose file for obvious :latest abuse.
+      # -----------------------------------------------------------------------
+      - name: Check that infra images are pinned versions
+        run: |
+          echo "Checking image pinning for infrastructure services..."
+
+          # These infra images SHOULD be pinned to a specific version
+          # (not :latest) because auto-updates of infra components are risky.
+          SHOULD_BE_PINNED=(
+            "rabbitmq"
+            "postgres"
+            "elasticsearch"
+            "logstash"
+            "kibana"
+            "mariadb"
+          )
+
+          WARNINGS=0
+          for image in "${SHOULD_BE_PINNED[@]}"; do
+            # Check if this image is used with :latest tag
+            if grep -E "${image}:latest" docker-compose.yml 2>/dev/null; then
+              echo "⚠️  WARNING: ${image} is using :latest tag."
+              echo "   Consider pinning to a specific version for stability."
+              WARNINGS=$((WARNINGS + 1))
+            fi
+          done
+
+          if [[ ${WARNINGS} -gt 0 ]]; then
+            echo "⚠️  ${WARNINGS} infrastructure image(s) use :latest."
+            echo "   This is a warning, not a failure. Consider pinning versions."
+          else
+            echo "✅ Infrastructure images are using pinned versions"
+          fi
+
+      # -----------------------------------------------------------------------
+      # Verify all team services have a Watchtower label set explicitly.
+      # Missing labels mean Watchtower behaviour is undefined for that service.
+      # -----------------------------------------------------------------------
+      - name: Check Watchtower labels are set on all services
+        run: |
+          echo "Checking Watchtower labels..."
+
+          # Every service in docker-compose should have the watchtower label
+          # explicitly set to either true or false. We warn if any service
+          # is missing the label entirely.
+          python3 << 'PYTHON'
+          import yaml, sys
+
+          with open("docker-compose.yml") as f:
+              compose = yaml.safe_load(f)
+
+          services = compose.get("services", {})
+          missing_label = []
+          watchtower_label = "com.centurylinklabs.watchtower.enable"
+
+          for name, config in services.items():
+              labels = config.get("labels", {})
+              # Labels can be a list or a dict in docker-compose
+              if isinstance(labels, list):
+                  has_label = any(watchtower_label in l for l in labels)
+              elif isinstance(labels, dict):
+                  has_label = watchtower_label in labels
+              else:
+                  has_label = False
+
+              if not has_label:
+                  missing_label.append(name)
+
+          if missing_label:
+              print(f"⚠️  Services missing Watchtower label: {', '.join(missing_label)}")
+              print("   Add: com.centurylinklabs.watchtower.enable: 'true' or 'false'")
+          else:
+              print("✅ All services have explicit Watchtower labels")
+          PYTHON
+
+      # -----------------------------------------------------------------------
+      # Check that all services are connected to shift_net.
+      # A service not on shift_net cannot communicate with RabbitMQ.
+      # -----------------------------------------------------------------------
+      - name: Check network membership
+        run: |
+          echo "Checking all services are on shift_net..."
+
+          python3 << 'PYTHON'
+          import yaml, sys
+
+          with open("docker-compose.yml") as f:
+              compose = yaml.safe_load(f)
+
+          services = compose.get("services", {})
+          not_on_shift_net = []
+
+          # These services intentionally use elk-net only (kibana, kibana-proxy)
+          elk_only_exceptions = {"kibana", "kibana-proxy", "kibana_proxy"}
+
+          for name, config in services.items():
+              if name in elk_only_exceptions:
+                  continue
+              networks = config.get("networks", [])
+              if isinstance(networks, dict):
+                  network_names = list(networks.keys())
+              elif isinstance(networks, list):
+                  network_names = networks
+              else:
+                  network_names = []
+
+              if "shift_net" not in network_names:
+                  not_on_shift_net.append(name)
+
+          if not_on_shift_net:
+              print(f"⚠️  Services not on shift_net: {', '.join(not_on_shift_net)}")
+              print("   These services cannot reach RabbitMQ or other services.")
+          else:
+              print("✅ All services are connected to shift_net")
+          PYTHON

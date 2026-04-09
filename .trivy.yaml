@@ -1,0 +1,21 @@
+# =============================================================================
+# .trivy.yaml
+# ShiftFestival – Infra Team
+#
+# Configuration for Trivy security scanner.
+# Used by the CI pipeline to scan docker-compose.yml for misconfigurations.
+# =============================================================================
+
+# Only report HIGH and CRITICAL severity issues
+severity:
+  - HIGH
+  - CRITICAL
+
+# Skip these checks that don't apply to our setup
+skip-check-ids:
+  - DS026  # No HEALTHCHECK (we handle this via our own heartbeat system)
+  - DS013  # RUN cd ... (not applicable to compose scans)
+
+# Scan these file types
+scan:
+  - config
