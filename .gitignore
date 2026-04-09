@@ -3,3 +3,8 @@ pgdata/
 .env
 odoo.conf
 config_recovery.php
+.stable_tags
+.rollback_state
+rollback.lock
+.previous_tags
+.deploy_failure

@@ -4,7 +4,7 @@ services:
   # ==========================================
   dozzle:
     container_name: dozzle
-    image: amir20/dozzle:latest
+    image: amir20/dozzle:v8
     restart: unless-stopped
     labels:
     - "com.centurylinklabs.watchtower.enable=false"
@@ -73,7 +73,7 @@ services:
       - shift_net
 
   pgadmin:
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:8.14
     container_name: pgadmin_ui
     restart: always
     environment:
@@ -87,6 +87,37 @@ services:
       - shift_net
     depends_on:
       - postgredb
+
+
+# ==========================================
+# INFRA: Runtime Rollback Monitor
+# ==========================================
+  rollback-monitor:
+    image: docker:24-cli
+    container_name: rollback_monitor
+    restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    environment:
+      - BASE_DIR=/opt/shiftfestival
+      - TEAMS_WEBHOOK_INFRA=${TEAMS_WEBHOOK_INFRA}
+      - TEAMS_WEBHOOK_FRONTEND=${TEAMS_WEBHOOK_FRONTEND}
+      - TEAMS_WEBHOOK_FACTURATIE=${TEAMS_WEBHOOK_FACTURATIE}
+      - TEAMS_WEBHOOK_KASSA=${TEAMS_WEBHOOK_KASSA}
+      - TEAMS_WEBHOOK_CRM=${TEAMS_WEBHOOK_CRM}
+      - TEAMS_WEBHOOK_PLANNING=${TEAMS_WEBHOOK_PLANNING}
+      - TEAMS_WEBHOOK_MONITORING=${TEAMS_WEBHOOK_MONITORING}
+    volumes:
+      # Docker socket zodat het script andere containers kan inspecteren
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Mount de volledige shiftfestival map voor toegang tot scripts en state files
+      - /opt/shiftfestival:/opt/shiftfestival
+    command: >
+      sh -c "apk add --no-cache bash curl jq &&
+            bash /opt/shiftfestival/scripts/runtime-rollback.sh"
+    networks:
+      - shift_net
+
   # ==========================================
   # TEAM FRONTEND (DRUPAL)
   # ==========================================
@@ -430,7 +461,7 @@ services:
 
   # ERP: Odoo web interface
   kassa-web:
-    image: odoo:latest
+    image: odoo:17
     container_name: kassa_odoo
     restart: unless-stopped
     depends_on:
@@ -453,7 +484,7 @@ services:
 
   # PROXY: Handles SSL and exposes Odoo on the assigned port 30030
   kassa-proxy:
-    image: nginx:latest
+    image: nginx:1.27-alpine
     container_name: kassa_proxy
     restart: unless-stopped
     ports:
@@ -674,7 +705,7 @@ services:
   # AUTOMATISERING
   # ==========================================
   watchtower:
-    image: containrrr/watchtower
+    image: containrrr/watchtower:1.7.1
     container_name: watchtower
     restart: unless-stopped
     environment:

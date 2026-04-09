@@ -1,3 +1,29 @@
+# =============================================================================
+# deploy.yml
+# ShiftFestival – Infra Team
+#
+# PURPOSE:
+#   Deploys the full stack to the Azure VM on every push to main.
+#   After bringing containers up it runs health checks, updates .stable_tags
+#   on success, and rolls back + notifies Teams on failure.
+#
+# FLOW:
+#   1. Copy all repo files to VM via SCP
+#   2. Snapshot current image tags → saved as PREVIOUS in env
+#   3. docker compose pull && up -d
+#   4. Health check every service (max 3 attempts, 30s apart)
+#   5a. All healthy → update .stable_tags → notify Teams "deploy OK"
+#   5b. Any unhealthy → rollback to previous tags → notify Teams "deploy FAILED"
+#
+# REQUIRED GITHUB SECRETS:
+#   VM_HOST              – Azure VM IP or hostname
+#   VM_USER              – SSH username (e.g. ehbstudent)
+#   SSH_PRIVATE_KEY      – Private key for SSH access
+#   TEAMS_WEBHOOK_INFRA  – Teams webhook URL for #Infra channel
+#   TEAMS_WEBHOOK_FRONTEND, _FACTURATIE, _KASSA, _CRM, _PLANNING, _MONITORING
+#                        – Teams webhook URLs per team (optional but recommended)
+# =============================================================================
+
 name: Deploy Infra to VM
 
 on:
@@ -8,12 +34,22 @@ on:
 
 jobs:
   deploy:
+    name: Deploy to Azure VM
     runs-on: ubuntu-latest
+
     steps:
+      # -----------------------------------------------------------------------
+      # STEP 1: Check out the repository so we have all files including scripts
+      # -----------------------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Copy files to VM via SSH
+      # -----------------------------------------------------------------------
+      # STEP 2: Copy ALL repo files to the VM
+      # This includes docker-compose.yml, scripts/, nginx configs, etc.
+      # The .env file lives ONLY on the VM and is never in git.
+      # -----------------------------------------------------------------------
+      - name: Copy files to VM via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
@@ -23,7 +59,25 @@ jobs:
           source: "./*"
           target: "/opt/shiftfestival/"
 
-      - name: Docker Compose Up
+      # -----------------------------------------------------------------------
+      # STEP 3: Make scripts executable on the VM
+      # -----------------------------------------------------------------------
+      - name: Set script permissions
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            chmod +x /opt/shiftfestival/scripts/*.sh
+
+      # -----------------------------------------------------------------------
+      # STEP 4: Snapshot current image digests BEFORE pulling new ones.
+      # These are saved to /opt/shiftfestival/.previous_tags so we can
+      # roll back to them if the health check fails.
+      # -----------------------------------------------------------------------
+      - name: Snapshot current image tags (pre-deploy baseline)
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -32,4 +86,361 @@ jobs:
           port: 60022
           script: |
             cd /opt/shiftfestival
+
+            # List of services that have rollback-capable images (team images on GHCR).
+            # Infrastructure images (nginx, postgres, rabbitmq) are pinned versions
+            # and are not rolled back automatically.
+            ROLLBACK_SERVICES=(
+              "frontend_drupal"
+              "fossbilling_app"
+              "fossbilling_connector"
+              "kassa_odoo"
+              "kassa_integratie"
+              "crm_receiver"
+              "planning_service"
+              "identity-service"
+            )
+
+            # Write the current image tag for each running service to .previous_tags.
+            # If a container is not running yet (first deploy), we skip it.
+            echo "# Pre-deploy snapshot – $(date)" > .previous_tags
+            for service in "${ROLLBACK_SERVICES[@]}"; do
+              image=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
+              if [[ -n "${image}" ]]; then
+                echo "${service}=${image}" >> .previous_tags
+                echo "Snapshotted: ${service} = ${image}"
+              else
+                echo "Skipping ${service} (not running yet – first deploy)"
+              fi
+            done
+
+      # -----------------------------------------------------------------------
+      # STEP 5: Pull latest images and bring the stack up.
+      # --remove-orphans cleans up containers from removed compose services.
+      # -----------------------------------------------------------------------
+      - name: Pull latest images and start stack
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+            echo "Pulling latest images..."
+            docker compose pull
+            echo "Starting stack..."
             docker compose up -d --remove-orphans
+            echo "Stack started."
+
+      # -----------------------------------------------------------------------
+      # STEP 6: Health checks – give containers time to start, then verify.
+      # Strategy:
+      #   - Wait 30s for containers to initialise
+      #   - Check docker health status for services that have a HEALTHCHECK
+      #   - For services without a HEALTHCHECK, verify the container is running
+      #   - Retry up to 3 times with 30s between attempts
+      #   - If any service fails all retries → trigger rollback
+      # -----------------------------------------------------------------------
+      - name: Run health checks
+        id: healthcheck
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+
+            echo "Waiting 30s for containers to initialise..."
+            sleep 30
+
+            # Services to health-check after deploy.
+            # Format: "container_name:check_type"
+            #   docker_health  = has a HEALTHCHECK in docker-compose, use docker inspect
+            #   running        = no HEALTHCHECK, just verify it is running
+            SERVICES_TO_CHECK=(
+              "rabbitmq_broker:docker_health"
+              "integration_db:docker_health"
+              "elasticsearch:docker_health"
+              "frontend_drupal:running"
+              "fossbilling_app:running"
+              "fossbilling_connector:running"
+              "kassa_odoo:running"
+              "kassa_integratie:running"
+              "crm_receiver:running"
+              "planning_service:running"
+              "identity-service:running"
+            )
+
+            MAX_RETRIES=3
+            RETRY_INTERVAL=30
+            FAILED_SERVICES=()
+
+            for entry in "${SERVICES_TO_CHECK[@]}"; do
+              container="${entry%%:*}"
+              check_type="${entry##*:}"
+              success=false
+
+              echo "--- Checking: ${container} (${check_type}) ---"
+
+              for attempt in $(seq 1 ${MAX_RETRIES}); do
+                echo "  Attempt ${attempt}/${MAX_RETRIES}..."
+
+                if [[ "${check_type}" == "docker_health" ]]; then
+                  # Use docker's built-in health status
+                  health=$(docker inspect --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "${container}" 2>/dev/null || echo "not_found")
+                  echo "  Health status: ${health}"
+                  if [[ "${health}" == "healthy" ]]; then
+                    success=true
+                    break
+                  fi
+                else
+                  # Just check if the container is running
+                  status=$(docker inspect --format='{{.State.Status}}' "${container}" 2>/dev/null || echo "not_found")
+                  echo "  Container status: ${status}"
+                  if [[ "${status}" == "running" ]]; then
+                    success=true
+                    break
+                  fi
+                fi
+
+                if [[ ${attempt} -lt ${MAX_RETRIES} ]]; then
+                  echo "  Not ready yet. Waiting ${RETRY_INTERVAL}s before retry..."
+                  sleep ${RETRY_INTERVAL}
+                fi
+              done
+
+              if ! ${success}; then
+                echo "  FAILED: ${container} did not become healthy after ${MAX_RETRIES} attempts."
+                FAILED_SERVICES+=("${container}")
+              else
+                echo "  OK: ${container} is healthy."
+              fi
+            done
+
+            # If any service failed, write the list to a file and exit with error
+            if [[ ${#FAILED_SERVICES[@]} -gt 0 ]]; then
+              echo "FAILED_SERVICES=${FAILED_SERVICES[*]}" > /opt/shiftfestival/.deploy_failure
+              echo "Health check FAILED for: ${FAILED_SERVICES[*]}"
+              exit 1
+            fi
+
+            echo "All health checks passed!"
+            # Clean up any leftover failure file from a previous run
+            rm -f /opt/shiftfestival/.deploy_failure
+
+      # -----------------------------------------------------------------------
+      # STEP 7a (SUCCESS PATH): Update .stable_tags with the newly deployed
+      # image references. The runtime-rollback.sh script uses these as the
+      # rollback target if a container crashes after this deploy.
+      # -----------------------------------------------------------------------
+      - name: Update .stable_tags after successful deploy
+        if: success()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+
+            ROLLBACK_SERVICES=(
+              "frontend_drupal"
+              "fossbilling_app"
+              "fossbilling_connector"
+              "kassa_odoo"
+              "kassa_integratie"
+              "crm_receiver"
+              "planning_service"
+              "identity-service"
+            )
+
+            echo "# Automatically managed by deploy.yml – DO NOT EDIT MANUALLY" > .stable_tags
+            echo "# Last updated: $(date)" >> .stable_tags
+
+            for service in "${ROLLBACK_SERVICES[@]}"; do
+              image=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
+              if [[ -n "${image}" ]]; then
+                echo "${service}=${image}" >> .stable_tags
+                echo "Stable tag recorded: ${service} = ${image}"
+              fi
+            done
+
+            # Also reset the rollback counter for all services since this
+            # is now a fresh stable baseline.
+            echo "# Reset after successful deploy $(date)" > .rollback_state
+            echo "Rollback state reset."
+
+      # -----------------------------------------------------------------------
+      # STEP 7b (SUCCESS PATH): Send a success notification to Teams #Infra.
+      # -----------------------------------------------------------------------
+      - name: Notify Teams – deploy success
+        if: success()
+        run: |
+          # Get the commit info for the notification
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          ACTOR="${{ github.actor }}"
+          REF="${{ github.ref_name }}"
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "28A745",
+            "summary": "Deploy successful",
+            "sections": [
+              {
+                "activityTitle": "**[INFO] ✅ Deploy successful – ShiftFestival**",
+                "activitySubtitle": "$(date '+%Y-%m-%d %H:%M:%S')",
+                "text": "All services are healthy after deploy.\n\n**Branch:** \`${REF}\`\n**Commit:** \`${COMMIT_SHA:0:7}\`\n**Message:** ${COMMIT_MSG}\n**Deployed by:** ${ACTOR}\n\n.stable_tags updated with new baseline."
+              }
+            ]
+          }
+          EOF
+          )
+
+          if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
+            curl -s -o /dev/null -w "%{http_code}" \
+              -H "Content-Type: application/json" \
+              -d "${PAYLOAD}" \
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
+          else
+            echo "No Teams webhook configured – skipping notification."
+            echo "Deploy success: ${REF} @ ${COMMIT_SHA:0:7} by ${ACTOR}"
+          fi
+
+      # -----------------------------------------------------------------------
+      # STEP 8a (FAILURE PATH): Collect logs from failed containers.
+      # -----------------------------------------------------------------------
+      - name: Collect failure logs
+        if: failure()
+        id: collect_logs
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+
+            # Read which services failed from the file written by the health check step
+            if [[ -f .deploy_failure ]]; then
+              source .deploy_failure
+              echo "Failed services: ${FAILED_SERVICES}"
+            fi
+
+            # Collect the last 30 log lines from each failed container
+            LOG_OUTPUT=""
+            for service in ${FAILED_SERVICES}; do
+              LOG_OUTPUT+="=== ${service} ===\n"
+              LOG_OUTPUT+=$(docker logs --tail 30 "${service}" 2>&1 || echo "Could not retrieve logs")
+              LOG_OUTPUT+="\n\n"
+            done
+
+            # Save to a temp file so the rollback step can read it
+            echo "${LOG_OUTPUT}" > /tmp/deploy_failure_logs.txt
+            echo "Logs collected."
+
+      # -----------------------------------------------------------------------
+      # STEP 8b (FAILURE PATH): Roll back to the previous image tags.
+      # We pinned these in STEP 4 (.previous_tags file).
+      # -----------------------------------------------------------------------
+      - name: Rollback to previous image tags
+        if: failure()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+
+            echo "=== ROLLBACK INITIATED ==="
+
+            # Check if we have a previous snapshot to roll back to
+            if [[ ! -f .previous_tags ]]; then
+              echo "No .previous_tags file found – this may be the first deploy."
+              echo "Cannot roll back. Manual intervention required."
+              exit 0
+            fi
+
+            # Pause Watchtower to prevent it pulling :latest during rollback
+            echo "Pausing Watchtower..."
+            docker pause watchtower 2>/dev/null || echo "Watchtower not running."
+
+            # Roll back each service that has a previous tag recorded
+            ROLLBACK_COUNT=0
+            while IFS='=' read -r service image; do
+              # Skip comment lines
+              [[ "${service}" =~ ^#.*$ ]] && continue
+              [[ -z "${service}" ]] && continue
+
+              echo "Rolling back ${service} to ${image}..."
+
+              # Pull the previous image
+              if docker pull "${image}" 2>/dev/null; then
+                # Tag it as latest so compose picks it up
+                image_repo="${image%%:*}"
+                docker tag "${image}" "${image_repo}:latest" 2>/dev/null || true
+
+                # Restart just this service
+                docker compose up -d --no-deps "${service}" 2>/dev/null \
+                  && echo "  ✅ ${service} rolled back to ${image}" \
+                  || echo "  ❌ ${service} compose-up failed after rollback pull"
+
+                (( ROLLBACK_COUNT++ ))
+              else
+                echo "  ❌ Could not pull ${image} – skipping rollback for ${service}"
+              fi
+            done < .previous_tags
+
+            echo "Rollback complete. ${ROLLBACK_COUNT} service(s) restored."
+
+            # Unpause Watchtower now that images are pinned to previous versions
+            sleep 5
+            docker unpause watchtower 2>/dev/null || true
+            echo "Watchtower unpaused."
+
+      # -----------------------------------------------------------------------
+      # STEP 8c (FAILURE PATH): Notify Teams about the failed deploy + rollback.
+      # -----------------------------------------------------------------------
+      - name: Notify Teams – deploy failed + rollback executed
+        if: failure()
+        run: |
+          COMMIT_SHA="${{ github.sha }}"
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          ACTOR="${{ github.actor }}"
+          REF="${{ github.ref_name }}"
+
+          PAYLOAD=$(cat <<EOF
+          {
+            "@type": "MessageCard",
+            "@context": "http://schema.org/extensions",
+            "themeColor": "FF0000",
+            "summary": "Deploy FAILED – rollback executed",
+            "sections": [
+              {
+                "activityTitle": "**[CRITICAL] 🔴 Deploy FAILED – rollback executed**",
+                "activitySubtitle": "$(date '+%Y-%m-%d %H:%M:%S')",
+                "text": "One or more services failed their health check after deploy. The stack has been automatically rolled back to the previous stable version.\n\n**Branch:** \`${REF}\`\n**Commit:** \`${COMMIT_SHA:0:7}\`\n**Message:** ${COMMIT_MSG}\n**Pushed by:** ${ACTOR}\n\n**Action required:** Check the GitHub Actions logs for details on which containers failed and why. Fix the issue before pushing again."
+              }
+            ]
+          }
+          EOF
+          )
+
+          if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
+            curl -s -o /dev/null \
+              -H "Content-Type: application/json" \
+              -d "${PAYLOAD}" \
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
+          else
+            echo "No Teams webhook configured – skipping notification."
+            echo "CRITICAL: Deploy failed for ${REF} @ ${COMMIT_SHA:0:7}"
+          fi
