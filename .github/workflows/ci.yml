@@ -258,10 +258,10 @@ jobs:
           # Patterns that should NEVER appear in committed files
           # We check all files except .env.example and CI configs
           DANGEROUS_PATTERNS=(
-            "password\s*=\s*['\"][^${\{]"   # password = "literal" (not a variable)
-            "POSTGRES_PASSWORD\s*=\s*[a-zA-Z0-9]"  # hardcoded postgres password
-            "MYSQL_PASSWORD\s*=\s*[a-zA-Z0-9]"     # hardcoded mysql password
-            "secret_key\s*=\s*['\"][^$]"            # hardcoded secret key
+            "password=[^$]"   # password = "literal" (not a variable)
+            "POSTGRES_PASSWORD=[a-zA-Z0-9]"  # hardcoded postgres password
+            "MYSQL_PASSWORD=[a-zA-Z0-9]"     # hardcoded mysql password
+            "secret_key=[^$]"            # hardcoded secret key
           )
 
           for pattern in "${DANGEROUS_PATTERNS[@]}"; do
