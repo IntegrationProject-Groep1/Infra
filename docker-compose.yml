@@ -562,6 +562,9 @@ services:
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_PORT=${MYSQL_PORT}
+      # Required for MySQL to initialize on a fresh volume.
+      # We use a random root password since the app connects via MYSQL_USER, not root.
+      - MYSQL_RANDOM_ROOT_PASSWORD=1
     volumes:
       - crm_db_data:/var/lib/mysql
     networks:
