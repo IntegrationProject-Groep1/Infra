@@ -271,6 +271,9 @@ services:
       - RABBITMQ_USER=${RABBITMQMONITORING_USER}
       - RABBITMQ_PASS=${RABBITMQMONITORING_PASS}
       - RABBITMQ_VHOST=${RABBIT_VHOST}
+      - RABBITMQMONITORING_USER=${RABBITMQMONITORING_USER}
+      - RABBITMQMONITORING_PASS=${RABBITMQMONITORING_PASS}
+      - RABBITMQ_VHOST=${RABBIT_VHOST}
     labels:
     - "com.centurylinklabs.watchtower.enable=false"
     volumes:
@@ -466,7 +469,7 @@ services:
 
   # ERP: Odoo web interface
   kassa-web:
-    image: odoo:17
+    image: odoo:latest
     container_name: kassa_odoo
     restart: unless-stopped
     depends_on:

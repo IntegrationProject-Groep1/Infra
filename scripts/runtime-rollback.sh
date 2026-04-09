@@ -622,12 +622,15 @@ main() {
 
     # Load .env if it exists (for local testing without exporting env vars)
     if [[ -f "${BASE_DIR}/.env" ]]; then
-        # shellcheck source=/dev/null
-        set -a
-        source "${BASE_DIR}/.env"
-        set +a
-        log ".env loaded."
-    fi
+    while IFS= read -r line || [[ -n "${line}" ]]; do
+        # Skip comments and empty lines
+        [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+        [[ -z "${line}" ]] && continue
+        # Export raw value without bash interpolation
+        export "${line?}"
+    done < "${BASE_DIR}/.env"
+    log ".env loaded."
+fi
 
     # Ensure state files exist so subsequent reads never fail
     touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}"
