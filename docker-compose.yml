@@ -1,12 +1,13 @@
 services:
   # ==========================================
-  # CORE INFRASTRUCTUUR
+  # CORE INFRASTRUCTURE
   # ==========================================
   dozzle:
     container_name: dozzle
     image: amir20/dozzle:latest
     restart: unless-stopped
-    # Dozzle draait intern op 8080, Nginx spreekt deze poort aan
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -17,12 +18,12 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      # Mapping van de open Azure poort 30002 naar de SSL poort 443 van Nginx
+      # Map Azure port 30002 to internal SSL port 443
       - "30002:443"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
-      # Certificaten voor de HTTPS verbinding
       - ./certs:/certs:ro
-      # Koppeling naar de Nginx configuratie file
       - ./dozzle-nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - dozzle
@@ -35,19 +36,639 @@ services:
     hostname: my-rabbit
     restart: unless-stopped
     ports:
-      # AMQP poort voor dataverkeer van applicaties
-      - "5672:5672"
-      # RabbitMQ Management via SSL op poort 30001
+      # AMQP port for application data traffic
+      - "30000:5672"
+      # RabbitMQ Management UI via SSL on port 30001
       - "30001:15671"
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./certs:/etc/rabbitmq/certs:ro
       - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     networks:
       - shift_net
+
+  postgredb:
+    image: postgres:16-alpine
+    container_name: integration_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    ports:
+      - "${EXTERNAL_DB_PORT:-30004}:5432"
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    networks:
+      - shift_net
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin_ui
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "30005:80"  # Port 30005 for the pgAdmin web interface
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    networks:
+      - shift_net
+    depends_on:
+      - postgredb
+  # ==========================================
+  # TEAM FRONTEND (DRUPAL)
+  # ==========================================
+  frontend-db:
+    image: mariadb:10.11
+    container_name: frontend_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DRUPAL_DB_ROOT_PASS}
+      MYSQL_DATABASE: ${DRUPAL_DB_NAME:-drupal}
+      MYSQL_USER: ${DRUPAL_DB_USER:-drupal_user}
+      MYSQL_PASSWORD: ${DRUPAL_DB_PASS}
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      # Persistent storage for database tables and users
+      - frontend_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shift_net
+
+  frontend-drupal:
+    image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
+    container_name: frontend_drupal
+    restart: unless-stopped
+    environment:
+      DRUPAL_DB_HOST: frontend_db
+      DRUPAL_DB_NAME: ${DRUPAL_DB_NAME:-drupal}
+      DRUPAL_DB_USER: ${DRUPAL_DB_USER:-drupal_user}
+      DRUPAL_DB_PASSWORD: ${DRUPAL_DB_PASS}
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQFRONTEND_USER}
+      RABBITMQ_PASS: ${RABBITMQFRONTEND_PASS}
+      RABBITMQ_VHOST: /
+      RABBITMQ_HOST: rabbitmq_broker
+      # Port and Reverse Proxy settings for Azure VM
+      DRUPAL_REVERSE_PROXY: "true"
+      DRUPAL_BASE_URL: ${DRUPAL_BASE_URL}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      # Only mount the files directory to keep uploads persistent.
+      # Themes and modules will be loaded directly from the Docker image.
+      - frontend_drupal_files:/var/www/html/sites/default/files
+      # - frontend_drupal_config:/var/www/html/sites/default
+    depends_on:
+      frontend-db:
+        condition: service_healthy
+    networks:
+      - shift_net
+
+  frontend-proxy:
+    container_name: frontend_proxy
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      # Map Azure port 30020 to internal SSL port 443
+      - "30020:443"
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - ./certs:/certs:ro
+      - ./frontend-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend-drupal
+    networks:
+      - shift_net
+
+  frontend-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: frontend_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=frontend
+      - TARGETS=frontend_drupal:80
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQFRONTEND_USER}
+      - RABBITMQ_PASS=${RABBITMQFRONTEND_PASS}
+      - RABBITMQ_VHOST=/
+    labels:
+    - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - frontend-drupal
+      - rabbitmq
+    networks:
+      - shift_net
+
+  # ==========================================================
+  # MONITORING & LOGGING (ELK STACK)
+  # Centralized logging for heartbeats and system metrics
+  # ==========================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ES_ADMIN_PASS}
+      # Set JVM heap size via .env (e.g., ES_MEM_LIMIT=1g) to prevent OOM crashes
+      - "ES_JAVA_OPTS=-Xms${ES_MEM_LIMIT} -Xmx${ES_MEM_LIMIT}"
+    ports:
+      # Requested port 30060 for external Elasticsearch access
+      - "30060:9200"
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    networks:
+      - shift_net  # Required to communicate with Logstash and RabbitMQ
+      - elk-net
+    healthcheck:
+      # Ensures ES is ready before dependent services start
+      test: ["CMD-SHELL", "curl -s -u ${ES_ADMIN_USER}:${ES_ADMIN_PASS} http://localhost:9200/_cluster/health | grep -qE 'status\":\"(green|yellow)'"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  # Config Container that only provides the logstash.conf
+  logstash-config:
+    image: ghcr.io/integrationproject-groep1/monitoring:latest
+    container_name: logstash_config
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    # This container just needs to exist to provide the volume
+    volumes:
+      - logstash-pipeline:/usr/share/logstash/pipeline
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.17.0
+    container_name: logstash
+    restart: unless-stopped
+    environment:
+      - xpack.monitoring.enabled=false
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ES_ADMIN_USER=${ES_ADMIN_USER}
+      - ES_ADMIN_PASS=${ES_ADMIN_PASS}
+      - RABBITMQ_HOST=${RABBIT_HOST}
+      - RABBITMQ_PORT=${RABBIT_PORT}
+      # logstash.conf reads RABBITMQ_USER / RABBITMQ_PASS inside the container
+      - RABBITMQ_USER=${RABBITMQMONITORING_USER}
+      - RABBITMQ_PASS=${RABBITMQMONITORING_PASS}
+      - RABBITMQ_VHOST=${RABBIT_VHOST}
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      # We mount the volume provided by the config container
+      - logstash-pipeline:/usr/share/logstash/pipeline:ro
+    networks:
+      - shift_net
+      - elk-net
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      logstash-config:
+        condition: service_started
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=kibana_system
+      - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASS}
+      - XPACK_SECURITY_ENABLED=true
+    networks:
+      - elk-net
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  kibana-proxy:
+    container_name: kibana_proxy
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "30061:443"  # External port 30061 to Nginx 443
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - ./certs:/certs:ro
+      - ./kibana-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - kibana
+    networks:
+      - elk-net
+
+  monitoring-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: monitoring_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=monitoring
+      - TARGETS=kibana:5601,elasticsearch:9200
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQMONITORING_USER}
+      - RABBITMQ_PASS=${RABBITMQMONITORING_PASS}
+      - RABBITMQ_VHOST=${RABBIT_VHOST:-/}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      kibana:
+        condition: service_started
+    networks:
+      - shift_net
+      - elk-net
+
+  # ==========================================
+  # TEAM FACTURATIE
+  # ==========================================
+  fossbilling-db:
+    image: mariadb:10.11
+    container_name: fossbilling_db
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${FOSSBILLING_DB_NAME}
+      MYSQL_USER: ${FOSSBILLING_DB_USER}
+      MYSQL_PASSWORD: ${FOSSBILLING_DB_PASS}
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - fossbilling_db_data:/var/lib/mysql
+    networks:
+      - shift_net
+
+  fossbilling-app:
+    image: fossbilling/fossbilling:latest
+    container_name: fossbilling_app
+    restart: unless-stopped
+    environment:
+      DB_HOST: fossbilling_db
+      DB_NAME: ${FOSSBILLING_DB_NAME}
+      DB_USER: ${FOSSBILLING_DB_USER}
+      DB_PASSWORD: ${FOSSBILLING_DB_PASS}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      # Mount the recovery config directly over the expected location
+      - ./config_recovery.php:/var/www/html/config.php:ro
+      - fossbilling_app_data:/var/www/html/data
+      - fossbilling_uploads:/var/www/html/uploads
+    depends_on:
+      fossbilling-db:
+        condition: service_started
+    networks:
+      - shift_net
+
+  fossbilling-connector:
+    image: ghcr.io/integrationproject-groep1/facturatie:latest
+    container_name: fossbilling_connector
+    restart: unless-stopped
+    environment:
+      PYTHONPATH: /app
+      BILLING_API_URL: http://fossbilling_app/api
+      RABBITMQ_HOST: rabbitmq_broker
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQFACTURATIE_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQFACTURATIE_PASS}
+      DB_HOST: fossbilling_db
+      DB_NAME: ${FOSSBILLING_DB_NAME}
+      DB_USER: ${FOSSBILLING_DB_USER}
+      DB_PASSWORD: ${FOSSBILLING_DB_PASS}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - fossbilling-app
+      - rabbitmq
+    networks:
+      - shift_net
+
+  fossbilling-proxy:
+    container_name: fossbilling_proxy
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "30010:443"
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - ./certs:/certs:ro
+      - ./fossbilling-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - fossbilling-app
+    networks:
+      - shift_net
+
+  fossbilling-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: fossbilling_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=facturatie
+      - TARGETS=fossbilling_app:80
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQFACTURATIE_USER}
+      - RABBITMQ_PASS=${RABBITMQFACTURATIE_PASS}
+      - RABBITMQ_VHOST=/
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - fossbilling-app
+      - rabbitmq
+    networks:
+      - shift_net
+
+# ==========================================
+# TEAM KASSA (ODOO) - Port Range 30030-30039
+# ==========================================
+
+  # DATABASE: PostgreSQL 15 storage for Odoo
+  kassa-db:
+    image: postgres:15
+    container_name: kassa_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_USER=${POSTGRES_USER}
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - kassa_db_data:/var/lib/postgresql/data
+    networks:
+      - shift_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ERP: Odoo web interface
+  kassa-web:
+    image: odoo:latest
+    container_name: kassa_odoo
+    restart: unless-stopped
+    depends_on:
+      kassa-db:
+        condition: service_healthy
+    # No direct ports here; we access this through the kassa-proxy
+    command: odoo -d odoo_kassa --db-filter=^odoo_kassa$
+    environment:
+      - HOST=kassa-db
+      - USER=${POSTGRES_USER}
+      - PASSWORD=${POSTGRES_PASSWORD}
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - ./addons:/mnt/extra-addons
+      - ./odoo.conf:/etc/odoo/odoo.conf:ro
+      - kassa_odoo_data:/var/lib/odoo
+    networks:
+      - shift_net
+
+  # PROXY: Handles SSL and exposes Odoo on the assigned port 30030
+  kassa-proxy:
+    image: nginx:latest
+    container_name: kassa_proxy
+    restart: unless-stopped
+    ports:
+      - "30030:443"
+    labels:
+    - "com.centurylinklabs.watchtower.enable=false"
+    volumes:
+      - ./kassa-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/certs:ro
+    depends_on:
+      - kassa-web
+    networks:
+      - shift_net
+
+  # INTEGRATION: Team Kassa custom logic
+  kassa-integratie:
+    image: ghcr.io/integrationproject-groep1/kassa:latest
+    container_name: kassa_integratie
+    restart: unless-stopped
+    depends_on:
+      - kassa-web
+    environment:
+      - ODOO_URL=${ODOO_URL}
+      - ODOO_DB=${ODOO_DB}
+      - ODOO_USER=${ODOO_USER}
+      - ODOO_PASS=${ODOO_PASS}
+      - RABBIT_HOST=${RABBIT_HOST}
+      - RABBIT_PORT=${RABBIT_PORT}
+      - RABBIT_USER=${RABBITMQKASSA_USER}
+      - RABBIT_PASS=${RABBITMQKASSA_PASS}
+      - RABBIT_VHOST=${RABBIT_VHOST}
+      - RABBIT_AUTO_SETUP_TOPOLOGY=${RABBIT_AUTO_SETUP_TOPOLOGY}
+      - RABBIT_EXCHANGE=${RABBIT_EXCHANGE}
+      - RABBIT_INCOMING_QUEUE=${RABBIT_INCOMING_QUEUE}
+      - POLL_INTERVAL=${POLL_INTERVAL}
+      - ODOO_MASTER_PASS=${ODOO_MASTER_PASS}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    volumes:
+      - kassa_outbox_data:/app/outbox
+    networks:
+      - shift_net
+
+  kassa-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: kassa_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=kassa
+      - TARGETS=kassa-web:8069
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQKASSA_USER}
+      - RABBITMQ_PASS=${RABBITMQKASSA_PASS}
+      - RABBITMQ_VHOST=/
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - kassa-web
+      - rabbitmq
+    networks:
+      - shift_net
+
+  # =========================================================================
+  # CRM System (Receiver Worker) & Heartbeat Sidecar
+  # =========================================================================
+
+  # CRM Receiver: Background worker that processes incoming RabbitMQ messages
+  # and syncs data to Salesforce and Supabase.
+  crm-receiver:
+    image: ghcr.io/integrationproject-groep1/crm:latest
+    container_name: crm_receiver
+    restart: unless-stopped
+    ports:
+      - "30040:3000"
+    environment:
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQCRM_USER}
+      - RABBITMQ_PASS=${RABBITMQCRM_PASSRAW}
+      - RABBITMQ_VHOST=/
+      # External API Keys (Ensure these are present in the host's .env file)
+      - SF_INSTANCE_URL=${SF_INSTANCE_URL}
+      - SF_CLIENT_ID=${SF_CLIENT_ID}
+      - SF_CLIENT_SECRET=${SF_CLIENT_SECRET}
+      - SF_REFRESH_TOKEN=${SF_REFRESH_TOKEN}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - rabbitmq
+    networks:
+      - shift_net
+
+# DATABASE: MySQL for Team CRM
+  crm-db:
+    image: mysql:8.0
+    container_name: crm_db
+    restart: unless-stopped
+    environment:
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_PORT=${MYSQL_PORT}
+      # Required for MySQL to initialize on a fresh volume.
+      # We use a random root password since the app connects via MYSQL_USER, not root.
+      - MYSQL_RANDOM_ROOT_PASSWORD=1
+    volumes:
+      - crm_db_data:/var/lib/mysql
+    networks:
+      - shift_net
+
+  # CRM Heartbeat: Monitors the CRM Receiver.
+  crm-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: crm_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=crm
+      # IMPORTANT: Currently set to port 80 as a placeholder.
+      # Since crm_receiver is a worker, it may not expose an HTTP port.
+      # If this fails, we must confirm the health-check port with Team CRM.
+      - TARGETS=crm_receiver:3000
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQCRM_USER}
+      # Password contains special chars (#, $) — must be quoted in .env: RABBITMQCRM_PASSRAW="your_password_here"
+      - RABBITMQ_PASS=${RABBITMQCRM_PASSRAW}
+      - RABBITMQ_VHOST=/
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - crm-receiver
+    networks:
+      - shift_net
+
+  # =========================================================================
+  # PLANNING SYSTEM & Heartbeat Sidecar
+  # =========================================================================
+
+  # Planning Service: Centralized scheduling and resource management.
+  # Assigned port range: 30050 - 30059.
+  planning-service:
+    image: ghcr.io/integrationproject-groep1/planning:latest
+    container_name: planning_service
+    restart: unless-stopped
+    ports:
+      # Expose internal service port 30050 to the host for external access.
+      - "30050:30050"
+    environment:
+      # Map internal RabbitMQ connection details to our central broker.
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_PORT=5672
+      - RABBITMQ_USER=${RABBITMQPLANNING_USER}
+      - RABBITMQ_PASS=${RABBITMQPLANNING_PASS}
+      - RABBITMQ_VHOST=/
+      # Add additional environment variables from team planning's .env here if required.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    networks:
+      - shift_net
+    depends_on:
+      - rabbitmq
+
+  # Planning Heartbeat: Monitoring sidecar for the Planning Service.
+  # Verifies service availability on internal port 30050.
+  planning-heartbeat:
+    image: ghcr.io/integrationproject-groep1/heartbeat:latest
+    container_name: planning_heartbeat
+    restart: unless-stopped
+    environment:
+      - SYSTEM_NAME=planning
+      # Monitoring target: internal container name and port.
+      - TARGETS=planning_service:30050
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBITMQ_USER=${RABBITMQPLANNING_USER}
+      - RABBITMQ_PASS=${RABBITMQPLANNING_PASS}
+      - RABBITMQ_VHOST=/
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - planning-service
+      - rabbitmq
+    networks:
+      - shift_net
+  # ==========================================
+  # BUFFER (30070 - 30100)
+  # ==========================================
+  identity-service:
+    image: ghcr.io/integrationproject-groep1/identity-service:latest
+    container_name: identity-service
+    restart: always
+    environment:
+      - DB_HOST=postgredb
+      - DB_PORT=5432
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - RABBITMQ_HOST=rabbitmq_broker
+      - RABBIT_HOST=rabbitmq_broker
+      - RABBIT_USER=${IDENTITY_RABBIT_USER}
+      - RABBIT_PASS=${IDENTITY_RABBIT_PASS}
+      - RABBITMQ_USER=${IDENTITY_RABBIT_USER}
+      - RABBITMQ_PASS=${IDENTITY_RABBIT_PASS}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+    depends_on:
+      - postgredb
+      - rabbitmq
+    networks:
+      - shift_net
+
 
   # ==========================================
   # AUTOMATISERING
@@ -57,18 +678,40 @@ services:
     container_name: watchtower
     restart: unless-stopped
     environment:
-      # Oplossing voor de Docker API versie mismatch
+      # Fix for Docker API version mismatch between Watchtower and the host daemon
       - DOCKER_API_VERSION=1.40
+      # Only update containers that have the watchtower enable label set to true
+      - WATCHTOWER_LABEL_ENABLE=true
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --cleanup
+      - /home/ehbstudent/.docker/config.json:/config.json:ro
+    command: --interval 60 --cleanup
 
 networks:
   shift_net:
     name: shiftfestival_network
+  elk-net:
+    name: elk-net
 
 volumes:
   rabbitmq_data:
-    # Gebruik het bestaande externe volume voor data-persistentie
+    # Use the existing external volume for data persistence
     external: true
     name: shiftfestival_rabbitmq_data
+  frontend_db_data:
+  frontend_drupal_files:
+  frontend_drupal_config:
+  fossbilling_db_data:
+  fossbilling_app_data:
+  fossbilling_uploads:
+  kassa_db_data:
+    name: shiftfestival_kassa_db_data
+  kassa_odoo_data:
+    name: shiftfestival_kassa_odoo_data
+  kassa_outbox_data:
+    name: shiftfestival_kassa_outbox_data
+  es-data:
+  logstash-pipeline:
+  fossbilling_config:
+  crm_db_data:
+    name: shiftfestival_crm_db_data

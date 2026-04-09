@@ -1,0 +1,5 @@
+certs/
+pgdata/
+.env
+odoo.conf
+config_recovery.php
