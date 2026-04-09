@@ -19,7 +19,7 @@
 #   VM_HOST              – Azure VM IP or hostname
 #   VM_USER              – SSH username (e.g. ehbstudent)
 #   SSH_PRIVATE_KEY      – Private key for SSH access
-#   TEAMS_WEBHOOK_INFRA  – Teams webhook URL for #Infra channel
+#   TEAMS_WEBHOOK_INFRA  – Teams webhook URL for #Infra channel (Power Automate)
 #   TEAMS_WEBHOOK_FRONTEND, _FACTURATIE, _KASSA, _CRM, _PLANNING, _MONITORING
 #                        – Teams webhook URLs per team (optional but recommended)
 # =============================================================================
@@ -31,11 +31,25 @@ on:
     branches:
       - main
   workflow_dispatch:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches:
+      - main
 
 jobs:
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
+    # Only deploy if:
+    # - Triggered manually (workflow_dispatch)
+    # - Triggered by a push directly
+    # - Triggered by CI Pipeline AND it succeeded
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       # -----------------------------------------------------------------------
@@ -171,7 +185,6 @@ jobs:
               "kassa_integratie:running"
               "crm_receiver:running"
               "planning_service:running"
-              "identity-service:running"
             )
 
             MAX_RETRIES=3
@@ -276,11 +289,11 @@ jobs:
 
       # -----------------------------------------------------------------------
       # STEP 7b (SUCCESS PATH): Send a success notification to Teams #Infra.
+      # Uses Power Automate Adaptive Card format (not legacy MessageCard).
       # -----------------------------------------------------------------------
       - name: Notify Teams – deploy success
         if: success()
         run: |
-          # Get the commit info for the notification
           COMMIT_SHA="${{ github.sha }}"
           COMMIT_MSG="${{ github.event.head_commit.message }}"
           ACTOR="${{ github.actor }}"
@@ -288,26 +301,53 @@ jobs:
 
           PAYLOAD=$(cat <<EOF
           {
-            "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
-            "themeColor": "28A745",
-            "summary": "Deploy successful",
-            "sections": [
-              {
-                "activityTitle": "**[INFO] ✅ Deploy successful – ShiftFestival**",
-                "activitySubtitle": "$(date '+%Y-%m-%d %H:%M:%S')",
-                "text": "All services are healthy after deploy.\n\n**Branch:** \`${REF}\`\n**Commit:** \`${COMMIT_SHA:0:7}\`\n**Message:** ${COMMIT_MSG}\n**Deployed by:** ${ACTOR}\n\n.stable_tags updated with new baseline."
+            "type": "message",
+            "attachments": [{
+              "contentType": "application/vnd.microsoft.card.adaptive",
+              "contentUrl": null,
+              "content": {
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": [
+                  {
+                    "type": "TextBlock",
+                    "text": "✅ Deploy successful – ShiftFestival",
+                    "weight": "Bolder",
+                    "size": "Medium",
+                    "color": "Good",
+                    "wrap": true
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')",
+                    "isSubtle": true,
+                    "size": "Small"
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "Branch: ${REF} | Commit: ${COMMIT_SHA:0:7} | By: ${ACTOR}",
+                    "wrap": true,
+                    "spacing": "Medium"
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "${COMMIT_MSG}",
+                    "wrap": true,
+                    "isSubtle": true
+                  }
+                ]
               }
-            ]
+            }]
           }
           EOF
           )
 
           if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-            curl -s -o /dev/null -w "%{http_code}" \
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Content-Type: application/json" \
               -d "${PAYLOAD}" \
-              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}")
+            echo "Teams notification sent (HTTP ${HTTP_STATUS})"
           else
             echo "No Teams webhook configured – skipping notification."
             echo "Deploy success: ${REF} @ ${COMMIT_SHA:0:7} by ${ACTOR}"
@@ -409,6 +449,7 @@ jobs:
 
       # -----------------------------------------------------------------------
       # STEP 8c (FAILURE PATH): Notify Teams about the failed deploy + rollback.
+      # Uses Power Automate Adaptive Card format (not legacy MessageCard).
       # -----------------------------------------------------------------------
       - name: Notify Teams – deploy failed + rollback executed
         if: failure()
@@ -420,26 +461,60 @@ jobs:
 
           PAYLOAD=$(cat <<EOF
           {
-            "@type": "MessageCard",
-            "@context": "http://schema.org/extensions",
-            "themeColor": "FF0000",
-            "summary": "Deploy FAILED – rollback executed",
-            "sections": [
-              {
-                "activityTitle": "**[CRITICAL] 🔴 Deploy FAILED – rollback executed**",
-                "activitySubtitle": "$(date '+%Y-%m-%d %H:%M:%S')",
-                "text": "One or more services failed their health check after deploy. The stack has been automatically rolled back to the previous stable version.\n\n**Branch:** \`${REF}\`\n**Commit:** \`${COMMIT_SHA:0:7}\`\n**Message:** ${COMMIT_MSG}\n**Pushed by:** ${ACTOR}\n\n**Action required:** Check the GitHub Actions logs for details on which containers failed and why. Fix the issue before pushing again."
+            "type": "message",
+            "attachments": [{
+              "contentType": "application/vnd.microsoft.card.adaptive",
+              "contentUrl": null,
+              "content": {
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": [
+                  {
+                    "type": "TextBlock",
+                    "text": "🔴 Deploy FAILED – rollback executed",
+                    "weight": "Bolder",
+                    "size": "Medium",
+                    "color": "Attention",
+                    "wrap": true
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')",
+                    "isSubtle": true,
+                    "size": "Small"
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "Branch: ${REF} | Commit: ${COMMIT_SHA:0:7} | By: ${ACTOR}",
+                    "wrap": true,
+                    "spacing": "Medium"
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "${COMMIT_MSG}",
+                    "wrap": true,
+                    "isSubtle": true
+                  },
+                  {
+                    "type": "TextBlock",
+                    "text": "⚠️ Check GitHub Actions logs for details on which containers failed.",
+                    "wrap": true,
+                    "color": "Attention",
+                    "spacing": "Medium"
+                  }
+                ]
               }
-            ]
+            }]
           }
           EOF
           )
 
           if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-            curl -s -o /dev/null \
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
               -H "Content-Type: application/json" \
               -d "${PAYLOAD}" \
-              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}")
+            echo "Teams notification sent (HTTP ${HTTP_STATUS})"
           else
             echo "No Teams webhook configured – skipping notification."
             echo "CRITICAL: Deploy failed for ${REF} @ ${COMMIT_SHA:0:7}"
