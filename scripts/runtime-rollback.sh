@@ -184,7 +184,8 @@ send_teams_message() {
     local body_escaped
     body_escaped=$(printf '%s' "${body}" | sed 's/\\/\\\\/g; s/"/\\"/g; :a;N;$!ba;s/\n/\\n/g')
 
-    local payload="{
+    local payload
+    payload="{
     \"type\": \"message\",
     \"attachments\": [{
         \"contentType\": \"application/vnd.microsoft.card.adaptive\",
@@ -218,20 +219,6 @@ send_teams_message() {
         log "Teams notification sent: ${title}"
     else
         error "Teams webhook returned HTTP ${http_status} for: ${title}"
-    fi
-}
-
-    # Send the card; suppress output but capture HTTP status code
-    local http_status
-    http_status=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "Content-Type: application/json" \
-        -d "${payload}" \
-        "${webhook_url}")
-
-    if [[ "${http_status}" != "200" ]]; then
-        error "Teams webhook returned HTTP ${http_status} for: ${title}"
-    else
-        log "Teams notification sent: ${title}"
     fi
 }
 
