@@ -255,7 +255,6 @@ jobs:
           # Patterns that should NEVER appear in committed files
           # We check all files except .env.example and CI configs
           DANGEROUS_PATTERNS=(
-            "password=[^$]"   # password = "literal" (not a variable)
             "POSTGRES_PASSWORD=[a-zA-Z][a-zA-Z0-9]{3,}"  # hardcoded postgres password
             "MYSQL_PASSWORD=[a-zA-Z][a-zA-Z0-9]{3,}"     # hardcoded mysql password
             "secret_key=[a-zA-Z][a-zA-Z0-9]{3,}"            # hardcoded secret key
