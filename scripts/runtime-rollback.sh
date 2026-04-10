@@ -114,7 +114,6 @@ MONITORED_SERVICES=(
     "crm_receiver"
     "planning_service"
     "identity-service"
-    "monitoring_heartbeat"
 )
 
 # =============================================================================
@@ -180,45 +179,57 @@ send_teams_message() {
     local body="$4"
     local log_snippet="${5:-}"
 
-    # Escape special characters for JSON embedding
-    local body_escaped
-    body_escaped=$(printf '%s' "${body}" | sed 's/\\/\\\\/g; s/"/\\"/g; :a;N;$!ba;s/\n/\\n/g')
+    # Choose a colour bar for the Teams card based on severity
+    local color
+    case "${severity}" in
+        CRITICAL) color="FF0000" ;;   # red
+        WARNING)  color="FFA500" ;;   # orange
+        INFO)     color="0078D4" ;;   # teams blue
+        *)        color="808080" ;;   # grey fallback
+    esac
 
+    # Build the Adaptive Card JSON payload
+    # We keep it simple (MessageCard format) for maximum Teams compatibility.
     local payload
-    payload="{
-    \"type\": \"message\",
-    \"attachments\": [{
-        \"contentType\": \"application/vnd.microsoft.card.adaptive\",
-        \"contentUrl\": null,
-        \"content\": {
-            \"type\": \"AdaptiveCard\",
-            \"version\": \"1.4\",
-            \"body\": [
-                {\"type\": \"TextBlock\", \"text\": \"[${severity}] ${title}\", \"weight\": \"Bolder\", \"size\": \"Medium\", \"wrap\": true},
-                {\"type\": \"TextBlock\", \"text\": \"ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')\", \"isSubtle\": true, \"size\": \"Small\"},
-                {\"type\": \"TextBlock\", \"text\": \"${body_escaped}\", \"wrap\": true}
-            ]
-        }
-    }]
-}"
+    payload=$(cat <<EOF
+{
+  "@type": "MessageCard",
+  "@context": "http://schema.org/extensions",
+  "themeColor": "${color}",
+  "summary": "${title}",
+  "sections": [
+    {
+      "activityTitle": "**[${severity}] ${title}**",
+      "activitySubtitle": "ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')",
+      "text": "${body}"
+    }
+    $(if [[ -n "${log_snippet}" ]]; then
+        echo ",{\"title\": \"Last 30 log lines\", \"text\": \"\`\`\`\\n${log_snippet}\\n\`\`\`\"}"
+      fi)
+  ]
+}
+EOF
+)
 
     if [[ -z "${webhook_url}" ]]; then
+        # No webhook configured yet – print to console for local testing
         warn "[TEAMS FALLBACK] ${severity}: ${title}"
         warn "[TEAMS FALLBACK] ${body}"
         [[ -n "${log_snippet}" ]] && warn "[TEAMS FALLBACK] LOGS: ${log_snippet}"
         return 0
     fi
 
+    # Send the card; suppress output but capture HTTP status code
     local http_status
     http_status=$(curl -s -o /dev/null -w "%{http_code}" \
         -H "Content-Type: application/json" \
         -d "${payload}" \
         "${webhook_url}")
 
-    if [[ "${http_status}" == "200" || "${http_status}" == "202" ]]; then
-        log "Teams notification sent: ${title}"
-    else
+    if [[ "${http_status}" != "200" ]]; then
         error "Teams webhook returned HTTP ${http_status} for: ${title}"
+    else
+        log "Teams notification sent: ${title}"
     fi
 }
 
@@ -530,81 +541,115 @@ diagnose_and_recover() {
     log "STEP 5 OK – Rollback count ${rollback_count}/${MAX_ROLLBACKS}. Proceeding with rollback."
 
     # ------------------------------------------------------------------
-    # STEP 6: EXECUTE ROLLBACK
-    # Order matters:
-    #   a. Acquire lock (prevent race with another check cycle or deploy)
-    #   b. Stop Watchtower for this container (prevent it re-pulling :latest)
-    #   c. Pull the stable image and restart the service
-    #   d. Update the rollback counter
-    #   e. Send a rich Teams notification with all relevant details
-    #   f. Release lock
+    # STEP 6: EXECUTE STICKY ROLLBACK
+    #
+    # "Sticky" means we PIN the stable image SHA into the .env file so
+    # that docker-compose uses it directly. Because the container then
+    # runs on a SHA digest (not a floating tag like :latest), Watchtower
+    # has nothing to monitor and will leave it alone until the next
+    # successful deploy clears the pin.
+    #
+    # Order:
+    #   a. Acquire lock
+    #   b. Pause Watchtower (prevent race during the pin operation)
+    #   c. Pull the stable SHA from the registry
+    #   d. Write the pin into .env  (e.g. FRONTEND_DRUPAL_IMAGE=...@sha256:...)
+    #   e. Restart the service – compose now reads the pinned SHA from .env
+    #   f. Update rollback counter
+    #   g. Unpause Watchtower – it ignores SHA-pinned containers
+    #   h. Notify teams
+    #   i. Release lock
     # ------------------------------------------------------------------
     if ! acquire_lock; then
         warn "STEP 6 – Could not acquire lock. Another rollback is in progress. Skipping."
         return 0
     fi
 
-    log "STEP 6 – Executing rollback: ${service} → ${stable_image}"
+    # Read the combined SHA|TAG entry written by deploy.yml
+    local stable_entry
+    stable_entry=$(grep "^${service}=" "${STABLE_TAGS_FILE}" | cut -d'=' -f2- | head -1)
 
-    # a. Pause Watchtower so it does not immediately re-pull :latest and undo
-    #    our rollback within the next 60-second Watchtower cycle.
+    if [[ -z "${stable_entry}" ]]; then
+        error "STEP 6 – No stable entry found for ${service}. Aborting rollback."
+        release_lock
+        return 1
+    fi
+
+    # Split into technical SHA (for docker pull) and readable tag (for logs/Teams)
+    local sha_image="${stable_entry%%|*}"
+    local readable_stable_tag="${stable_entry##*|}"
+
+    log "STEP 6 – Executing STICKY rollback: ${service} → ${readable_stable_tag} (${sha_image})"
+
+    # a. Pause Watchtower to prevent it interfering during the pin operation
     log "Pausing Watchtower container..."
     docker pause watchtower 2>/dev/null || warn "Could not pause Watchtower (may already be paused or missing)."
 
-    # b. Pull the stable image explicitly so docker compose uses it
-    log "Pulling stable image: ${stable_image}"
-    if ! docker pull "${stable_image}"; then
-        error "Failed to pull stable image ${stable_image}. Aborting rollback."
+    # b. Pull the exact stable image by SHA digest
+    log "Pulling stable SHA: ${sha_image}"
+    if ! docker pull "${sha_image}"; then
+        error "Failed to pull stable image ${sha_image}. Aborting rollback."
         docker unpause watchtower 2>/dev/null || true
         release_lock
         notify "${service}" "CRITICAL" \
             "🔴 Rollback FAILED – could not pull stable image for ${service}" \
-            "Attempted to pull \`${stable_image}\` but the pull failed (network issue or image no longer in registry).\n\n**Manual intervention required.**" \
+            "Attempted to pull \`${sha_image}\` but the pull failed.\n\n**Manual intervention required.**" \
             "${log_snippet}"
         return 1
     fi
 
-    # c. Tag the stable image as :latest locally so docker compose picks it up
-    #    without needing to change docker-compose.yml
-    local image_repo="${stable_image%%:*}"
-    docker tag "${stable_image}" "${image_repo}:latest" 2>/dev/null || true
+    # c. PIN the SHA into the .env file.
+    #    Convert service name to uppercase env var name:
+    #    e.g. "frontend_drupal" → FRONTEND_DRUPAL_IMAGE
+    #    docker-compose.yml must use ${FRONTEND_DRUPAL_IMAGE:-ghcr.io/.../frontend:latest}
+    local env_var_name
+    env_var_name=$(echo "${service}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_IMAGE
 
-    # d. Restart only the affected service via docker compose
+    log "Pinning ${service} in .env: ${env_var_name}=${sha_image}"
+    # Remove any existing pin for this service, then append the new one
+    sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
+    echo "${env_var_name}=${sha_image}" >> "${BASE_DIR}/.env"
+
+    # d. Restart the service – docker compose now reads the pinned SHA from .env
     cd "${BASE_DIR}"
-    log "Restarting ${service} with stable image..."
+    log "Restarting ${service} with pinned SHA..."
     if ! docker compose up -d --no-deps "${service}"; then
-        error "docker compose up failed for ${service} after rollback pull."
+        error "docker compose up failed for ${service} after sticky rollback."
+        # Clean up the pin so the next deploy is not blocked
+        sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
         docker unpause watchtower 2>/dev/null || true
         release_lock
         notify "${service}" "CRITICAL" \
-            "🔴 Rollback compose-up FAILED for ${service}" \
-            "Pulled stable image \`${stable_tag}\` successfully, but \`docker compose up\` failed.\n\nInfra team: check compose file and container logs." \
+            "🔴 Sticky rollback compose-up FAILED for ${service}" \
+            "Pulled stable SHA \`${sha_image}\` successfully but \`docker compose up\` failed.\n\nInfra team: check compose file and container logs." \
             "${log_snippet}"
         return 1
     fi
 
     # e. Update rollback counter
-    increment_rollback_count "${service}" "image_crash_${current_tag}"
+    increment_rollback_count "${service}" "sticky_rollback_${readable_stable_tag}"
 
-    # f. Unpause Watchtower – now that :latest points to the stable image,
-    #    Watchtower pulling :latest will simply confirm the correct version.
-    sleep 5  # brief pause to let the container start before Watchtower wakes
+    # f. Unpause Watchtower.
+    #    Because the container now runs directly from a SHA digest, Watchtower
+    #    has no floating tag to monitor and will skip this container entirely
+    #    until the pin is cleared by the next successful deploy.
+    sleep 5
     docker unpause watchtower 2>/dev/null || true
-    log "Watchtower unpaused."
+    log "Watchtower unpaused. Container ${service} is pinned – Watchtower will ignore it."
 
-    # g. Collect fresh logs from the now-restarted container for the notification
+    # g. Collect fresh logs for the notification
     sleep 10
     local post_rollback_logs
     post_rollback_logs=$(get_container_logs "${service}" 20)
 
-    # h. Send the rich Teams rollback notification to infra + owning team
+    # h. Send the Teams rollback notification to infra + owning team
     notify "${service}" "CRITICAL" \
-        "🔄 Rollback executed – ${service}: ${current_tag} → ${stable_tag}" \
-        "Container \`${service}\` was automatically rolled back.\n\n**Failing version:** \`${current_tag}\`\n**Restored version:** \`${stable_tag}\`\n**Rollback attempt:** $((rollback_count + 1)) of ${MAX_ROLLBACKS}\n\n**Root cause summary:**\n- RabbitMQ: online ✅\n- Database: online ✅\n- Image changed: yes (${current_tag} ≠ ${stable_tag}) ✅\n\nPlease investigate the failing image \`${current_tag}\` before pushing again." \
+        "🔄 STICKY Rollback executed – ${service}: ${current_tag} → ${readable_stable_tag}" \
+        "Container \`${service}\` was automatically rolled back and **pinned** to its last stable SHA.\n\n**Failing version:** \`${current_tag}\`\n**Restored + pinned to:** \`${readable_stable_tag}\`\n**SHA:** \`${sha_image}\`\n**Rollback attempt:** $((rollback_count + 1)) of ${MAX_ROLLBACKS}\n\nWatchtower will NOT re-update this container until the pin is cleared by a new successful deploy.\n\n⚠️ Fix the failing image \`${current_tag}\` and push a new version to clear the pin." \
         "=== Logs BEFORE rollback (${service}) ===\n${log_snippet}\n\n=== Logs AFTER rollback start ===\n${post_rollback_logs}"
 
     release_lock
-    log "Rollback complete: ${service} is now running ${stable_tag}."
+    log "Sticky rollback complete: ${service} is pinned to ${readable_stable_tag}."
 }
 
 # =============================================================================
@@ -620,18 +665,17 @@ main() {
     log "Base dir       : ${BASE_DIR}"
     log "======================================================"
 
-    # Load .env if it exists (robust version)
+    # Load .env safely – handles passwords containing $, %, &, ! and other
+    # special characters that would break a plain `source` command.
     if [[ -f "${BASE_DIR}/.env" ]]; then
         while IFS= read -r line || [[ -n "${line}" ]]; do
-            # 1. Verwijder trailing carriage returns (voor files gemaakt op Windows)
+            # Strip Windows carriage returns
             line="${line%$'\r'}"
-            # 2. Trim leading/trailing whitespace
+            # Trim leading/trailing whitespace
             line=$(echo "${line}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-            
-            # 3. Sla lege regels of comments over
+            # Skip empty lines and comments
             [[ -z "${line}" || "${line}" == \#* ]] && continue
-            
-            # 4. Alleen exporteren als de regel begint met een geldige KEY=VALUE structuur
+            # Only export valid KEY=VALUE pairs (ignore malformed lines)
             if [[ "${line}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*= ]]; then
                 export "${line?}"
             fi

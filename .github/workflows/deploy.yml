@@ -27,25 +27,15 @@
 name: Deploy Infra to VM
 
 on:
-  workflow_dispatch:
-  workflow_run:
-    workflows: ["CI Pipeline"]
-    types:
-      - completed
+  push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
-    # Only deploy if:
-    # - Triggered manually (workflow_dispatch)
-    # - Triggered by a push directly
-    # - Triggered by CI Pipeline AND it succeeded
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       # -----------------------------------------------------------------------
@@ -111,21 +101,54 @@ jobs:
               "identity-service"
             )
 
-            # Write the current image tag for each running service to .previous_tags.
+            # Write SHA|TAG for each running service to .previous_tags.
+            # SHA digest is used for reliable rollback (immune to :latest drift).
+            # Readable tag is used for Teams notifications and logs.
             # If a container is not running yet (first deploy), we skip it.
             echo "# Pre-deploy snapshot – $(date)" > .previous_tags
             for service in "${ROLLBACK_SERVICES[@]}"; do
-              image=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
-              if [[ -n "${image}" ]]; then
-                echo "${service}=${image}" >> .previous_tags
-                echo "Snapshotted: ${service} = ${image}"
+              sha_image=$(docker inspect --format='{{index .RepoDigests 0}}' "${service}" 2>/dev/null || echo "")
+              readable_tag=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
+              if [[ -n "${readable_tag}" ]]; then
+                if [[ -n "${sha_image}" ]]; then
+                  echo "${service}=${sha_image}|${readable_tag}" >> .previous_tags
+                else
+                  # Fallback for images without a registry digest (local builds)
+                  echo "${service}=${readable_tag}|${readable_tag}" >> .previous_tags
+                fi
+                echo "Snapshotted: ${service} = ${readable_tag}"
               else
                 echo "Skipping ${service} (not running yet – first deploy)"
               fi
             done
 
       # -----------------------------------------------------------------------
-      # STEP 5: Pull latest images and bring the stack up.
+      # STEP 5a: Clear any sticky rollback pins from .env before pulling.
+      # When runtime-rollback.sh performs a sticky rollback, it writes a pin
+      # like FRONTEND_DRUPAL_IMAGE=...@sha256:... into the .env file.
+      # This prevents Watchtower from re-updating a broken service.
+      # On a new deploy, we clear all pins so fresh images can be pulled.
+      # -----------------------------------------------------------------------
+      - name: Clear sticky rollback pins from .env
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            cd /opt/shiftfestival
+            # Remove all lines ending in _IMAGE=ghcr.io/... or _IMAGE=...@sha256:...
+            # These are sticky pins written by runtime-rollback.sh
+            if grep -qE '_IMAGE=(ghcr\.io|.*@sha256)' .env 2>/dev/null; then
+              sed -i -E '/_IMAGE=(ghcr\.io|.*@sha256)/d' .env
+              echo "✅ Sticky rollback pins cleared from .env"
+            else
+              echo "ℹ️  No sticky pins found in .env – nothing to clear"
+            fi
+
+      # -----------------------------------------------------------------------
+      # STEP 5b: Pull latest images and bring the stack up.
       # --remove-orphans cleans up containers from removed compose services.
       # -----------------------------------------------------------------------
       - name: Pull latest images and start stack
@@ -181,7 +204,6 @@ jobs:
               "kassa_integratie:running"
               "crm_receiver:running"
               "planning_service:running"
-              "identity-service:running"
             )
 
             MAX_RETRIES=3
@@ -272,10 +294,16 @@ jobs:
             echo "# Last updated: $(date)" >> .stable_tags
 
             for service in "${ROLLBACK_SERVICES[@]}"; do
-              image=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
-              if [[ -n "${image}" ]]; then
-                echo "${service}=${image}" >> .stable_tags
-                echo "Stable tag recorded: ${service} = ${image}"
+              sha_image=$(docker inspect --format='{{index .RepoDigests 0}}' "${service}" 2>/dev/null || echo "")
+              readable_tag=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
+              if [[ -n "${readable_tag}" ]]; then
+                if [[ -n "${sha_image}" ]]; then
+                  # Store as SHA|TAG so runtime-rollback.sh can use both
+                  echo "${service}=${sha_image}|${readable_tag}" >> .stable_tags
+                else
+                  echo "${service}=${readable_tag}|${readable_tag}" >> .stable_tags
+                fi
+                echo "Stable tag recorded: ${service} = ${readable_tag}"
               fi
             done
 
