@@ -32,18 +32,18 @@ The ShiftFestival platform runs as a microservices stack on a single Azure VM (U
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Azure VM – integrationproject-2526s2-dag01.westeurope.azure... │
-│                                                                   │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
-│  │   RabbitMQ   │  │  PostgreSQL  │  │      ELK Stack       │  │
-│  │ (msg broker) │  │ (identity)   │  │ (logs & monitoring)  │  │
-│  └──────┬───────┘  └──────┬───────┘  └──────────────────────┘  │
-│         │                  │                                      │
-│  ┌──────┴──────────────────┴────────────────────────────────┐   │
-│  │                    shift_net (Docker network)             │   │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
+│  │   RabbitMQ   │  │  PostgreSQL  │  │      ELK Stack       │   │
+│  │ (msg broker) │  │ (identity)   │  │ (logs & monitoring)  │   │
+│  └──────┬───────┘  └──────┬───────┘  └──────────────────────┘   │
+│         │                 │                                     │
+│  ┌──────┴─────────────────┴─────────────────────────────────┐   │
+│  │                    shift_net (Docker network)            │   │
 │  └──────┬────────┬────────┬────────┬────────┬───────────────┘   │
-│         │        │        │        │        │                     │
-│    Frontend  Facturatie  Kassa    CRM   Planning  Identity        │
-│    (Drupal) (FOSSBill.) (Odoo)         (O365)   (UUID svc)       │
+│         │        │        │        │        │                   │
+│    Frontend  Facturatie  Kassa    CRM   Planning  Identity      │
+│    (Drupal) (FOSSBill.) (Odoo)         (O365)   (UUID svc)      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -107,7 +107,7 @@ Push to main
     │
     ▼
 ┌─────────────────────────────────────────┐
-│           CI Pipeline (ci.yml)           │
+│           CI Pipeline (ci.yml)          │
 │                                         │
 │  1. Validate docker-compose.yml syntax  │
 │  2. Lint YAML files                     │
@@ -118,16 +118,16 @@ Push to main
                    │ CI passes
                    ▼
 ┌─────────────────────────────────────────┐
-│          Deploy Pipeline (deploy.yml)    │
+│          Deploy Pipeline (deploy.yml)   │
 │                                         │
 │  1. Copy repo files to VM via SCP       │
 │  2. Clear sticky rollback pins          │
 │  3. Snapshot current image SHAs         │
 │  4. docker compose pull && up -d        │
-│  5. Health checks (3 attempts × 30s)   │
+│  5. Health checks (3 attempts × 30s)    │
 │                                         │
-│  ✅ All healthy → update .stable_tags   │
-│  ❌ Any failed  → rollback + alert      │
+│  ✅ All healthy → update .stable_tags  │
+│  ❌ Any failed  → rollback + alert     │
 └─────────────────────────────────────────┘
 ```
 
