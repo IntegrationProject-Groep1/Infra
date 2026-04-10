@@ -198,10 +198,11 @@ services:
       - TEAMS_WEBHOOK_PLANNING=${TEAMS_WEBHOOK_PLANNING}
       - TEAMS_WEBHOOK_MONITORING=${TEAMS_WEBHOOK_MONITORING}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock          # Docker API access
-      - /opt/shiftfestival:/opt/shiftfestival              # Scripts and state files
+      - /var/run/docker.sock:/var/run/docker.sock                      # Docker API access
+      - /opt/shiftfestival:/opt/shiftfestival                          # Scripts and state files
+      - /home/ehbstudent/.docker/config.json:/root/.docker/config.json:ro  # GHCR auth for manifest inspect
     command: >
-      sh -c "apk add --no-cache bash curl jq &&
+      sh -c "apk add --no-cache bash curl jq python3 &&
              bash /opt/shiftfestival/scripts/runtime-rollback.sh"
     networks:
       - shift_net

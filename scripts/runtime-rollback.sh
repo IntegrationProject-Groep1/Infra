@@ -18,12 +18,20 @@
 #   6. Execute rollback: stop Watchtower, pull stable image, restart, notify
 #
 # FILES MANAGED BY THIS SCRIPT (never commit these to git):
-#   /opt/shiftfestival/.stable_tags    – last known-good image tag per service
+#   /opt/shiftfestival/.stable_tags    – last known-good image SHA|TAG per service
 #   /opt/shiftfestival/.rollback_state – rollback counter per service
 #   /opt/shiftfestival/rollback.lock   – prevents two simultaneous rollbacks
+#   /opt/shiftfestival/.rollback_pins  – active sticky pins awaiting a fix
+#                                        format: service=bad_sha|env_var|readable_tag
+#
+# AUTOMATIC PIN RELEASE:
+#   After a sticky rollback, check_pinned_services() runs every cycle and
+#   queries the GHCR registry manifest. When a NEW SHA appears on :latest
+#   (meaning the team pushed a fix), the pin is automatically released and
+#   the service is restarted with the new image.
 #
 # DEPENDENCIES:
-#   docker, curl, jq (install: apt-get install -y jq)
+#   docker, curl, jq, python3 (install: apk add bash curl jq python3)
 # =============================================================================
 
 set -euo pipefail
@@ -52,6 +60,10 @@ MAX_ROLLBACKS=2
 
 # How long (seconds) a rollback lock can be held before we consider it stale
 LOCK_TIMEOUT=300
+
+# State file tracking active sticky pins (service=bad_sha|env_var|readable_tag)
+ROLLBACK_PINS_FILE="${BASE_DIR}/.rollback_pins"
+
 
 # Teams webhook URLs – loaded from environment or /opt/shiftfestival/.env
 # These are set as GitHub Secrets and injected by deploy.yml on first deploy.
@@ -114,7 +126,7 @@ MONITORED_SERVICES=(
     "crm_receiver"
     "planning_service"
     "identity-service"
-    "monitoring_heartbeat"
+    "monitoring_heartbeat"   # Monitors the ELK stack – must also be monitored itself
 )
 
 # =============================================================================
@@ -173,6 +185,27 @@ release_lock() {
 #   $4  – body text (plain, will be wrapped in a code block if it looks like logs)
 #   $5  – (optional) extra detail / log snippet
 # =============================================================================
+# =============================================================================
+# HELPER: JSON ESCAPING
+# Safely escapes a string for embedding inside a JSON value.
+# =============================================================================
+escape_json() {
+    printf '%s' "$1"         | sed 's/\\/\\\\/g'         | sed 's/"/\\"/g'         | sed ':a;N;$!ba;s/\n/\\n/g'
+}
+
+# =============================================================================
+# HELPER: TEAMS NOTIFICATION
+#
+# Sends a Power Automate Adaptive Card to a Teams channel.
+# Falls back to console if webhook URL is empty (local testing).
+#
+# Arguments:
+#   $1 – webhook URL
+#   $2 – severity: INFO | WARNING | CRITICAL
+#   $3 – title string
+#   $4 – body text
+#   $5 – (optional) log snippet
+# =============================================================================
 send_teams_message() {
     local webhook_url="$1"
     local severity="$2"
@@ -180,61 +213,59 @@ send_teams_message() {
     local body="$4"
     local log_snippet="${5:-}"
 
-    # Choose a colour bar for the Teams card based on severity
-    local color
+    # Map severity to Adaptive Card colour name
+    local card_color
     case "${severity}" in
-        CRITICAL) color="FF0000" ;;   # red
-        WARNING)  color="FFA500" ;;   # orange
-        INFO)     color="0078D4" ;;   # teams blue
-        *)        color="808080" ;;   # grey fallback
+        CRITICAL) card_color="Attention" ;;
+        WARNING)  card_color="Warning"   ;;
+        INFO)     card_color="Good"      ;;
+        *)        card_color="Default"   ;;
     esac
 
-    # Build the Adaptive Card JSON payload
-    # We keep it simple (MessageCard format) for maximum Teams compatibility.
-    local payload
-    payload=$(cat <<EOF
-{
-  "@type": "MessageCard",
-  "@context": "http://schema.org/extensions",
-  "themeColor": "${color}",
-  "summary": "${title}",
-  "sections": [
-    {
-      "activityTitle": "**[${severity}] ${title}**",
-      "activitySubtitle": "ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')",
-      "text": "${body}"
-    }
-    $(if [[ -n "${log_snippet}" ]]; then
-        echo ",{\"title\": \"Last 30 log lines\", \"text\": \"\`\`\`\\n${log_snippet}\\n\`\`\`\"}"
-      fi)
-  ]
-}
-EOF
-)
+    local body_escaped
+    body_escaped=$(escape_json "${body}")
+
+    # Build body blocks – add log block only when logs are provided
+    local card_body
+    card_body="[
+        {"type":"TextBlock","text":"[${severity}] ${title}","weight":"Bolder","size":"Medium","color":"${card_color}","wrap":true},
+        {"type":"TextBlock","text":"ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')","isSubtle":true,"size":"Small"},
+        {"type":"TextBlock","text":"${body_escaped}","wrap":true,"spacing":"Medium"}"
+
+    if [[ -n "${log_snippet}" ]]; then
+        local logs_escaped
+        logs_escaped=$(escape_json "${log_snippet}")
+        card_body="${card_body},
+        {"type":"TextBlock","text":"📋 Last log lines:","weight":"Bolder","spacing":"Medium"},
+        {"type":"TextBlock","text":"${logs_escaped}","fontType":"Monospace","size":"Small","wrap":true}"
+    fi
+
+    card_body="${card_body}]"
+
+    local payload="{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","contentUrl":null,"content":{"type":"AdaptiveCard","version":"1.4","body":${card_body}}}]}"
 
     if [[ -z "${webhook_url}" ]]; then
-        # No webhook configured yet – print to console for local testing
         warn "[TEAMS FALLBACK] ${severity}: ${title}"
         warn "[TEAMS FALLBACK] ${body}"
         [[ -n "${log_snippet}" ]] && warn "[TEAMS FALLBACK] LOGS: ${log_snippet}"
         return 0
     fi
 
-    # Send the card; suppress output but capture HTTP status code
     local http_status
-    http_status=$(curl -s -o /dev/null -w "%{http_code}" \
-        -H "Content-Type: application/json" \
-        -d "${payload}" \
-        "${webhook_url}")
+    http_status=$(curl -s -o /dev/null -w "%{http_code}"         -H "Content-Type: application/json"         -d "${payload}"         "${webhook_url}")
 
-    if [[ "${http_status}" != "200" ]]; then
-        error "Teams webhook returned HTTP ${http_status} for: ${title}"
-    else
+    if [[ "${http_status}" == "200" || "${http_status}" == "202" ]]; then
         log "Teams notification sent: ${title}"
+    else
+        error "Teams webhook returned HTTP ${http_status} for: ${title}"
     fi
 }
 
-# Convenience wrapper: always notify infra AND the owning team.
+
+# =============================================================================
+# HELPER: notify() – send to Infra AND owning team
+# Always notifies the #Infra channel AND the service's owning team channel.
+# =============================================================================
 notify() {
     local service="$1"
     local severity="$2"
@@ -242,15 +273,16 @@ notify() {
     local body="$4"
     local log_snippet="${5:-}"
 
-    # Always alert the infra channel
+    # Always alert the Infra channel
     send_teams_message "${TEAMS_WEBHOOK_INFRA}" "${severity}" "${title}" "${body}" "${log_snippet}"
 
-    # Also alert the service's owning team if a webhook is mapped
+    # Also alert the owning team channel
     local team_webhook="${SERVICE_TEAM_WEBHOOK[${service}]:-}"
     if [[ -n "${team_webhook}" && "${team_webhook}" != "${TEAMS_WEBHOOK_INFRA}" ]]; then
         send_teams_message "${team_webhook}" "${severity}" "${title}" "${body}" "${log_snippet}"
     fi
 }
+
 
 # =============================================================================
 # HELPER: DOCKER UTILITIES
@@ -630,27 +662,151 @@ diagnose_and_recover() {
     # e. Update rollback counter
     increment_rollback_count "${service}" "sticky_rollback_${readable_stable_tag}"
 
-    # f. Unpause Watchtower.
-    #    Because the container now runs directly from a SHA digest, Watchtower
-    #    has no floating tag to monitor and will skip this container entirely
-    #    until the pin is cleared by the next successful deploy.
+    # f. Record the BAD SHA in .rollback_pins so check_pinned_services() can
+    #    automatically detect when the team pushes a fix to GHCR and release
+    #    the pin without any manual intervention.
+    #    Format: service=bad_sha|env_var_name|readable_tag
+    sed -i "/^${service}=/d" "${ROLLBACK_PINS_FILE}" 2>/dev/null || true
+    echo "${service}=${current_image}|${env_var_name}|${readable_stable_tag}" >> "${ROLLBACK_PINS_FILE}"
+    log "Recorded bad SHA in .rollback_pins for automatic fix detection."
+
+    # g. Unpause Watchtower – SHA-pinned container will be ignored automatically
     sleep 5
     docker unpause watchtower 2>/dev/null || true
     log "Watchtower unpaused. Container ${service} is pinned – Watchtower will ignore it."
 
-    # g. Collect fresh logs for the notification
+    # h. Collect fresh logs for the notification
     sleep 10
     local post_rollback_logs
     post_rollback_logs=$(get_container_logs "${service}" 20)
 
-    # h. Send the Teams rollback notification to infra + owning team
+    # i. Send notification WITH action button to BOTH Infra AND the owning team.
+    #    The button links to GitHub Actions so the team can manually trigger a
+    #    redeploy as a fallback if the automatic fix detection does not fire.
+    local rollback_body
+    rollback_body="Container \`${service}\` was automatically rolled back and PINNED to its last stable SHA.\n\n"
+    rollback_body+="**Failing version:** \`${current_tag}\`\n"
+    rollback_body+="**Restored + pinned to:** \`${readable_stable_tag}\`\n"
+    rollback_body+="**Rollback attempt:** $((rollback_count + 1)) of ${MAX_ROLLBACKS}\n\n"
+    rollback_body+="The rollback monitor will automatically detect when a new image is pushed to GHCR and release the pin.\n\n"
+    rollback_body+="⚠️ Fix the failing image and push a new version. The rollback monitor will automatically detect the new image within 30 seconds."
+
     notify "${service}" "CRITICAL" \
         "🔄 STICKY Rollback executed – ${service}: ${current_tag} → ${readable_stable_tag}" \
-        "Container \`${service}\` was automatically rolled back and **pinned** to its last stable SHA.\n\n**Failing version:** \`${current_tag}\`\n**Restored + pinned to:** \`${readable_stable_tag}\`\n**SHA:** \`${sha_image}\`\n**Rollback attempt:** $((rollback_count + 1)) of ${MAX_ROLLBACKS}\n\nWatchtower will NOT re-update this container until the pin is cleared by a new successful deploy.\n\n⚠️ Fix the failing image \`${current_tag}\` and push a new version to clear the pin." \
-        "=== Logs BEFORE rollback (${service}) ===\n${log_snippet}\n\n=== Logs AFTER rollback start ===\n${post_rollback_logs}"
+        "${rollback_body}" \
+        "=== Logs BEFORE rollback (${service}) ===
+${log_snippet}
+
+=== Logs AFTER rollback start ===
+${post_rollback_logs}"
 
     release_lock
     log "Sticky rollback complete: ${service} is pinned to ${readable_stable_tag}."
+}
+
+# =============================================================================
+# HELPER: CHECK PINNED SERVICES FOR AUTOMATIC FIX DETECTION
+#
+# Runs at the start of every check cycle. For each service in .rollback_pins,
+# it queries the GHCR registry manifest (WITHOUT downloading the image) to see
+# if the team has pushed a new SHA to :latest.
+#
+# If a NEW SHA is found  → release pin, restart service, notify both channels
+# If SAME SHA is found   → keep pin, service stays stable on the rollback image
+# If registry unreachable → keep pin, log warning, try again next cycle
+#
+# This makes the fix flow fully automatic:
+#   Team pushes fix → GHCR:latest gets new SHA → rollback monitor detects it
+#   → pin released → service restarted with new image → Watchtower takes over
+# =============================================================================
+check_pinned_services() {
+    # Nothing to do if no pins are active
+    [[ ! -f "${ROLLBACK_PINS_FILE}" ]] && return 0
+    [[ ! -s "${ROLLBACK_PINS_FILE}" ]] && return 0
+
+    log "Checking pinned services for new images in registry..."
+
+    while IFS='=' read -r service pin_data; do
+        # Skip comment lines and empty lines
+        [[ "${service}" =~ ^#.*$ ]] && continue
+        [[ -z "${service}" ]] && continue
+
+        # Parse the pin entry: bad_sha|env_var_name|readable_tag
+        local bad_sha env_var_name readable_tag
+        bad_sha="${pin_data%%|*}"
+        local rest="${pin_data#*|}"
+        env_var_name="${rest%%|*}"
+        readable_tag="${rest##*|}"
+
+        log "PIN CHECK: ${service} – bad SHA: ${bad_sha:0:19}... tag: ${readable_tag}"
+
+        # Query the registry manifest digest WITHOUT downloading the full image.
+        # docker manifest inspect reads only the manifest JSON from the registry.
+        # We extract the config digest which identifies the unique image content.
+        local registry_sha=""
+        registry_sha=$(docker manifest inspect "${readable_tag}" 2>/dev/null             | python3 -c "
+import sys, json
+try:
+    data = json.load(sys.stdin)
+    # Multi-arch manifest list → use digest of first platform entry
+    if data.get('schemaVersion') == 2 and 'manifests' in data:
+        print(data['manifests'][0].get('digest', ''))
+    # Single manifest → use config digest
+    elif 'config' in data:
+        print(data['config'].get('digest', ''))
+    else:
+        print('')
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
+
+        if [[ -z "${registry_sha}" ]]; then
+            warn "PIN CHECK: Could not reach registry for ${service} – keeping pin, will retry next cycle."
+            continue
+        fi
+
+        if [[ "${registry_sha}" == "${bad_sha}" ]]; then
+            log "PIN CHECK: ${service} – registry still has bad image (${registry_sha:0:19}...) – pin remains active."
+            continue
+        fi
+
+        # ── NEW IMAGE DETECTED ──────────────────────────────────────────────
+        log "PIN CHECK: NEW image detected for ${service}!"
+        log "  Bad image:  ${bad_sha:0:19}..."
+        log "  New image:  ${registry_sha:0:19}..."
+        log "  Releasing sticky pin and restarting ${service}..."
+
+        # Remove the pin from .env
+        sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
+
+        # Remove the entry from .rollback_pins
+        sed -i "/^${service}=/d" "${ROLLBACK_PINS_FILE}"
+
+        # Pull the new image and restart the service
+        cd "${BASE_DIR}"
+        if docker compose up -d --no-deps "${service}" 2>/dev/null; then
+            log "PIN RELEASED: ${service} restarted with new image. Watchtower will monitor normally."
+            notify "${service}" "INFO" \
+                "✅ Sticky pin released – ${service} updated with new image" \
+                "A new image was detected in the registry for \`${service}\`.
+
+The sticky rollback pin has been **automatically released** and the service has been restarted.
+
+**Bad image (was pinned to):** \`${bad_sha:0:19}...\`
+**New image (now running):** \`${registry_sha:0:19}...\`
+
+If the new image also fails, the rollback system will activate again." \
+                ""                 ""                 ""
+        else
+            error "PIN RELEASE: docker compose up failed for ${service} after pin release."
+            # Re-add the pin since the restart failed
+            echo "${service}=${bad_sha}|${env_var_name}|${readable_tag}" >> "${ROLLBACK_PINS_FILE}"
+            sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
+            echo "${env_var_name}=${bad_sha}" >> "${BASE_DIR}/.env"
+
+            notify "${service}" "CRITICAL"                 "🔴 Pin release FAILED for ${service}"                 "A new image was detected but \`docker compose up\` failed after releasing the pin.\n\nThe pin has been re-applied. Infra team: manual investigation required."                 ""
+        fi
+    done < "${ROLLBACK_PINS_FILE}"
 }
 
 # =============================================================================
@@ -684,12 +840,18 @@ main() {
         log ".env loaded and sanitized."
     fi
 
-    # Ensure state files exist so subsequent reads never fail
-    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}"
+    # Ensure all state files exist so reads never fail on first run
+    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}" "${ROLLBACK_PINS_FILE}"
 
     while true; do
         log "--- Starting check cycle ---"
 
+        # ── Phase 1: Check if any pinned services have a new image available ──
+        # This runs BEFORE the health checks so that a fixed service is already
+        # restarted with the new image before we evaluate its health status.
+        check_pinned_services
+
+        # ── Phase 2: Health check every monitored service ─────────────────────
         for service in "${MONITORED_SERVICES[@]}"; do
             local status
             status=$(get_container_status "${service}")
@@ -697,8 +859,7 @@ main() {
             health=$(get_health_status "${service}")
 
             # Only investigate if something looks wrong
-            if [[ "${status}" != "running" ]] \
-                || [[ "${health}" == "unhealthy" ]]; then
+            if [[ "${status}" != "running" ]]                 || [[ "${health}" == "unhealthy" ]]; then
                 warn "Service ${service} needs attention: status=${status}, health=${health}"
                 diagnose_and_recover "${service}"
             else
