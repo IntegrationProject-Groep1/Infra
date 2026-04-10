@@ -222,27 +222,44 @@ send_teams_message() {
         *)        card_color="Default"   ;;
     esac
 
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+
     local body_escaped
     body_escaped=$(escape_json "${body}")
 
-    # Build body blocks – add log block only when logs are provided
-    local card_body
-    card_body="[
-        {"type":"TextBlock","text":"[${severity}] ${title}","weight":"Bolder","size":"Medium","color":"${card_color}","wrap":true},
-        {"type":"TextBlock","text":"ShiftFestival · $(date '+%Y-%m-%d %H:%M:%S')","isSubtle":true,"size":"Small"},
-        {"type":"TextBlock","text":"${body_escaped}","wrap":true,"spacing":"Medium"}"
+    # Build the Adaptive Card body array using printf to avoid shellcheck
+    # SC2140 warnings caused by embedded double quotes in assignment strings.
+    local header_block
+    header_block=$(printf '{"type":"TextBlock","text":"[%s] %s","weight":"Bolder","size":"Medium","color":"%s","wrap":true}'         "${severity}" "${title}" "${card_color}")
+
+    local meta_block
+    meta_block=$(printf '{"type":"TextBlock","text":"ShiftFestival · %s","isSubtle":true,"size":"Small"}'         "${timestamp}")
+
+    local body_block
+    body_block=$(printf '{"type":"TextBlock","text":"%s","wrap":true,"spacing":"Medium"}'         "${body_escaped}")
+
+    # Start building the card body array
+    local card_body="[${header_block},${meta_block},${body_block}"
 
     if [[ -n "${log_snippet}" ]]; then
         local logs_escaped
         logs_escaped=$(escape_json "${log_snippet}")
-        card_body="${card_body},
-        {"type":"TextBlock","text":"📋 Last log lines:","weight":"Bolder","spacing":"Medium"},
-        {"type":"TextBlock","text":"${logs_escaped}","fontType":"Monospace","size":"Small","wrap":true}"
+
+        local log_header_block
+        log_header_block=$(printf '{"type":"TextBlock","text":"📋 Last log lines:","weight":"Bolder","spacing":"Medium"}')
+
+        local log_body_block
+        log_body_block=$(printf '{"type":"TextBlock","text":"%s","fontType":"Monospace","size":"Small","wrap":true}'             "${logs_escaped}")
+
+        card_body="${card_body},${log_header_block},${log_body_block}"
     fi
 
     card_body="${card_body}]"
 
-    local payload="{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","contentUrl":null,"content":{"type":"AdaptiveCard","version":"1.4","body":${card_body}}}]}"
+    # Assemble the full Power Automate Adaptive Card payload
+    local payload
+    payload=$(printf '{"type":"message","attachments":[{"contentType":"application/vnd.microsoft.card.adaptive","contentUrl":null,"content":{"type":"AdaptiveCard","version":"1.4","body":%s}}]}'         "${card_body}")
 
     if [[ -z "${webhook_url}" ]]; then
         warn "[TEAMS FALLBACK] ${severity}: ${title}"
