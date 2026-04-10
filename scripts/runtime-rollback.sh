@@ -114,6 +114,7 @@ MONITORED_SERVICES=(
     "crm_receiver"
     "planning_service"
     "identity-service"
+    "monitoring_heartbeat"
 )
 
 # =============================================================================
