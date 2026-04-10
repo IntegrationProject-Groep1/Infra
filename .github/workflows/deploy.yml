@@ -77,6 +77,12 @@ jobs:
           port: 60022
           source: "./*"
           target: "/opt/shiftfestival/"
+          # Exclude files/directories that have no purpose on the VM:
+          #   .github/  – CI/CD pipeline definitions (only needed by GitHub)
+          #   assets/   – README images and GIFs
+          #   README.md – Documentation (only needed on GitHub)
+          #   *.md      – All markdown documentation files
+          exclude: ".github,assets,README.md,*.md,test-environment"
 
       # -----------------------------------------------------------------------
       # STEP 3: Make all scripts executable on the VM
