@@ -348,7 +348,7 @@ services:
       - ELASTICSEARCH_USERNAME=kibana_system
       - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASS}
       - XPACK_SECURITY_ENABLED=true
-      - SERVER_PUBLICBASEURL=https://kibana.desiderius.me
+      - SERVER_PUBLICBASEURL=${KIBANA_PUBLIC_BASE_URL}
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     depends_on:
