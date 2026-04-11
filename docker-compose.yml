@@ -80,7 +80,7 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
-      - "30002:80"   # Azure external port 30002 → internal HTTPS 443
+      - "30002:80"
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
