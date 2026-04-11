@@ -93,7 +93,7 @@ services:
   # ---------------------------------------------------------------------------
   # RabbitMQ – Central message broker
   # All inter-service communication flows through this broker via AMQP.
-  # Management UI accessible on port 30001 via SSL.
+  # Management UI accessible on port 30001 via HTTP (SSL handled by Cloudflare).
   # IMPORTANT: Uses a named external volume to preserve queues across restarts.
   # ---------------------------------------------------------------------------
   rabbitmq:
@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
     ports:
       - "30000:5672"    # AMQP data port (used by all services)
-      - "30001:15672"   # Management UI (SSL, configured in rabbitmq.conf)
+      - "30001:15672"   # Management UI (HTTP, configured in rabbitmq.conf)
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
