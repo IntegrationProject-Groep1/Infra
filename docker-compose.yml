@@ -103,7 +103,7 @@ services:
     restart: unless-stopped
     ports:
       - "30000:5672"    # AMQP data port (used by all services)
-      - "30001:15671"   # Management UI (SSL, configured in rabbitmq.conf)
+      - "30001:15672"   # Management UI (SSL, configured in rabbitmq.conf)
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
@@ -116,7 +116,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq          # External volume – survives redeployments
-      - ./certs:/etc/rabbitmq/certs:ro
+
       - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
     networks:
       - shift_net
