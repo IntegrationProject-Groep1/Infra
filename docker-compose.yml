@@ -211,8 +211,8 @@ services:
   # SSL termination is handled by Cloudflare; internal services run on plain HTTP.
   # ---------------------------------------------------------------------------
   cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared-tunnel
+    image: cloudflare/cloudflared:2026.3.0
+    container_name: cloudflared_tunnel
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:
