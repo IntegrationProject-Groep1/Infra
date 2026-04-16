@@ -21,12 +21,12 @@
 #   - The rollback monitor does the actual recovery automatically
 #
 # WHAT THIS TESTS:
-#   ✅ Rollback monitor detects a crashed/unhealthy container
-#   ✅ Diagnosis matrix correctly identifies the issue
-#   ✅ Sticky rollback pins the stable SHA in .env
-#   ✅ Container is restarted with the stable image
-#   ✅ Teams notifications are sent to Infra + owning team
-#   ✅ .rollback_pins file is written correctly
+#   Rollback monitor detects a crashed/unhealthy container
+#   Diagnosis matrix correctly identifies the issue
+#   Sticky rollback pins the stable SHA in .env
+#   Container is restarted with the stable image
+#   Teams notifications are sent to Infra + owning team
+#   .rollback_pins file is written correctly
 # =============================================================================
 
 set -euo pipefail
@@ -62,6 +62,7 @@ if [[ "${1:-}" == "--restore" ]]; then
     fi
 
     log "Restoring from: ${latest_backup}"
+    # shellcheck source=/dev/null
     source "${latest_backup}"
 
     # Restore .env – remove any test pins

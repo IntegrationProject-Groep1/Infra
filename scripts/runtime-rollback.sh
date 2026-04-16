@@ -875,9 +875,21 @@ main() {
             local health
             health=$(get_health_status "${service}")
 
-            # Only investigate if something looks wrong
-            if [[ "${status}" != "running" ]]                 || [[ "${health}" == "unhealthy" ]]; then
-                warn "Service ${service} needs attention: status=${status}, health=${health}"
+            # Detect crash loops: track RestartCount delta between cycles
+            local restart_count
+            restart_count=$(docker inspect --format='{{.RestartCount}}' "${service}" 2>/dev/null || echo 0)
+            local restart_count_file="${BASE_DIR}/.restart_counts"
+            local prev_count
+            prev_count=$(grep "^${service}=" "${restart_count_file}" 2>/dev/null | cut -d'=' -f2 || echo 0)
+            sed -i "/^${service}=/d" "${restart_count_file}" 2>/dev/null || true
+            echo "${service}=${restart_count}" >> "${restart_count_file}"
+            local recent_restarts=$(( restart_count - prev_count ))
+
+            # Investigate if not running, unhealthy, OR crash loop detected
+            if [[ "${status}" != "running" ]] \
+                || [[ "${health}" == "unhealthy" ]] \
+                || (( recent_restarts >= 2 )); then
+                warn "Service ${service} needs attention: status=${status}, health=${health}, restarts_since_last_check=${recent_restarts}"
                 diagnose_and_recover "${service}"
             else
                 log "Service ${service}: OK (${status}/${health})"
