@@ -98,6 +98,26 @@ jobs:
             chmod +x /opt/shiftfestival/scripts/*.sh
 
       # -----------------------------------------------------------------------
+      # STEP 3b: Set deploy lock
+      #
+      # Creates /opt/shiftfestival/.deploy_in_progress so runtime-rollback.sh
+      # skips its check cycles during the deploy. Without this, the monitor
+      # fires CRITICAL alerts for every service that goes down during
+      # "docker compose up", spamming both #Infra and all team channels.
+      # The lock is always removed in STEP 11 (if: always()).
+      # -----------------------------------------------------------------------
+      - name: Set deploy lock (suppress rollback monitor during deploy)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            touch /opt/shiftfestival/.deploy_in_progress
+            echo "Deploy lock set at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor suppressed."
+
+      # -----------------------------------------------------------------------
       # STEP 4: Clear sticky rollback pins from .env
       #
       # When runtime-rollback.sh detects a crash, it writes a "sticky pin" into
@@ -526,6 +546,25 @@ jobs:
             sleep 5
             docker unpause watchtower 2>/dev/null || true
             echo "Watchtower unpaused."
+
+      # -----------------------------------------------------------------------
+      # STEP 11: Remove deploy lock (ALWAYS runs – success or failure)
+      #
+      # Removes .deploy_in_progress so the rollback monitor resumes normal
+      # operation after the deploy finishes. Using if: always() guarantees
+      # the lock is cleared even when earlier steps fail.
+      # -----------------------------------------------------------------------
+      - name: Remove deploy lock
+        if: always()
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            rm -f /opt/shiftfestival/.deploy_in_progress
+            echo "Deploy lock removed at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor resumed."
 
       # -----------------------------------------------------------------------
       # STEP 10c (FAILURE PATH): Notify Teams – deploy failed

@@ -190,7 +190,11 @@ release_lock() {
 # Safely escapes a string for embedding inside a JSON value.
 # =============================================================================
 escape_json() {
-    printf '%s' "$1"         | sed 's/\\/\\\\/g'         | sed 's/"/\\"/g'         | sed ':a;N;$!ba;s/\n/\\n/g'
+    # Escape backslashes first, then double quotes, then convert real newlines to \n
+    printf '%s' "$1" \
+        | sed 's/\\/\\\\/g' \
+        | sed 's/"/\\"/g' \
+        | sed ':a;N;$!ba;s/\n/\\n/g'
 }
 
 # =============================================================================
@@ -488,7 +492,8 @@ diagnose_and_recover() {
         fi
 
         warn "STEP 1 FAIL – Multiple services down. Cause: ${cause}. No rollback."
-        notify "${service}" "CRITICAL" \
+        # Infra outage → only notify #Infra. Owning teams cannot fix VM-level issues.
+        send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL" \
             "🔴 Infra outage detected – ${cause}" \
             "Multiple services went down simultaneously. This is an infrastructure problem, NOT a bad application image. **No rollback has been triggered.**\n\nAffected service checked: \`${service}\` (${container_status})\nCause: ${cause}\n\nInfra team: please check RabbitMQ, Elasticsearch, and VM health immediately." \
             "${log_snippet}"
@@ -550,7 +555,8 @@ diagnose_and_recover() {
 
     if [[ -z "${stable_image}" ]]; then
         warn "STEP 4 – No stable image recorded for ${service}. Cannot compare. Treating as config issue."
-        notify "${service}" "WARNING" \
+        # No stable baseline = deploy/infra issue → only notify #Infra
+        send_teams_message "${TEAMS_WEBHOOK_INFRA}" "WARNING" \
             "⚠️ No stable baseline for ${service} – cannot rollback" \
             "Container \`${service}\` is down, but no stable image tag has been recorded in \`.stable_tags\` yet.\n\nThis happens on the very first deployment before a successful health check.\n\nInfra team: investigate manually, then run a clean deploy to establish a baseline." \
             "${log_snippet}"
@@ -821,7 +827,11 @@ If the new image also fails, the rollback system will activate again." \
             sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
             echo "${env_var_name}=${bad_sha}" >> "${BASE_DIR}/.env"
 
-            notify "${service}" "CRITICAL"                 "🔴 Pin release FAILED for ${service}"                 "A new image was detected but \`docker compose up\` failed after releasing the pin.\n\nThe pin has been re-applied. Infra team: manual investigation required."                 ""
+            # Pin release failure = compose/VM issue → only notify #Infra
+            send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL" \
+                "🔴 Pin release FAILED for ${service}" \
+                "A new image was detected but \`docker compose up\` failed after releasing the pin.\n\nThe pin has been re-applied. Infra team: manual investigation required." \
+                ""
         fi
     done < "${ROLLBACK_PINS_FILE}"
 }
@@ -858,9 +868,20 @@ main() {
     fi
 
     # Ensure all state files exist so reads never fail on first run
-    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}" "${ROLLBACK_PINS_FILE}"
+    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}" "${ROLLBACK_PINS_FILE}" "${BASE_DIR}/.restart_counts"
 
     while true; do
+        # ── Deploy lock check ────────────────────────────────────────────────
+        # When deploy.yml is running, it creates .deploy_in_progress to signal
+        # that services are intentionally being restarted. We skip the entire
+        # check cycle to avoid false CRITICAL alerts during deployments.
+        # The lock is always removed by deploy.yml when it finishes (success or failure).
+        if [[ -f "${BASE_DIR}/.deploy_in_progress" ]]; then
+            log "Deploy in progress – skipping check cycle to avoid false alerts."
+            sleep "${CHECK_INTERVAL}"
+            continue
+        fi
+
         log "--- Starting check cycle ---"
 
         # ── Phase 1: Check if any pinned services have a new image available ──
@@ -875,21 +896,24 @@ main() {
             local health
             health=$(get_health_status "${service}")
 
-            # Detect crash loops: track RestartCount delta between cycles
+            # ── Crash loop detection via RestartCount delta ──────────────────
+            # Docker RestartCount is cumulative and never resets. By comparing
+            # the current count to what we saw last cycle (stored in
+            # .restart_counts), we detect services that have restarted 2+
+            # times in a single 30s window – a strong indicator of a crash loop.
             local restart_count
             restart_count=$(docker inspect --format='{{.RestartCount}}' "${service}" 2>/dev/null || echo 0)
             local restart_count_file="${BASE_DIR}/.restart_counts"
             local prev_count
             prev_count=$(grep "^${service}=" "${restart_count_file}" 2>/dev/null | cut -d'=' -f2 || echo 0)
+            # Update stored count for next cycle comparison
             sed -i "/^${service}=/d" "${restart_count_file}" 2>/dev/null || true
             echo "${service}=${restart_count}" >> "${restart_count_file}"
             local recent_restarts=$(( restart_count - prev_count ))
 
-            # Investigate if not running, unhealthy, OR crash loop detected
-            if [[ "${status}" != "running" ]] \
-                || [[ "${health}" == "unhealthy" ]] \
-                || (( recent_restarts >= 2 )); then
-                warn "Service ${service} needs attention: status=${status}, health=${health}, restarts_since_last_check=${recent_restarts}"
+            # Investigate if not running, unhealthy, OR in a crash loop
+            if [[ "${status}" != "running" ]]                 || [[ "${health}" == "unhealthy" ]]                 || (( recent_restarts >= 2 )); then
+                warn "Service ${service} needs attention: status=${status}, health=${health}, restarts_this_cycle=${recent_restarts}"
                 diagnose_and_recover "${service}"
             else
                 log "Service ${service}: OK (${status}/${health})"
