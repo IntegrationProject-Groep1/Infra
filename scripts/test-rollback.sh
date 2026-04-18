@@ -305,7 +305,6 @@ echo "${TEST_SERVICE}=${stable_entry}" >> "${BASE_DIR}/.stable_tags"
 success "Restored original stable SHA in .stable_tags"
 
 # Remove any sticky pin written by the rollback
-local env_var
 env_var=$(echo "${TEST_SERVICE}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_IMAGE
 sed -i "/^${env_var}=/d" "${BASE_DIR}/.env" 2>/dev/null || true
 success "Removed any sticky pin from .env"
