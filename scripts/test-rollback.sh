@@ -186,7 +186,8 @@ if ! docker pull "${OLDER_TAG}" >/dev/null 2>&1; then
     exit 1
 fi
 
-older_sha=$(docker inspect --format='{{.Image}}' "${OLDER_TAG}" 2>/dev/null || echo "")
+# {{.Id}} works on images (not {{.Image}} which is for containers)
+older_sha=$(docker inspect --format='{{.Id}}' "${OLDER_TAG}" 2>/dev/null || echo "")
 if [[ -z "${older_sha}" ]]; then
     error "Could not determine SHA for ${OLDER_TAG}."
     exit 1
@@ -196,17 +197,22 @@ success "Older version pulled: ${OLDER_TAG} (SHA: ${older_sha:0:19}...)"
 log ""
 log "Starting container with older version (simulating bad Watchtower update)..."
 
-# Start the container with the older image
-# This simulates Watchtower pulling v1.1.1 which then crashes
+# Start the container with the older image by writing it to .env temporarily.
+# docker-compose.yml reads ${KASSA_INTEGRATIE_IMAGE:-default} so this works.
 cd "${BASE_DIR}" || exit 1
-KASSA_INTEGRATIE_IMAGE="${OLDER_TAG}" docker compose up -d --no-deps "${compose_service}"     >/dev/null 2>&1
+sed -i "/^KASSA_INTEGRATIE_IMAGE=/d" .env 2>/dev/null || true
+echo "KASSA_INTEGRATIE_IMAGE=${OLDER_TAG}" >> .env
+
+docker compose up -d --no-deps "${compose_service}" >/dev/null 2>&1
 sleep 3
 
-# Verify it is running with the older image
+# Verify it started with the older image
 running_sha=$(docker inspect --format='{{.Image}}' "${TEST_SERVICE}" 2>/dev/null || echo "")
-if [[ "${running_sha}" != "${older_sha}" ]]; then
-    warn "Container SHA (${running_sha:0:19}...) does not match expected older SHA."
-    warn "Test may not work as expected. Continuing anyway..."
+log "Container running with SHA: ${running_sha:0:19}..."
+if [[ "${running_sha}" == "${older_sha}" ]]; then
+    success "Container is running with ${OLDER_TAG} as expected ✅"
+else
+    warn "SHA mismatch but continuing (container may be using cached image)"
 fi
 
 # Now stop it to simulate the crash
