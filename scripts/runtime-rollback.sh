@@ -753,18 +753,45 @@ diagnose_and_recover() {
     log "Pausing Watchtower container..."
     docker pause watchtower 2>/dev/null || warn "Could not pause Watchtower (may already be paused or missing)."
 
-    # b. Pull the exact stable image by SHA digest
-    log "Pulling stable SHA: ${sha_image}"
-    if ! docker pull "${sha_image}"; then
-        error "Failed to pull stable image ${sha_image}. Aborting rollback."
+    # b. Pull the exact stable image by SHA digest.
+    #
+    # IMPORTANT: docker pull requires a fully-qualified reference when pulling
+    # by digest. A bare sha256:abc... is NOT a valid pull target because Docker
+    # does not know which registry to query.
+    #
+    # Correct format:  ghcr.io/org/repo@sha256:abc123...
+    # Wrong format:    sha256:abc123...   (→ "pull access denied for sha256")
+    #
+    # We build the pull reference by combining the readable tag's registry/repo
+    # part with the SHA digest.
+    local pull_ref
+    if [[ "${sha_image}" == sha256:* ]]; then
+        # Extract registry/repo from the readable tag (strip the :tag suffix)
+        local registry_repo="${readable_stable_tag%%:*}"
+        pull_ref="${registry_repo}@${sha_image}"
+    else
+        # sha_image already looks like a full reference (legacy fallback)
+        pull_ref="${sha_image}"
+    fi
+
+    log "Pulling stable image: ${pull_ref}"
+    if ! docker pull "${pull_ref}"; then
+        error "Failed to pull stable image ${pull_ref}. Aborting rollback."
         docker unpause watchtower 2>/dev/null || true
         release_lock
+        # Use pull_ref as part of the event_key so a new pull target
+        # (e.g. after a redeploy updates the stable SHA) is not suppressed
         notify "${service}" "CRITICAL" \
             "🔴 Rollback FAILED – could not pull stable image for ${service}" \
-            "Attempted to pull \`${sha_image}\` but the pull failed.\n\n**Manual intervention required.**" \
-            "${log_snippet}"
+            "Attempted to pull \`${pull_ref}\` but the pull failed.\n\nThis may be a registry authentication issue or the image was deleted.\n\n**Manual intervention required.**" \
+            "${log_snippet}" \
+            "rollback_pull_failed_${pull_ref:0:30}"
         return 1
     fi
+
+    # Tag the pulled image with the readable reference so docker compose can
+    # find it by name when restarting the service.
+    docker tag "${pull_ref}" "${readable_stable_tag}" 2>/dev/null || true
 
     # c. PIN the SHA into the .env file.
     #    Convert service name to uppercase env var name:
@@ -826,6 +853,8 @@ diagnose_and_recover() {
     rollback_body+="The rollback monitor will automatically detect when a new image is pushed to GHCR and release the pin.\n\n"
     rollback_body+="⚠️ Fix the failing image and push a new version. The rollback monitor will automatically detect the new image within 30 seconds."
 
+    # Use rollback attempt number as part of event_key so attempt 1 and
+    # attempt 2 both trigger a notification even within the cooldown window.
     notify "${service}" "CRITICAL" \
         "🔄 STICKY Rollback executed – ${service}: ${current_tag} → ${readable_stable_tag}" \
         "${rollback_body}" \
@@ -833,7 +862,8 @@ diagnose_and_recover() {
 ${log_snippet}
 
 === Logs AFTER rollback start ===
-${post_rollback_logs}"
+${post_rollback_logs}" \
+        "rollback_executed_attempt_$((rollback_count + 1))"
 
     release_lock
     log "Sticky rollback complete: ${service} is pinned to ${readable_stable_tag}."
@@ -1035,6 +1065,14 @@ main() {
                 diagnose_and_recover "${service}"
             else
                 log "Service ${service}: OK (${status}/${health})"
+                # Service is healthy – clear any active notification cooldowns
+                # so the next incident is not suppressed by a stale cooldown
+                if [[ -f "${BASE_DIR}/.notification_cooldown" ]]; then
+                    if grep -q "^${service}:" "${BASE_DIR}/.notification_cooldown" 2>/dev/null; then
+                        sed -i "/^${service}:/d" "${BASE_DIR}/.notification_cooldown"
+                        log "Cleared notification cooldown for recovered service: ${service}"
+                    fi
+                fi
             fi
         done
 
