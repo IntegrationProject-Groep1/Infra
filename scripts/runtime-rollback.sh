@@ -224,15 +224,16 @@ release_lock() {
 # Safely escapes a string for embedding inside a JSON value.
 # =============================================================================
 escape_json() {
-    # 1. Escape real backslashes (but not the \n sequences we use for line breaks)
-    # 2. Escape double quotes
-    # 3. Convert real newlines (from heredocs etc.) to \n
-    # NOTE: We deliberately do NOT re-escape \n sequences that are already
-    # in the string as literal backslash-n pairs, because our body strings
-    # use \n intentionally for line breaks in the Teams Adaptive Card.
+    # Escape for JSON embedding:
+    #   1. Protect literal \n sequences (our intentional line breaks) with a placeholder
+    #   2. Escape real backslashes
+    #   3. Escape double quotes
+    #   4. Convert real newlines to \n
+    #   5. Restore the placeholder back to \n
+    # Uses only basic sed features compatible with busybox (Alpine container).
     printf '%s' "$1" \
+        | sed 's/\\n/NEWLINE_PLACEHOLDER/g' \
         | sed 's/\\/\\\\/g' \
-        | sed 's/\\\\n/NEWLINE_PLACEHOLDER/g' \
         | sed 's/"/\\"/g' \
         | sed ':a;N;$!ba;s/\n/\\n/g' \
         | sed 's/NEWLINE_PLACEHOLDER/\\n/g'
