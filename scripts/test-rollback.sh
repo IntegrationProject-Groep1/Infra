@@ -205,19 +205,24 @@ log "=== Waiting for rollback monitor to detect the condition ==="
 log "The monitor checks every 30s. Expected behaviour:"
 log "  - Monitor detects container stopped"
 log "  - Diagnosis runs through Steps 1-5"
-log "  - Step 4 fires WARNING (same image as stable)"
 log "  - Teams notification sent to Infra + Kassa channels"
 log ""
+
+# Record the current log line count so we only look at NEW log lines
+# generated AFTER the test condition was injected. This prevents false
+# negatives caused by leftover log lines from previous test runs.
+LOG_LINES_BEFORE=$(docker logs rollback_monitor 2>&1 | wc -l)
+log "Current monitor log lines: ${LOG_LINES_BEFORE} (only new lines will be checked)"
 
 MAX_WAIT=90
 WAITED=0
 DETECTED=false
 
 while (( WAITED < MAX_WAIT )); do
-    # Check if the monitor picked up the event by looking at its logs
-    recent_log=$(docker logs rollback_monitor --tail 20 2>&1 || echo "")
+    # Only look at log lines written AFTER we started the test
+    new_logs=$(docker logs rollback_monitor 2>&1 | tail -n +"${LOG_LINES_BEFORE}")
 
-    if echo "${recent_log}" | grep -q "Diagnosing service: ${TEST_SERVICE}"; then
+    if echo "${new_logs}" | grep -q "Diagnosing service: ${TEST_SERVICE}"; then
         DETECTED=true
         break
     fi
@@ -235,8 +240,8 @@ if ! ${DETECTED}; then
 else
     success "Monitor detected the condition and started diagnosing! ✅"
     log ""
-    log "Relevant monitor output:"
-    docker logs rollback_monitor --tail 15 2>&1 | grep -E "${TEST_SERVICE}|STEP|Diagnosing" | tail -10 || true
+    log "Relevant monitor output (new lines only):"
+    docker logs rollback_monitor 2>&1 | tail -n +"${LOG_LINES_BEFORE}" | grep -E "${TEST_SERVICE}|STEP|Diagnosing|Rollback|rollback|Teams" | tail -15 || true
 fi
 
 # =============================================================================

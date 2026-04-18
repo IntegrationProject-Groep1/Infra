@@ -224,11 +224,18 @@ release_lock() {
 # Safely escapes a string for embedding inside a JSON value.
 # =============================================================================
 escape_json() {
-    # Escape backslashes first, then double quotes, then convert real newlines to \n
+    # 1. Escape real backslashes (but not the \n sequences we use for line breaks)
+    # 2. Escape double quotes
+    # 3. Convert real newlines (from heredocs etc.) to \n
+    # NOTE: We deliberately do NOT re-escape \n sequences that are already
+    # in the string as literal backslash-n pairs, because our body strings
+    # use \n intentionally for line breaks in the Teams Adaptive Card.
     printf '%s' "$1" \
         | sed 's/\\/\\\\/g' \
+        | sed 's/\\\\n/NEWLINE_PLACEHOLDER/g' \
         | sed 's/"/\\"/g' \
-        | sed ':a;N;$!ba;s/\n/\\n/g'
+        | sed ':a;N;$!ba;s/\n/\\n/g' \
+        | sed 's/NEWLINE_PLACEHOLDER/\\n/g'
 }
 
 # =============================================================================
@@ -677,19 +684,31 @@ diagnose_and_recover() {
         return 0
     fi
 
+    # Extract the stable SHA from the SHA|TAG entry (everything before '|')
+    local stable_sha="${stable_image%%|*}"
+    local stable_readable="${stable_image##*|}"
     local stable_tag
-    stable_tag=$(get_image_tag "${stable_image}")
+    stable_tag=$(get_image_tag "${stable_readable}")
 
-    if [[ "${current_image}" == "${stable_image}" ]]; then
-        warn "STEP 4 FAIL – Current image (${current_tag}) IS the stable image. This is a config or environment problem, not a bad image. No rollback."
+    # Compare using SHA digests:
+    #   current_sha = docker inspect {{.Image}} of the (now stopped) container
+    #   stable_sha  = SHA recorded by deploy.yml after last successful deploy
+    #
+    # If they match → same image version → rollback would be pointless → config issue
+    # If they differ → new image was deployed after stable baseline → rollback makes sense
+    #
+    # NOTE: current_sha may be empty if the container never started. In that case
+    # we fall through to rollback as a safe default.
+    if [[ -n "${current_sha}" && "${current_sha}" == "${stable_sha}" ]]; then
+        warn "STEP 4 FAIL – Current SHA (${current_sha:0:19}...) matches stable SHA. Config/env issue, not a bad image. No rollback."
         notify "${service}" "WARNING" \
             "⚠️ Config/env issue detected in ${service}" \
-            "Container \`${service}\` is down, but it is running the same image that was previously stable (\`${stable_tag}\`).\n\nThis points to a **configuration or environment problem** (missing env var, wrong secret, volume issue).\n\n**No rollback triggered** – rolling back to the same image would not help. Infra team: check \`.env\` and docker-compose volumes." \
+            "Container \`${service}\` is down, but it is running the same image that was previously stable (\`${stable_tag}\`, SHA: \`${stable_sha:0:19}...\`).\n\nThis points to a **configuration or environment problem** (missing env var, wrong secret, volume issue).\n\n**No rollback triggered** – rolling back to the same image would not help. Infra team: check \`.env\` and docker-compose volumes." \
             "${log_snippet}"
         return 0
     fi
 
-    log "STEP 4 OK – Current image (${current_tag}) differs from stable (${stable_tag}). New image is the likely cause."
+    log "STEP 4 OK – Current SHA (${current_sha:0:19}...) differs from stable SHA (${stable_sha:0:19}...). New image is the likely cause."
 
     # ------------------------------------------------------------------
     # STEP 5: Have we already hit MAX_ROLLBACKS for this service?
@@ -856,8 +875,8 @@ diagnose_and_recover() {
     #    redeploy as a fallback if the automatic fix detection does not fire.
     local rollback_body
     rollback_body="Container \`${service}\` was automatically rolled back and PINNED to its last stable SHA.\n\n"
-    rollback_body+="**Failing version:** \`${current_tag}\`\n"
-    rollback_body+="**Restored + pinned to:** \`${readable_stable_tag}\`\n"
+    rollback_body+="**Failing image:** \`${current_tag}\` (SHA: \`${current_sha:0:19}...\`)\n"
+    rollback_body+="**Restored + pinned to:** \`${stable_readable}\` (SHA: \`${stable_sha:0:19}...\`)\n"
     rollback_body+="**Rollback attempt:** $((rollback_count + 1)) of ${MAX_ROLLBACKS}\n\n"
     rollback_body+="The rollback monitor will automatically detect when a new image is pushed to GHCR and release the pin.\n\n"
     rollback_body+="⚠️ Fix the failing image and push a new version. The rollback monitor will automatically detect the new image within 30 seconds."
@@ -865,7 +884,7 @@ diagnose_and_recover() {
     # Use rollback attempt number as part of event_key so attempt 1 and
     # attempt 2 both trigger a notification even within the cooldown window.
     notify "${service}" "CRITICAL" \
-        "🔄 STICKY Rollback executed – ${service}: ${current_tag} → ${readable_stable_tag}" \
+        "🔄 STICKY Rollback executed – ${service}" \
         "${rollback_body}" \
         "=== Logs BEFORE rollback (${service}) ===
 ${log_snippet}
