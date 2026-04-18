@@ -21,12 +21,12 @@
 #   - The rollback monitor does the actual recovery automatically
 #
 # WHAT THIS TESTS:
-#   Rollback monitor detects a crashed/unhealthy container
-#   Diagnosis matrix correctly identifies the issue
-#   Sticky rollback pins the stable SHA in .env
-#   Container is restarted with the stable image
-#   Teams notifications are sent to Infra + owning team
-#   .rollback_pins file is written correctly
+#   ✅ Rollback monitor detects a crashed/unhealthy container
+#   ✅ Diagnosis matrix correctly identifies the issue
+#   ✅ Sticky rollback pins the stable SHA in .env
+#   ✅ Container is restarted with the stable image
+#   ✅ Teams notifications are sent to Infra + owning team
+#   ✅ .rollback_pins file is written correctly
 # =============================================================================
 
 set -euo pipefail
@@ -62,7 +62,6 @@ if [[ "${1:-}" == "--restore" ]]; then
     fi
 
     log "Restoring from: ${latest_backup}"
-    # shellcheck source=/dev/null
     source "${latest_backup}"
 
     # Restore .env – remove any test pins
@@ -84,11 +83,12 @@ if [[ "${1:-}" == "--restore" ]]; then
         success "Cleaned .rollback_pins"
     fi
 
-    # Restart the service cleanly
+    # Restart the service cleanly using the compose service name
     if [[ -n "${TEST_SERVICE:-}" ]]; then
         cd "${BASE_DIR}"
-        docker compose up -d --no-deps "${TEST_SERVICE}"
-        success "Service ${TEST_SERVICE} restarted with original image"
+        local_compose="${TEST_COMPOSE_SERVICE:-${TEST_SERVICE}}"
+        docker compose up -d --no-deps "${local_compose}"
+        success "Service ${local_compose} restarted with original image"
     fi
 
     rm -f "${latest_backup}"
@@ -130,6 +130,8 @@ success "Stable baseline found: ${stable_tag} (${stable_sha:0:19}...)"
 
 # =============================================================================
 # SAVE CURRENT STATE (backup before any changes)
+# CRITICAL: backup must happen BEFORE any fake SHA injection so --restore
+# recovers the REAL state, not the fake test state.
 # =============================================================================
 log ""
 log "=== Saving current state ==="
@@ -137,9 +139,23 @@ log "=== Saving current state ==="
 # Calculate env var name (e.g. kassa_integratie → KASSA_INTEGRATIE_IMAGE)
 env_var_name=$(echo "${TEST_SERVICE}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_IMAGE
 
-# Save everything needed for restore
+# Resolve docker compose service name (container names use underscores,
+# compose service names may use hyphens – they must match docker-compose.yml)
+case "${TEST_SERVICE}" in
+    "kassa_integratie")      compose_service="kassa-integratie" ;;
+    "frontend_drupal")       compose_service="frontend-drupal" ;;
+    "fossbilling_app")       compose_service="fossbilling-app" ;;
+    "fossbilling_connector") compose_service="fossbilling-connector" ;;
+    "crm_receiver")          compose_service="crm-receiver" ;;
+    "planning_service")      compose_service="planning-service" ;;
+    "kassa_odoo")            compose_service="kassa-web" ;;
+    *)                       compose_service="${TEST_SERVICE}" ;;
+esac
+
+# Save backup with the REAL stable entry (captured before injection)
 cat > "${TEST_BACKUP_FILE}" << BACKUP
 TEST_SERVICE="${TEST_SERVICE}"
+TEST_COMPOSE_SERVICE="${compose_service}"
 TEST_ENV_VAR="${env_var_name}"
 ORIGINAL_STABLE_ENTRY="${stable_entry}"
 ORIGINAL_IMAGE=$(docker inspect --format='{{.Config.Image}}' "${TEST_SERVICE}")
@@ -149,32 +165,30 @@ success "State saved to ${TEST_BACKUP_FILE}"
 log "  Restore at any time with: bash ${0} --restore"
 
 # =============================================================================
-# INJECT A FAKE BAD IMAGE INTO .STABLE_TAGS
-#
-# We overwrite the .stable_tags entry with a deliberately wrong SHA
-# so the rollback monitor thinks the current image is "different from stable"
-# and triggers a rollback back to the real stable SHA.
-#
-# The "current" image stays the same – only the stable reference changes
-# to point to a non-existent/wrong SHA, forcing a rollback.
+# INJECT TEST CONDITION:
+#   1. Write a FAKE stable SHA (all zeros) into .stable_tags so the monitor
+#      sees current image != stable → passes Step 4 of diagnosis matrix
+#   2. Stop the container so monitor sees it as down → passes Step 2
 # =============================================================================
 log ""
 log "=== Injecting test condition ==="
 
-# Generate a fake "current bad" SHA by modifying one character of the real SHA
-# This makes the current container look like it's running a "different" image
-fake_bad_sha="${stable_sha:0:-4}DEAD"
+# Use a full-length obviously-fake SHA so it is clearly different from any real SHA
+fake_bad_sha="sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 log "Overwriting .stable_tags with fake stable entry..."
 log "  Real stable SHA: ${stable_sha:0:19}..."
 log "  Fake stable SHA: ${fake_bad_sha:0:19}..."
 
-# Write the fake entry – this makes the monitor think the running image
-# is NEWER than stable and therefore candidates for rollback
+# Write the fake stable entry
 sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
 echo "${TEST_SERVICE}=${fake_bad_sha}|${stable_tag}" >> "${BASE_DIR}/.stable_tags"
 
-success "Fake stable entry written. Monitor will see current image != stable."
+# Stop the container – this is what triggers the rollback monitor
+log "Stopping ${TEST_SERVICE} to trigger rollback detection..."
+docker stop "${TEST_SERVICE}" 2>/dev/null || true
+
+success "Test condition injected: container stopped + fake stable SHA written."
 
 # =============================================================================
 # WAIT FOR THE ROLLBACK MONITOR TO DETECT AND ACT
@@ -288,10 +302,10 @@ success "Reset rollback counter for ${TEST_SERVICE}"
 sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.rollback_pins" 2>/dev/null || true
 success "Cleaned .rollback_pins"
 
-# Restart service cleanly with original image
+# Restart service cleanly using the correct compose service name
 cd "${BASE_DIR}"
-docker compose up -d --no-deps "${TEST_SERVICE}"
-success "Service ${TEST_SERVICE} restarted cleanly"
+docker compose up -d --no-deps "${compose_service}"
+success "Service ${compose_service} restarted cleanly"
 
 # Remove backup file
 rm -f "${TEST_BACKUP_FILE}"

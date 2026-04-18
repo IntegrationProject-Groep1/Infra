@@ -112,6 +112,25 @@ declare -A SERVICE_TEAM_WEBHOOK=(
 )
 
 # -----------------------------------------------------------------------------
+# CONTAINER NAME → DOCKER COMPOSE SERVICE NAME MAPPING
+#
+# Docker container names use underscores (e.g. kassa_integratie) but
+# docker compose service names use hyphens (e.g. kassa-integratie).
+# This mapping ensures docker compose up targets the correct service name.
+# Any container NOT listed here falls back to using its own name as-is.
+# -----------------------------------------------------------------------------
+declare -A CONTAINER_TO_COMPOSE=(
+    ["frontend_drupal"]="frontend-drupal"
+    ["fossbilling_app"]="fossbilling-app"
+    ["fossbilling_connector"]="fossbilling-connector"
+    ["kassa_odoo"]="kassa-web"
+    ["kassa_integratie"]="kassa-integratie"
+    ["crm_receiver"]="crm-receiver"
+    ["planning_service"]="planning-service"
+    ["monitoring_heartbeat"]="monitoring-heartbeat"
+)
+
+# -----------------------------------------------------------------------------
 # SERVICES TO MONITOR
 # Only monitor services that have a heartbeat sidecar and a meaningful image.
 # Infrastructure containers (nginx proxies, watchtower) are excluded because
@@ -347,6 +366,17 @@ get_container_logs() {
 }
 
 # =============================================================================
+# HELPER: COMPOSE SERVICE NAME RESOLVER
+# Translates a Docker container name to the correct docker compose service name.
+# Container names use underscores; compose service names may use hyphens.
+# =============================================================================
+get_compose_service() {
+    local container="$1"
+    # Look up in the mapping; fall back to the container name itself
+    echo "${CONTAINER_TO_COMPOSE[${container}]:-${container}}"
+}
+
+# =============================================================================
 # HELPER: .stable_tags FILE
 # Format (one line per service):
 #   SERVICE_NAME=ghcr.io/org/repo:v1.2.1
@@ -428,15 +458,15 @@ reset_rollback_count() {
 # =============================================================================
 multiple_services_down() {
     local down_count=0
-    for service in "${MONITORED_SERVICES[@]}"; do
-        local status
-        status=$(get_container_status "${service}")
-        local health
-        health=$(get_health_status "${service}")
+    local s  # Use 's' to avoid clobbering the 'service' variable in the caller
+    for s in "${MONITORED_SERVICES[@]}"; do
+        local s_status
+        s_status=$(get_container_status "${s}")
+        local s_health
+        s_health=$(get_health_status "${s}")
 
-        if [[ "${status}" != "running" ]] \
-            || [[ "${health}" == "unhealthy" ]]; then
-            (( down_count++ ))
+        if [[ "${s_status}" != "running" ]]             || [[ "${s_health}" == "unhealthy" ]]; then
+            (( down_count++ )) || true
         fi
     done
 
@@ -667,18 +697,18 @@ diagnose_and_recover() {
     echo "${env_var_name}=${sha_image}" >> "${BASE_DIR}/.env"
 
     # d. Restart the service – docker compose now reads the pinned SHA from .env
+    #    IMPORTANT: use the compose service name (hyphens), not the container name
+    local compose_service
+    compose_service=$(get_compose_service "${service}")
     cd "${BASE_DIR}"
-    log "Restarting ${service} with pinned SHA..."
-    if ! docker compose up -d --no-deps "${service}"; then
-        error "docker compose up failed for ${service} after sticky rollback."
+    log "Restarting compose service '${compose_service}' (container: ${service}) with pinned SHA..."
+    if ! docker compose up -d --no-deps "${compose_service}"; then
+        error "docker compose up failed for ${service} (compose: ${compose_service}) after sticky rollback."
         # Clean up the pin so the next deploy is not blocked
         sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
         docker unpause watchtower 2>/dev/null || true
         release_lock
-        notify "${service}" "CRITICAL" \
-            "🔴 Sticky rollback compose-up FAILED for ${service}" \
-            "Pulled stable SHA \`${sha_image}\` successfully but \`docker compose up\` failed.\n\nInfra team: check compose file and container logs." \
-            "${log_snippet}"
+        notify "${service}" "CRITICAL"             "🔴 Sticky rollback compose-up FAILED for ${service}"             "Pulled stable SHA \`${sha_image}\` but \`docker compose up ${compose_service}\` failed.\n\nInfra team: check compose file and container logs."             "${log_snippet}"
         return 1
     fi
 
@@ -805,9 +835,11 @@ except Exception:
         # Remove the entry from .rollback_pins
         sed -i "/^${service}=/d" "${ROLLBACK_PINS_FILE}"
 
-        # Pull the new image and restart the service
+        # Pull the new image and restart the service using the compose service name
+        local pin_compose_service
+        pin_compose_service=$(get_compose_service "${service}")
         cd "${BASE_DIR}"
-        if docker compose up -d --no-deps "${service}" 2>/dev/null; then
+        if docker compose up -d --no-deps "${pin_compose_service}" 2>/dev/null; then
             log "PIN RELEASED: ${service} restarted with new image. Watchtower will monitor normally."
             notify "${service}" "INFO" \
                 "✅ Sticky pin released – ${service} updated with new image" \
@@ -821,7 +853,7 @@ The sticky rollback pin has been **automatically released** and the service has 
 If the new image also fails, the rollback system will activate again." \
                 ""                 ""                 ""
         else
-            error "PIN RELEASE: docker compose up failed for ${service} after pin release."
+            error "PIN RELEASE: docker compose up failed for ${service} (compose: ${pin_compose_service}) after pin release."
             # Re-add the pin since the restart failed
             echo "${service}=${bad_sha}|${env_var_name}|${readable_tag}" >> "${ROLLBACK_PINS_FILE}"
             sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
