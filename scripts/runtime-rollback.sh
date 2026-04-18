@@ -575,7 +575,9 @@ diagnose_and_recover() {
 
     # Gather basic info upfront so we can include it in every notification
     local current_image
-    current_image=$(get_container_image "${service}")
+    current_image=$(get_container_image "${service}")   # readable tag: ghcr.io/org/repo:latest
+    local current_sha
+    current_sha=$(docker inspect --format='{{.Image}}' "${service}" 2>/dev/null || echo "")  # real SHA digest
     local current_tag
     current_tag=$(get_image_tag "${current_image}")
     local container_status
@@ -828,9 +830,16 @@ diagnose_and_recover() {
     #    automatically detect when the team pushes a fix to GHCR and release
     #    the pin without any manual intervention.
     #    Format: service=bad_sha|env_var_name|readable_tag
+    #
+    #    IMPORTANT: we store current_sha (the real SHA digest via {{.Image}}),
+    #    NOT current_image (the readable tag like ghcr.io/.../kassa:latest).
+    #    check_pinned_services() compares this against the registry manifest
+    #    digest from `docker buildx imagetools inspect`. Both must use the
+    #    same SHA format for the comparison to work correctly.
+    local bad_sha_to_record="${current_sha:-${current_image}}"
     sed -i "/^${service}=/d" "${ROLLBACK_PINS_FILE}" 2>/dev/null || true
-    echo "${service}=${current_image}|${env_var_name}|${readable_stable_tag}" >> "${ROLLBACK_PINS_FILE}"
-    log "Recorded bad SHA in .rollback_pins for automatic fix detection."
+    echo "${service}=${bad_sha_to_record}|${env_var_name}|${readable_stable_tag}" >> "${ROLLBACK_PINS_FILE}"
+    log "Recorded bad SHA in .rollback_pins: ${bad_sha_to_record:0:19}..."
 
     # g. Unpause Watchtower – SHA-pinned container will be ignored automatically
     sleep 5
