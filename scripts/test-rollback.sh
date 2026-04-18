@@ -62,6 +62,7 @@ if [[ "${1:-}" == "--restore" ]]; then
     fi
 
     log "Restoring from: ${latest_backup}"
+    # shellcheck source=/dev/null
     source "${latest_backup}"
 
     # Restore .env – remove any test pins
