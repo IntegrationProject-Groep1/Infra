@@ -34,7 +34,12 @@
 #   docker, curl, jq, python3 (install: apk add bash curl jq python3)
 # =============================================================================
 
-set -euo pipefail
+# NOTE: We deliberately do NOT use "set -e" here.
+# This is a long-running monitoring daemon that must NEVER exit because of a
+# single failed command. If docker pull fails, if a grep returns nothing, etc,
+# the script must continue running and keep monitoring. We only use -u and
+# pipefail for safety on undefined variables and broken pipes.
+set -uo pipefail
 
 # -----------------------------------------------------------------------------
 # CONFIGURATION
@@ -63,6 +68,16 @@ LOCK_TIMEOUT=300
 
 # State file tracking active sticky pins (service=bad_sha|env_var|readable_tag)
 ROLLBACK_PINS_FILE="${BASE_DIR}/.rollback_pins"
+
+# State file tracking when a notification was last sent per (service, event_key).
+# Prevents notification spam when a service fails repeatedly in a short window.
+# Format: service:event_key=timestamp
+NOTIFICATION_COOLDOWN_FILE="${BASE_DIR}/.notification_cooldown"
+
+# How long (seconds) to suppress duplicate notifications for the same
+# service + event_key. 10 minutes is a good balance between not missing
+# new incidents and not spamming when a service keeps crashing.
+NOTIFICATION_COOLDOWN_SECONDS=600
 
 
 # Teams webhook URLs – loaded from environment or /opt/shiftfestival/.env
@@ -303,8 +318,61 @@ send_teams_message() {
 
 
 # =============================================================================
-# HELPER: notify() – send to Infra AND owning team
-# Always notifies the #Infra channel AND the service's owning team channel.
+# HELPER: NOTIFICATION COOLDOWN
+#
+# Returns 0 (true) if a notification for this (service, event_key) combination
+# was already sent within NOTIFICATION_COOLDOWN_SECONDS. This prevents the same
+# alert from flooding Teams when a service is in a crash loop or a rollback
+# keeps failing.
+#
+# Arguments:
+#   $1 – service name (e.g. kassa_integratie)
+#   $2 – event key (e.g. "rollback_pull_failed", "rollback_executed")
+# =============================================================================
+in_cooldown() {
+    local service="$1"
+    local event_key="$2"
+    local cooldown_key="${service}:${event_key}"
+
+    [[ ! -f "${NOTIFICATION_COOLDOWN_FILE}" ]] && return 1  # no cooldown file = not in cooldown
+
+    local last_sent
+    last_sent=$(grep "^${cooldown_key}=" "${NOTIFICATION_COOLDOWN_FILE}" 2>/dev/null         | cut -d'=' -f2 | head -1)
+
+    [[ -z "${last_sent}" ]] && return 1  # never sent before = not in cooldown
+
+    local now
+    now=$(date +%s)
+    local age=$(( now - last_sent ))
+
+    if (( age < NOTIFICATION_COOLDOWN_SECONDS )); then
+        return 0  # in cooldown – suppress the notification
+    else
+        return 1  # cooldown expired – allow the notification
+    fi
+}
+
+# Records that a notification was just sent so future calls within the window are suppressed.
+mark_notification_sent() {
+    local service="$1"
+    local event_key="$2"
+    local cooldown_key="${service}:${event_key}"
+    local now
+    now=$(date +%s)
+
+    # Remove any previous entry for this key, then write the new timestamp
+    if [[ -f "${NOTIFICATION_COOLDOWN_FILE}" ]]; then
+        sed -i "/^${cooldown_key}=/d" "${NOTIFICATION_COOLDOWN_FILE}"
+    fi
+    echo "${cooldown_key}=${now}" >> "${NOTIFICATION_COOLDOWN_FILE}"
+}
+
+# =============================================================================
+# HELPER: notify() – send to Infra AND owning team (with cooldown)
+#
+# Always notifies the #Infra channel AND the service's owning team channel,
+# but suppresses duplicate notifications within NOTIFICATION_COOLDOWN_SECONDS.
+# Pass an event_key as the 6th arg to scope the cooldown per-event.
 # =============================================================================
 notify() {
     local service="$1"
@@ -312,6 +380,14 @@ notify() {
     local title="$3"
     local body="$4"
     local log_snippet="${5:-}"
+    # Use the title as the event key by default – same title = same event = dedup
+    local event_key="${6:-${title}}"
+
+    # Check if we already sent this notification recently
+    if in_cooldown "${service}" "${event_key}"; then
+        log "Suppressing duplicate notification (cooldown active): ${title}"
+        return 0
+    fi
 
     # Always alert the Infra channel
     send_teams_message "${TEAMS_WEBHOOK_INFRA}" "${severity}" "${title}" "${body}" "${log_snippet}"
@@ -321,6 +397,9 @@ notify() {
     if [[ -n "${team_webhook}" && "${team_webhook}" != "${TEAMS_WEBHOOK_INFRA}" ]]; then
         send_teams_message "${team_webhook}" "${severity}" "${title}" "${body}" "${log_snippet}"
     fi
+
+    # Record that we just sent this notification
+    mark_notification_sent "${service}" "${event_key}"
 }
 
 
@@ -523,10 +602,13 @@ diagnose_and_recover() {
 
         warn "STEP 1 FAIL – Multiple services down. Cause: ${cause}. No rollback."
         # Infra outage → only notify #Infra. Owning teams cannot fix VM-level issues.
-        send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL" \
-            "🔴 Infra outage detected – ${cause}" \
-            "Multiple services went down simultaneously. This is an infrastructure problem, NOT a bad application image. **No rollback has been triggered.**\n\nAffected service checked: \`${service}\` (${container_status})\nCause: ${cause}\n\nInfra team: please check RabbitMQ, Elasticsearch, and VM health immediately." \
-            "${log_snippet}"
+        # Use cooldown to prevent spam when multiple services keep failing.
+        if ! in_cooldown "infra" "outage_${cause}"; then
+            send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL"                 "🔴 Infra outage detected – ${cause}"                 "Multiple services went down simultaneously. This is an infrastructure problem, NOT a bad application image. **No rollback has been triggered.**\n\nAffected service checked: \`${service}\` (${container_status})\nCause: ${cause}\n\nInfra team: please check RabbitMQ, Elasticsearch, and VM health immediately."                 "${log_snippet}"
+            mark_notification_sent "infra" "outage_${cause}"
+        else
+            log "Infra outage notification suppressed (cooldown active)."
+        fi
         return 0  # no rollback
     fi
 
@@ -585,11 +667,11 @@ diagnose_and_recover() {
 
     if [[ -z "${stable_image}" ]]; then
         warn "STEP 4 – No stable image recorded for ${service}. Cannot compare. Treating as config issue."
-        # No stable baseline = deploy/infra issue → only notify #Infra
-        send_teams_message "${TEAMS_WEBHOOK_INFRA}" "WARNING" \
-            "⚠️ No stable baseline for ${service} – cannot rollback" \
-            "Container \`${service}\` is down, but no stable image tag has been recorded in \`.stable_tags\` yet.\n\nThis happens on the very first deployment before a successful health check.\n\nInfra team: investigate manually, then run a clean deploy to establish a baseline." \
-            "${log_snippet}"
+        # No stable baseline = deploy/infra issue → only notify #Infra (with cooldown)
+        if ! in_cooldown "${service}" "no_baseline"; then
+            send_teams_message "${TEAMS_WEBHOOK_INFRA}" "WARNING"                 "⚠️ No stable baseline for ${service} – cannot rollback"                 "Container \`${service}\` is down, but no stable image tag has been recorded in \`.stable_tags\` yet.\n\nThis happens on the very first deployment before a successful health check.\n\nInfra team: investigate manually, then run a clean deploy to establish a baseline."                 "${log_snippet}"
+            mark_notification_sent "${service}" "no_baseline"
+        fi
         return 0
     fi
 
@@ -793,25 +875,29 @@ check_pinned_services() {
 
         log "PIN CHECK: ${service} – bad SHA: ${bad_sha:0:19}... tag: ${readable_tag}"
 
-        # Query the registry manifest digest WITHOUT downloading the full image.
-        # docker manifest inspect reads only the manifest JSON from the registry.
-        # We extract the config digest which identifies the unique image content.
+        # Query the registry MANIFEST DIGEST without fully downloading layers.
+        # We use `docker buildx imagetools inspect` because it returns the SAME
+        # SHA that `docker inspect --format='{{.Image}}' <container>` returns
+        # for a running container – they match exactly. This is the correct
+        # value to compare against `bad_sha` (which was captured via {{.Image}}).
+        #
+        # Alternative approaches we tried and REJECTED:
+        #   - `docker manifest inspect` + .config.digest → returns the CONFIG
+        #     blob digest, which is NOT the same as {{.Image}}. Would cause
+        #     every check to fire "new image detected" incorrectly.
+        #   - `docker pull --quiet` → only prints image name, not the digest.
+        #   - HTTP HEAD to /v2/*/manifests/* → requires manual auth token
+        #     extraction, brittle.
         local registry_sha=""
-        registry_sha=$(docker manifest inspect "${readable_tag}" 2>/dev/null             | python3 -c "
-import sys, json
-try:
-    data = json.load(sys.stdin)
-    # Multi-arch manifest list → use digest of first platform entry
-    if data.get('schemaVersion') == 2 and 'manifests' in data:
-        print(data['manifests'][0].get('digest', ''))
-    # Single manifest → use config digest
-    elif 'config' in data:
-        print(data['config'].get('digest', ''))
-    else:
-        print('')
-except Exception:
-    print('')
-" 2>/dev/null || echo "")
+        registry_sha=$(docker buildx imagetools inspect "${readable_tag}" 2>/dev/null             | awk '/^Digest:/ {print $2; exit}' || echo "")
+
+        # Fallback: if buildx is unavailable for any reason, use docker pull
+        # and parse its "Digest:" output line. docker pull is a no-op when
+        # the image is already local AND the registry digest is unchanged,
+        # so this is safe and cheap.
+        if [[ -z "${registry_sha}" ]]; then
+            registry_sha=$(docker pull "${readable_tag}" 2>&1                 | awk '/^Digest:/ {print $2; exit}' || echo "")
+        fi
 
         if [[ -z "${registry_sha}" ]]; then
             warn "PIN CHECK: Could not reach registry for ${service} – keeping pin, will retry next cycle."
@@ -859,11 +945,11 @@ If the new image also fails, the rollback system will activate again." \
             sed -i "/^${env_var_name}=/d" "${BASE_DIR}/.env"
             echo "${env_var_name}=${bad_sha}" >> "${BASE_DIR}/.env"
 
-            # Pin release failure = compose/VM issue → only notify #Infra
-            send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL" \
-                "🔴 Pin release FAILED for ${service}" \
-                "A new image was detected but \`docker compose up\` failed after releasing the pin.\n\nThe pin has been re-applied. Infra team: manual investigation required." \
-                ""
+            # Pin release failure = compose/VM issue → only notify #Infra (with cooldown)
+            if ! in_cooldown "${service}" "pin_release_failed"; then
+                send_teams_message "${TEAMS_WEBHOOK_INFRA}" "CRITICAL"                     "🔴 Pin release FAILED for ${service}"                     "A new image was detected but \`docker compose up\` failed after releasing the pin.\n\nThe pin has been re-applied. Infra team: manual investigation required."                     ""
+                mark_notification_sent "${service}" "pin_release_failed"
+            fi
         fi
     done < "${ROLLBACK_PINS_FILE}"
 }
@@ -900,7 +986,7 @@ main() {
     fi
 
     # Ensure all state files exist so reads never fail on first run
-    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}" "${ROLLBACK_PINS_FILE}" "${BASE_DIR}/.restart_counts"
+    touch "${STABLE_TAGS_FILE}" "${ROLLBACK_STATE_FILE}" "${ROLLBACK_PINS_FILE}" "${BASE_DIR}/.restart_counts" "${NOTIFICATION_COOLDOWN_FILE}"
 
     while true; do
         # ── Deploy lock check ────────────────────────────────────────────────
