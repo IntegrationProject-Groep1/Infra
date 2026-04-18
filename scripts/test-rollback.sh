@@ -162,71 +162,71 @@ log "  Emergency restore: bash ${0} --restore"
 # =============================================================================
 # INJECT TEST CONDITION — Full rollback simulation
 #
-# To trigger a real rollback we need:
-#   current_sha (running container) ≠ stable_sha (in .stable_tags)
+# This simulates exactly what happens in production:
+#   1. deploy.yml has already recorded the REAL stable SHA in .stable_tags
+#      (sha256:856a8d = :latest) — we do NOT touch this
+#   2. We pull an older version (v1.1.1) and start the container with it
+#      → simulates: Watchtower pulled a newer/different image
+#   3. We stop that container
+#      → simulates: the new image crashed
+#   4. Monitor sees: current SHA (v1.1.1) ≠ stable SHA (:latest in .stable_tags)
+#      → Step 4 passes → Step 6 rollback to :latest ✅
 #
-# Strategy:
-#   1. Pull alpine:latest → get its SHA as a "fake stable" reference
-#   2. Write that SHA into .stable_tags as if it were the last stable deploy
-#   3. Stop the container (simulates a crash)
-#   4. Monitor sees: current_sha (real kassa) ≠ stable_sha (alpine)
-#      → Step 4 passes → Step 6 rollback executes
-#   5. Rollback pulls the REAL kassa SHA (from stable_entry backup)
-#      and restores the service correctly
-#
-# The real kassa SHA is backed up in TEST_BACKUP_FILE and will be
-# restored in the cleanup phase regardless of what happens.
+# .stable_tags is NOT modified — the rollback system uses it as-is,
+# exactly like it would in a real incident.
 # =============================================================================
 log ""
 log "=== Injecting test condition ==="
 
-# Pull a small known-good image to use as the fake stable SHA
-# alpine:latest is tiny (~3MB) and guaranteed to exist
-log "Pulling alpine:latest to use as fake stable SHA..."
-fake_stable_pull=$(docker pull alpine:latest 2>&1)
-fake_stable_sha=$(docker inspect --format='{{.Image}}'     "$(docker create alpine:latest 2>/dev/null)" 2>/dev/null || echo "")
+OLDER_TAG="ghcr.io/integrationproject-groep1/kassa:v1.1.1"
+log "Pulling ${OLDER_TAG} to simulate a bad Watchtower update..."
 
-# Clean up the temporary container we just created
-docker ps -a --filter "ancestor=alpine:latest" --filter "status=created"     -q 2>/dev/null | xargs docker rm 2>/dev/null || true
-
-if [[ -z "${fake_stable_sha}" ]]; then
-    # Fallback: get SHA directly from image store
-    fake_stable_sha=$(docker inspect --format='{{.Id}}' alpine:latest 2>/dev/null || echo "")
-fi
-
-if [[ -z "${fake_stable_sha}" ]]; then
-    error "Could not determine alpine SHA. Cannot run full rollback test."
+if ! docker pull "${OLDER_TAG}" >/dev/null 2>&1; then
+    error "Could not pull ${OLDER_TAG}. Cannot run rollback test."
     exit 1
 fi
 
-success "Fake stable SHA obtained: ${fake_stable_sha:0:19}..."
-log "Real stable SHA (will be restored): ${stable_sha:0:19}..."
+older_sha=$(docker inspect --format='{{.Image}}' "${OLDER_TAG}" 2>/dev/null || echo "")
+if [[ -z "${older_sha}" ]]; then
+    error "Could not determine SHA for ${OLDER_TAG}."
+    exit 1
+fi
 
-# Write the fake stable entry — monitor will see current image != stable
-log "Overwriting .stable_tags with fake stable entry..."
-sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
-echo "${TEST_SERVICE}=${fake_stable_sha}|ghcr.io/integrationproject-groep1/kassa:latest"     >> "${BASE_DIR}/.stable_tags"
-success "Fake stable entry written (alpine SHA as stable baseline)"
+success "Older version pulled: ${OLDER_TAG} (SHA: ${older_sha:0:19}...)"
+log ""
+log "Starting container with older version (simulating bad Watchtower update)..."
 
-# Stop the container to simulate a crash
-log "Stopping ${TEST_SERVICE} to simulate a crash..."
+# Start the container with the older image
+# This simulates Watchtower pulling v1.1.1 which then crashes
+cd "${BASE_DIR}" || exit 1
+KASSA_INTEGRATIE_IMAGE="${OLDER_TAG}" docker compose up -d --no-deps "${compose_service}"     >/dev/null 2>&1
+sleep 3
+
+# Verify it is running with the older image
+running_sha=$(docker inspect --format='{{.Image}}' "${TEST_SERVICE}" 2>/dev/null || echo "")
+if [[ "${running_sha}" != "${older_sha}" ]]; then
+    warn "Container SHA (${running_sha:0:19}...) does not match expected older SHA."
+    warn "Test may not work as expected. Continuing anyway..."
+fi
+
+# Now stop it to simulate the crash
+log "Stopping ${TEST_SERVICE} to simulate the crash of the bad image..."
 docker stop "${TEST_SERVICE}" >/dev/null 2>&1 || true
 
 stopped_status=$(docker inspect --format='{{.State.Status}}' "${TEST_SERVICE}" 2>/dev/null || echo "not_found")
 if [[ "${stopped_status}" == "running" ]]; then
-    error "Failed to stop container. Status: ${stopped_status}"
-    # Restore stable_tags before exiting
-    sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
-    echo "${TEST_SERVICE}=${stable_entry}" >> "${BASE_DIR}/.stable_tags"
+    error "Failed to stop container."
+    cd "${BASE_DIR}" || exit 1
+    docker compose up -d --no-deps "${compose_service}" >/dev/null 2>&1
     exit 1
 fi
 success "Container stopped (status: ${stopped_status})"
 log ""
 log "Test condition active:"
-log "  Container:    STOPPED (simulating crash)"
-log "  Current SHA:  ${stable_sha:0:19}... (real kassa image)"
-log "  Stable SHA:   ${fake_stable_sha:0:19}... (alpine – different!)"
-log "  Expected:     Step 4 passes → Step 6 rollback executes"
+log "  Container:    STOPPED (simulating crash of bad image)"
+log "  Current SHA:  ${running_sha:0:19}... (v1.1.1 – the 'bad' new image)"
+log "  Stable SHA:   ${stable_sha:0:19}... (:latest – the real stable baseline)"
+log "  Expected:     Step 4 passes → Step 6 rollback to :latest ✅"
 
 # =============================================================================
 # WAIT FOR THE ROLLBACK MONITOR TO DETECT IT
