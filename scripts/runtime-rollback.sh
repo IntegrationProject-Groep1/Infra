@@ -782,7 +782,7 @@ diagnose_and_recover() {
     #    IMPORTANT: use the compose service name (hyphens), not the container name
     local compose_service
     compose_service=$(get_compose_service "${service}")
-    cd "${BASE_DIR}"
+    cd "${BASE_DIR}" || return 1
     log "Restarting compose service '${compose_service}' (container: ${service}) with pinned SHA..."
     if ! docker compose up -d --no-deps "${compose_service}"; then
         error "docker compose up failed for ${service} (compose: ${compose_service}) after sticky rollback."
@@ -924,7 +924,7 @@ check_pinned_services() {
         # Pull the new image and restart the service using the compose service name
         local pin_compose_service
         pin_compose_service=$(get_compose_service "${service}")
-        cd "${BASE_DIR}"
+        cd "${BASE_DIR}" || return 1
         if docker compose up -d --no-deps "${pin_compose_service}" 2>/dev/null; then
             log "PIN RELEASED: ${service} restarted with new image. Watchtower will monitor normally."
             notify "${service}" "INFO" \

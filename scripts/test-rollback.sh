@@ -97,7 +97,7 @@ if [[ "${1:-}" == "--restore" ]]; then
     fi
 
     # Restart service cleanly
-    cd "${BASE_DIR}"
+    cd "${BASE_DIR}" || exit 1
     docker compose up -d --no-deps "${SERVICE_TO_RESTART}"
     success "Service ${SERVICE_TO_RESTART} restarted"
 
@@ -245,7 +245,7 @@ fi
 log ""
 log "=== Cleanup: restarting ${TEST_SERVICE} ==="
 
-cd "${BASE_DIR}"
+cd "${BASE_DIR}" || exit 1
 docker compose up -d --no-deps "${compose_service}" >/dev/null 2>&1
 sleep 3
 
