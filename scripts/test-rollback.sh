@@ -160,30 +160,73 @@ success "State saved to ${TEST_BACKUP_FILE}"
 log "  Emergency restore: bash ${0} --restore"
 
 # =============================================================================
-# TRIGGER TEST: Stop the container
+# INJECT TEST CONDITION — Full rollback simulation
 #
-# This is the SAFEST and most REALISTIC test:
-# - The container really stops (like a real crash)
-# - .stable_tags stays intact with the REAL SHA
-# - The monitor will detect the stop, diagnose through steps 1-5
-# - Step 4 will say "same image as stable" -> WARNING notification
-#   (because the stopped container still runs the stable image)
-# - OR if we want a full rollback test, we would need Team Kassa to push
-#   a new broken image first, then this test would trigger the rollback
+# To trigger a real rollback we need:
+#   current_sha (running container) ≠ stable_sha (in .stable_tags)
+#
+# Strategy:
+#   1. Pull alpine:latest → get its SHA as a "fake stable" reference
+#   2. Write that SHA into .stable_tags as if it were the last stable deploy
+#   3. Stop the container (simulates a crash)
+#   4. Monitor sees: current_sha (real kassa) ≠ stable_sha (alpine)
+#      → Step 4 passes → Step 6 rollback executes
+#   5. Rollback pulls the REAL kassa SHA (from stable_entry backup)
+#      and restores the service correctly
+#
+# The real kassa SHA is backed up in TEST_BACKUP_FILE and will be
+# restored in the cleanup phase regardless of what happens.
 # =============================================================================
 log ""
-log "=== Triggering test condition ==="
-log "Stopping ${TEST_SERVICE} to simulate a crash..."
+log "=== Injecting test condition ==="
 
+# Pull a small known-good image to use as the fake stable SHA
+# alpine:latest is tiny (~3MB) and guaranteed to exist
+log "Pulling alpine:latest to use as fake stable SHA..."
+fake_stable_pull=$(docker pull alpine:latest 2>&1)
+fake_stable_sha=$(docker inspect --format='{{.Image}}'     "$(docker create alpine:latest 2>/dev/null)" 2>/dev/null || echo "")
+
+# Clean up the temporary container we just created
+docker ps -a --filter "ancestor=alpine:latest" --filter "status=created"     -q 2>/dev/null | xargs docker rm 2>/dev/null || true
+
+if [[ -z "${fake_stable_sha}" ]]; then
+    # Fallback: get SHA directly from image store
+    fake_stable_sha=$(docker inspect --format='{{.Id}}' alpine:latest 2>/dev/null || echo "")
+fi
+
+if [[ -z "${fake_stable_sha}" ]]; then
+    error "Could not determine alpine SHA. Cannot run full rollback test."
+    exit 1
+fi
+
+success "Fake stable SHA obtained: ${fake_stable_sha:0:19}..."
+log "Real stable SHA (will be restored): ${stable_sha:0:19}..."
+
+# Write the fake stable entry — monitor will see current image != stable
+log "Overwriting .stable_tags with fake stable entry..."
+sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
+echo "${TEST_SERVICE}=${fake_stable_sha}|ghcr.io/integrationproject-groep1/kassa:latest"     >> "${BASE_DIR}/.stable_tags"
+success "Fake stable entry written (alpine SHA as stable baseline)"
+
+# Stop the container to simulate a crash
+log "Stopping ${TEST_SERVICE} to simulate a crash..."
 docker stop "${TEST_SERVICE}" >/dev/null 2>&1 || true
 
-# Verify it is stopped
 stopped_status=$(docker inspect --format='{{.State.Status}}' "${TEST_SERVICE}" 2>/dev/null || echo "not_found")
 if [[ "${stopped_status}" == "running" ]]; then
     error "Failed to stop container. Status: ${stopped_status}"
+    # Restore stable_tags before exiting
+    sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
+    echo "${TEST_SERVICE}=${stable_entry}" >> "${BASE_DIR}/.stable_tags"
     exit 1
 fi
 success "Container stopped (status: ${stopped_status})"
+log ""
+log "Test condition active:"
+log "  Container:    STOPPED (simulating crash)"
+log "  Current SHA:  ${stable_sha:0:19}... (real kassa image)"
+log "  Stable SHA:   ${fake_stable_sha:0:19}... (alpine – different!)"
+log "  Expected:     Step 4 passes → Step 6 rollback executes"
 
 # =============================================================================
 # WAIT FOR THE ROLLBACK MONITOR TO DETECT IT
@@ -203,9 +246,10 @@ success "Container stopped (status: ${stopped_status})"
 log ""
 log "=== Waiting for rollback monitor to detect the condition ==="
 log "The monitor checks every 30s. Expected behaviour:"
-log "  - Monitor detects container stopped"
-log "  - Diagnosis runs through Steps 1-5"
-log "  - Teams notification sent to Infra + Kassa channels"
+log "  - Monitor detects container stopped (exited)"
+log "  - Step 4: current SHA != stable SHA (alpine) → rollback triggered"
+log "  - Step 6: pulls REAL kassa stable SHA → service restored"
+log "  - Teams CRITICAL notification sent to Infra + Kassa"
 log ""
 
 # Record the current log line count so we only look at NEW log lines
@@ -245,27 +289,48 @@ else
 fi
 
 # =============================================================================
-# CLEANUP: Restart the service
+# CLEANUP: Restore original state
+# Regardless of what happened, we always:
+#   1. Restore the real stable SHA in .stable_tags
+#   2. Remove any sticky pins written by the rollback
+#   3. Restart the service cleanly
+#   4. Reset test counters and cooldowns
 # =============================================================================
 log ""
-log "=== Cleanup: restarting ${TEST_SERVICE} ==="
+log "=== Cleanup: restoring original state ==="
 
+# Always restore the real stable SHA (rollback may have changed it)
+sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.stable_tags"
+echo "${TEST_SERVICE}=${stable_entry}" >> "${BASE_DIR}/.stable_tags"
+success "Restored original stable SHA in .stable_tags"
+
+# Remove any sticky pin written by the rollback
+local env_var
+env_var=$(echo "${TEST_SERVICE}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')_IMAGE
+sed -i "/^${env_var}=/d" "${BASE_DIR}/.env" 2>/dev/null || true
+success "Removed any sticky pin from .env"
+
+# Remove from .rollback_pins
+sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.rollback_pins" 2>/dev/null || true
+success "Cleaned .rollback_pins"
+
+# Restart with the real image (no pin = uses compose default :latest)
 cd "${BASE_DIR}" || exit 1
 docker compose up -d --no-deps "${compose_service}" >/dev/null 2>&1
-sleep 3
+sleep 5
 
 final_status=$(docker inspect --format='{{.State.Status}}' "${TEST_SERVICE}" 2>/dev/null || echo "not_found")
 if [[ "${final_status}" == "running" ]]; then
-    success "Service ${TEST_SERVICE} is running again"
+    success "Service ${TEST_SERVICE} is running again ✅"
 else
     error "Service ${TEST_SERVICE} status: ${final_status} – manual check needed"
 fi
 
-# Reset rollback counter (test should not count)
+# Reset rollback counter (test should not count against MAX_ROLLBACKS)
 sed -i "/^${TEST_SERVICE}=/d" "${BASE_DIR}/.rollback_state" 2>/dev/null || true
 success "Reset rollback counter for ${TEST_SERVICE}"
 
-# Clear notification cooldown so future tests/alerts are not suppressed
+# Clear notification cooldown
 sed -i "/^${TEST_SERVICE}:/d" "${BASE_DIR}/.notification_cooldown" 2>/dev/null || true
 success "Cleared notification cooldown for ${TEST_SERVICE}"
 

@@ -445,9 +445,13 @@ get_image_tag() {
 get_container_logs() {
     local container="$1"
     local lines="${2:-30}"
-    # Replace double-quotes and backslashes so the logs embed safely in JSON.
+    # Escape logs for safe JSON embedding.
+    # Each sed command is on its own pipe for busybox compatibility –
+    # chaining multiple substitutions with ';' can fail in Alpine's busybox sed.
     docker logs --tail "${lines}" "${container}" 2>&1 \
-        | sed 's/\\/\\\\/g; s/"/\\"/g; s/$/\\n/g' \
+        | sed 's/\\/\\\\/g' \
+        | sed 's/"/\\"/g' \
+        | sed 's/$/\\n/' \
         | tr -d '\n' \
         || echo "Could not retrieve logs."
 }
