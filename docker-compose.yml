@@ -31,6 +31,7 @@
 #   30030 – Odoo (Kassa)
 #   30040 – CRM Receiver
 #   30050 – Planning Service
+#   30052 – pgAdmin (Planning DB)
 #   30060 – Elasticsearch
 #   30061 – Kibana
 #
@@ -887,6 +888,27 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - planning-service
+    networks:
+      - shift_net
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin (Planning) – Database UI for the planning PostgreSQL instance
+  # Accessible on port 30052. Connect to planning_db:5432 via the UI.
+  # ---------------------------------------------------------------------------
+  planning-pgadmin:
+    image: dpage/pgadmin4:8.14
+    container_name: planning_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "30052:80"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
+    depends_on:
+      planning-db:
+        condition: service_healthy
     networks:
       - shift_net
 

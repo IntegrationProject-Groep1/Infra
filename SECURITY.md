@@ -14,7 +14,7 @@
 - [x] H4 — Trivy security scan did not block CI on findings
 - [x] H5 — Missing HTTP security headers in all Nginx configs
 - [ ] M1 — Docker socket fully exposed to rollback-monitor (reverted — docker-socket-proxy image not available)
-- [x] M2 — pgAdmin exposed on all interfaces
+- [ ] M2 — pgAdmin exposed on all interfaces (reverted — 127.0.0.1 binding broke access; see note below)
 - [x] M3 — Dozzle has no authentication
 - [x] M4 — CRM and Planning ports not restricted to localhost (reverted — not in Cloudflare tunnel)
 
@@ -74,8 +74,7 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
 
 ### M2 — pgAdmin exposed on all interfaces
 **File:** `docker-compose.yml`
-**Was:** `30005:80` on all interfaces.
-**Fix:** Changed to `127.0.0.1:30005:80`. Only accessible via Cloudflare tunnel.
+**Status:** Reverted. Binding to `127.0.0.1:30005:80` broke access (Cloudflare tunnel appears to route via VM IP, not localhost). Port remains `30005:80` on all interfaces. Proper fix: add pgAdmin explicitly to the Cloudflare tunnel ingress config pointing to `localhost:30005`, then restore the `127.0.0.1` binding.
 
 ---
 
