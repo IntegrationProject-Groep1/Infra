@@ -13,7 +13,7 @@
 - [x] H3 — PostgreSQL exposed directly on network port
 - [x] H4 — Trivy security scan did not block CI on findings
 - [x] H5 — Missing HTTP security headers in all Nginx configs
-- [x] M1 — Docker socket fully exposed to rollback-monitor
+- [ ] M1 — Docker socket fully exposed to rollback-monitor (reverted — docker-socket-proxy image not available)
 - [x] M2 — pgAdmin exposed on all interfaces
 - [x] M3 — Dozzle has no authentication
 - [x] M4 — CRM and Planning ports not restricted to localhost (reverted — not in Cloudflare tunnel)
@@ -67,8 +67,8 @@ add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" alway
 
 ### M1 — Docker socket fully exposed to rollback-monitor
 **File:** `docker-compose.yml`
-**Was:** `/var/run/docker.sock` mounted directly into rollback-monitor — a compromised script would have full root-level control over the Docker daemon and the host.
-**Fix:** Added `docker-proxy` service (`tecnativa/docker-socket-proxy:0.2.2`) on isolated `docker-proxy-net`. rollback-monitor now connects via `DOCKER_HOST=tcp://docker-proxy:2375`. Blocked: BUILD, EXEC, SWARM, SECRETS, CONFIGS, TASKS, SERVICES, DISTRIBUTION, AUTH.
+**Status:** Open — reverted. The `tecnativa/docker-socket-proxy` image could not be pulled from Docker Hub. rollback-monitor uses the raw Docker socket again (original behaviour). This is accepted risk for now — the stack needs to run.
+**Proper fix when time allows:** Verify the correct image tag via `docker search tecnativa/docker-socket-proxy` on the VM, then re-implement the proxy using a confirmed working tag.
 
 ---
 
