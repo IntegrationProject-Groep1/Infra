@@ -32,11 +32,12 @@ The stack runs on a single Azure VM (`/opt/shiftfestival`) and consists of:
 
 **Core Infrastructure:**
 - **RabbitMQ** — Central async message broker; all inter-service communication goes through it using team-prefixed queues (e.g., `kassa.orders`, `crm.customer.created`)
-- **PostgreSQL 16** — Shared DB (primarily for Identity Service)
-- **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging; Logstash consumes heartbeat events from RabbitMQ
+- **PostgreSQL 16** — Shared DB (primarily for Identity Service); no external port — connect via `postgredb:5432` on `shift_net` or SSH tunnel
+- **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging; Logstash consumes heartbeat events from RabbitMQ; Elasticsearch bound to localhost only
 - **Dozzle** — Docker log viewer
-- **Cloudflare Tunnel** — Secure external access (no open ports required)
+- **Cloudflare Tunnel** — Secure external access; management/admin ports (RabbitMQ UI, pgAdmin, Elasticsearch) are bound to `127.0.0.1` and only reachable via this tunnel
 - **Watchtower** — Auto-pulls updated images from GHCR every 60s; only updates containers labeled `com.centurylinklabs.watchtower.enable: true`; ignores SHA-pinned containers
+- **docker-proxy** (`tecnativa/docker-socket-proxy`) — Restricted Docker API proxy on isolated `docker-proxy-net`; rollback-monitor connects here instead of the raw socket; blocks BUILD, EXEC, SWARM, SECRETS operations
 
 **Team Services** (6 independent teams, each with their own port range in `300XX`):
 - Frontend (Drupal, ports 30020–30029)

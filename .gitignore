@@ -1,6 +1,7 @@
 certs/
 pgdata/
 .env
+dozzle-users.yml
 odoo.conf
 config_recovery.php
 .stable_tags
