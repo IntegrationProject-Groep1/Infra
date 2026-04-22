@@ -164,10 +164,8 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-      PGADMIN_CONFIG_REVERSE_PROXY: "True"
-      PGADMIN_CONFIG_PROXY_X_FOR_COUNT: 1
     ports:
-      - "127.0.0.1:30005:80"
+      - "30005:80"
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     depends_on:
