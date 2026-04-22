@@ -785,14 +785,47 @@ services:
     networks:
       - shift_net
 
-  # ===========================================================================
-  # SECTION 8: TEAM PLANNING – Office 365 / Outlook Integration
-  # Port range: 30050–30059
-  # The planning service manages session scheduling and syncs with Outlook
-  # calendars for speakers and workshop organisers.
-  # ===========================================================================
+  # Dedicated Postgres for Planning data
+  planning-db:
+    image: postgres:16-alpine
+    container_name: planning_db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${PLANNING_DB_NAME}
+      - POSTGRES_USER=${PLANNING_DB_USER}
+      - POSTGRES_PASSWORD=${PLANNING_DB_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - planning_pgdata:/var/lib/postgresql/data
+    networks:
+      - shift_net
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
-  # STICKY ROLLBACK: ${PLANNING_SERVICE_IMAGE} pin is set on crash
+  planning-migrate:
+    image: postgres:16-alpine
+    container_name: planning_migrate
+    volumes:
+      - ./migrations/planning:/migrations:ro
+    environment:
+      - PGPASSWORD=${PLANNING_DB_PASSWORD}
+    command: >
+      sh -c "psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/001_initial.sql &&
+             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/002_planning_schema.sql &&
+             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/003_graph_sync.sql &&
+             echo 'Migrations completed.'"
+    depends_on:
+      planning-db:
+        condition: service_healthy
+    networks:
+      - shift_net
+    restart: "no"
+
+  # The main planning service
   planning-service:
     image: ${PLANNING_SERVICE_IMAGE:-ghcr.io/integrationproject-groep1/planning:latest}
     container_name: planning_service
@@ -800,15 +833,37 @@ services:
     ports:
       - "30050:30050"
     environment:
+      # Database – Use internal service name
+      - DB_HOST=planning_db
+      - DB_NAME=${PLANNING_DB_NAME}
+      - DB_USER=${PLANNING_DB_USER}
+      - DB_PASS=${PLANNING_DB_PASSWORD}
+      
+      # RabbitMQ – Connected to main broker
       - RABBITMQ_HOST=rabbitmq_broker
       - RABBITMQ_PORT=5672
       - RABBITMQ_USER=${RABBITMQPLANNING_USER}
       - RABBITMQ_PASS=${RABBITMQPLANNING_PASS}
       - RABBITMQ_VHOST=/
+      
+      # OAuth & API Secrets (New)
+      - AZURE_CLIENT_ID=${AZURE_CLIENT_ID}
+      - AZURE_CLIENT_SECRET=${AZURE_CLIENT_SECRET}
+      - TOKEN_CACHE_FILE=/app/data/token_cache.json
+      - API_TOKEN_SECRET=${API_TOKEN_SECRET}
+      - TOKEN_ENCRYPTION_KEY=${TOKEN_ENCRYPTION_KEY}
+    volumes:
+      # Persist the token cache so logins survive restarts
+      - planning_token_data:/app/data
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
-      - rabbitmq
+      planning-db:
+        condition: service_healthy
+      planning-migrate:
+        condition: service_completed_successfully
+      rabbitmq_broker:
+        condition: service_healthy
     networks:
       - shift_net
 
@@ -827,7 +882,6 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - planning-service
-      - rabbitmq
     networks:
       - shift_net
 
@@ -916,3 +970,7 @@ volumes:
   # CRM
   crm_db_data:
     name: shiftfestival_crm_db_data
+  planning_pgdata:
+    name: shiftfestival_planning_db_data
+  planning_token_data:
+    name: shiftfestival_planning_token_cache
