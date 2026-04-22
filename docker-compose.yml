@@ -188,7 +188,7 @@ services:
   # rollback-monitor connects to this proxy via DOCKER_HOST instead of the raw socket.
   # ---------------------------------------------------------------------------
   docker-proxy:
-    image: tecnativa/docker-socket-proxy:0.2.2
+    image: tecnativa/docker-socket-proxy:0.6.2
     container_name: docker_proxy
     restart: unless-stopped
     labels:
