@@ -82,7 +82,7 @@ jobs:
           #   assets/   – README images and GIFs
           #   README.md – Documentation (only needed on GitHub)
           #   *.md      – All markdown documentation files
-          exclude: ".github,assets,README.md,*.md,test-environment"
+          exclude: ".github,assets,README.md,*.md,test-environment,CLAUDE.md"
 
       # -----------------------------------------------------------------------
       # STEP 3: Make all scripts executable on the VM

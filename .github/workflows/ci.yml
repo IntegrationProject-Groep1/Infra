@@ -314,7 +314,7 @@ jobs:
           scan-type: config
           scan-ref: .
           trivy-config: .trivy.yaml
-          exit-code: 0   # Warn only for now – set to 1 to enforce
+          exit-code: 1   # Block merges on HIGH/CRITICAL findings
           severity: HIGH,CRITICAL
           format: table
 

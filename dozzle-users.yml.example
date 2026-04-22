@@ -1,0 +1,17 @@
+# Dozzle user accounts — simple authentication (Dozzle v8).
+#
+# This file is NOT committed to git. The real dozzle-users.yml lives only on the VM.
+# To create or update it on the VM:
+#
+#   sudo docker run --rm amir20/dozzle:v8 generate admin --password yourpassword
+#
+# Copy the output to /opt/shiftfestival/dozzle-users.yml on the VM.
+# The file persists between deploys (same as .env).
+
+users:
+  admin:
+    email: ""
+    name: "admin"
+    password: REPLACE_WITH_BCRYPT_HASH
+    filter: ""
+    roles: ""
