@@ -814,6 +814,7 @@ services:
     image: postgres:16-alpine
     container_name: planning_migrate
     volumes:
+      # We mappen de hele migrations map naar de container
       - ./migrations/planning:/migrations:ro
     environment:
       - PGPASSWORD=${PLANNING_DB_PASSWORD}
@@ -821,6 +822,7 @@ services:
       sh -c "psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/001_initial.sql &&
              psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/002_planning_schema.sql &&
              psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/003_graph_sync.sql &&
+             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/004_user_tokens.sql &&
              echo 'Migrations completed.'"
     depends_on:
       planning-db:
