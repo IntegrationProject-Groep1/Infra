@@ -16,7 +16,7 @@
 - [x] M1 — Docker socket fully exposed to rollback-monitor
 - [x] M2 — pgAdmin exposed on all interfaces
 - [x] M3 — Dozzle has no authentication
-- [x] M4 — CRM and Planning ports not restricted to localhost
+- [x] M4 — CRM and Planning ports not restricted to localhost (reverted — not in Cloudflare tunnel)
 
 ---
 
@@ -98,5 +98,4 @@ See `dozzle-users.yml.example` for the expected file format.
 
 ### M4 — CRM and Planning ports not restricted to localhost
 **File:** `docker-compose.yml`
-**Was:** `crm-receiver` on `0.0.0.0:30040` and `planning-service` on `0.0.0.0:30050`.
-**Fix:** Changed to `127.0.0.1:30040:3000` and `127.0.0.1:30050:30050`. Internal container communication via `shift_net` is unaffected.
+**Status:** Reverted. CRM and Planning are not in the Cloudflare tunnel (`desiderius.me`) and may be accessed via direct VM-IP or receive inbound webhooks (Salesforce). Binding to `127.0.0.1` would break that access. Proper fix is to add both services to the Cloudflare tunnel and then restrict the port binding.

@@ -166,7 +166,7 @@ services:
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
       PGADMIN_CONFIG_REVERSE_PROXY: "True"
     ports:
-      - "127.0.0.1:30005:80"     # localhost only; access via Cloudflare tunnel or SSH tunnel
+      - "30005:80"
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     depends_on:
@@ -775,7 +775,7 @@ services:
     container_name: crm_receiver
     restart: unless-stopped
     ports:
-      - "127.0.0.1:30040:3000"
+      - "30040:3000"
     environment:
       - RABBITMQ_HOST=rabbitmq_broker
       - RABBITMQ_PORT=5672
@@ -888,7 +888,7 @@ services:
     container_name: planning_service
     restart: unless-stopped
     ports:
-      - "127.0.0.1:30050:30050"
+      - "30050:30050"
     environment:
       - DB_HOST=planning_db
       - DB_NAME=${PLANNING_DB_NAME}
