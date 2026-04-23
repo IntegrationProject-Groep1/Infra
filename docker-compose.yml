@@ -205,7 +205,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/shiftfestival:/opt/shiftfestival
-      - /home/ehbstudent/.docker/config.json:/root/.docker/config.json:ro
     command: >
       sh -c "apk add --no-cache bash curl jq python3 &&
              bash /opt/shiftfestival/scripts/runtime-rollback.sh"
@@ -249,7 +248,6 @@ services:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /home/ehbstudent/.docker/config.json:/config.json:ro   # GHCR credentials
     command: --interval 60 --cleanup
 
   # ===========================================================================
@@ -816,27 +814,6 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
 
-  planning-migrate:
-    image: postgres:16-alpine
-    container_name: planning_migrate
-    volumes:
-      # We mappen de hele migrations map naar de container
-      - ./migrations/planning:/migrations:ro
-    environment:
-      - PGPASSWORD=${PLANNING_DB_PASSWORD}
-    command: >
-      sh -c "psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/001_initial.sql &&
-             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/002_planning_schema.sql &&
-             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/003_graph_sync.sql &&
-             psql -h planning_db -U ${PLANNING_DB_USER} -d ${PLANNING_DB_NAME} -f /migrations/004_user_tokens.sql &&
-             echo 'Migrations completed.'"
-    depends_on:
-      planning-db:
-        condition: service_healthy
-    networks:
-      - shift_net
-    restart: "no"
-
   # The main planning service
   planning-service:
     image: ${PLANNING_SERVICE_IMAGE:-ghcr.io/integrationproject-groep1/planning:latest}
@@ -866,8 +843,6 @@ services:
     depends_on:
       planning-db:
         condition: service_healthy
-      planning-migrate:
-        condition: service_completed_successfully
       rabbitmq:  # GEFIXED: Verwijst nu naar de service 'rabbitmq'
         condition: service_healthy
     networks:
