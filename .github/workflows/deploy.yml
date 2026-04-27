@@ -95,12 +95,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            chmod +x /opt/shiftfestival/scripts/*.sh
+            chmod +x shiftfestival1.0/scripts/*.sh
 
       # -----------------------------------------------------------------------
       # STEP 3b: Set deploy lock
       #
-      # Creates /opt/shiftfestival/.deploy_in_progress so runtime-rollback.sh
+      # Creates shiftfestival1.0/.deploy_in_progress so runtime-rollback.sh
       # skips its check cycles during the deploy. Without this, the monitor
       # fires CRITICAL alerts for every service that goes down during
       # "docker compose up", spamming both #Infra and all team channels.
@@ -114,7 +114,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            touch /opt/shiftfestival/.deploy_in_progress
+            touch shiftfestival1.0/.deploy_in_progress
             echo "Deploy lock set at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor suppressed."
 
       # -----------------------------------------------------------------------
@@ -135,7 +135,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             # Sticky pins written by runtime-rollback.sh look like:
             #   FRONTEND_DRUPAL_IMAGE=ghcr.io/...@sha256:abc123
@@ -172,7 +172,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             # Only team services with GHCR images are snapshotted.
             # Infrastructure images (rabbitmq, postgres, nginx) are pinned by
@@ -226,7 +226,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
             echo "Pulling latest images..."
             docker compose pull
             echo "Starting stack..."
@@ -254,7 +254,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             echo "Waiting 30s for containers to initialise..."
             sleep 30
@@ -316,13 +316,13 @@ jobs:
             done
 
             if [[ ${#FAILED_SERVICES[@]} -gt 0 ]]; then
-              echo "FAILED_SERVICES=${FAILED_SERVICES[*]}" > /opt/shiftfestival/.deploy_failure
+              echo "FAILED_SERVICES=${FAILED_SERVICES[*]}" > shiftfestival1.0/.deploy_failure
               echo "Health check FAILED for: ${FAILED_SERVICES[*]}"
               exit 1
             fi
 
             echo "All health checks passed!"
-            rm -f /opt/shiftfestival/.deploy_failure
+            rm -f shiftfestival1.0/.deploy_failure
 
       # -----------------------------------------------------------------------
       # STEP 8 (SUCCESS PATH): Update .stable_tags
@@ -341,7 +341,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             ROLLBACK_SERVICES=(
               "frontend_drupal"
@@ -459,7 +459,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             if [[ -f .deploy_failure ]]; then
               source .deploy_failure
@@ -495,7 +495,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd /opt/shiftfestival
+            cd shiftfestival1.0
 
             echo "=== ROLLBACK INITIATED ==="
 
@@ -563,7 +563,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            rm -f /opt/shiftfestival/.deploy_in_progress
+            rm -f shiftfestival1.0/.deploy_in_progress
             echo "Deploy lock removed at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor resumed."
 
       # -----------------------------------------------------------------------
