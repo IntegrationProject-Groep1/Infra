@@ -16,9 +16,18 @@ spec:
       labels:
         app: frontend-drupal
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: drupal
         image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
@@ -82,6 +91,12 @@ spec:
             cpu: "500m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "frontend"

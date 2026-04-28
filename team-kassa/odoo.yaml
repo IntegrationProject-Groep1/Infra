@@ -17,9 +17,18 @@ spec:
       labels:
         app: kassa-web
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
       containers:
       - name: odoo
         image: odoo:17
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         args:
         - "-d"
         - "odoo_kassa"
@@ -49,8 +58,19 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "500m"
+        volumeMounts:
+        - name: odoo-data
+          mountPath: /var/lib/odoo
+        - name: tmp
+          mountPath: /tmp
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "kassa"
@@ -70,6 +90,11 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQKASSA_PASS
+      volumes:
+      - name: odoo-data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

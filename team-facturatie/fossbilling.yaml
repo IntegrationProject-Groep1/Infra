@@ -16,9 +16,18 @@ spec:
       labels:
         app: fossbilling-app
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
@@ -76,9 +85,18 @@ spec:
       labels:
         app: facturatie-connector
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: connector
         image: ghcr.io/integrationproject-groep1/facturatie:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
@@ -118,6 +136,12 @@ spec:
             cpu: "200m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "facturatie"

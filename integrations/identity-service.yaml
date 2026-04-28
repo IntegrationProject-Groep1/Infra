@@ -16,9 +16,18 @@ spec:
       labels:
         app: identity-service
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: identity-service
         image: ghcr.io/integrationproject-groep1/identity-service:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: DB_HOST
           value: "postgredb-service"
@@ -69,6 +78,12 @@ spec:
             cpu: "200m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "identity-service"

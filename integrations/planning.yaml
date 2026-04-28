@@ -16,9 +16,18 @@ spec:
       labels:
         app: planning
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: planning
         image: ghcr.io/integrationproject-groep1/planning:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 3000
         env:
@@ -89,6 +98,12 @@ spec:
             cpu: "200m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "planning"
@@ -136,9 +151,18 @@ spec:
       labels:
         app: planning-db
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
       containers:
       - name: postgres
         image: postgres:15-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -167,10 +191,18 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run-postgres
+          mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: planning-db-data-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: run-postgres
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

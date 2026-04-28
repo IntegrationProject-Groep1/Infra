@@ -17,9 +17,18 @@ spec:
       labels:
         app: kassa-integration
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: kassa-worker
         image: ghcr.io/integrationproject-groep1/kassa:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: ODOO_URL
           value: "http://kassa-web-service:8069"
@@ -62,6 +71,12 @@ spec:
           value: "kassa.incoming"
         - name: RABBIT_AUTO_SETUP_TOPOLOGY
           value: "false"
+        - name: RABBIT_DLX
+          value: "kassa.exchange"
+        - name: RABBIT_DLQ
+          value: "kassa.incoming.dlq"
+        - name: RABBIT_DLX_ROUTING_KEY
+          value: "kassa.incoming.dlq"
         - name: POLL_INTERVAL
           value: "3"
         - name: BADGE_PAYMENT_METHOD_NAME
