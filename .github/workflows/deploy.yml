@@ -39,7 +39,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           source: "./*"
-          target: "shiftfestival1.0"
+          target: "shiftfestival"
           exclude: ".github,assets,README.md,*.md,CLAUDE.md,DOCUMENTATION.md,SECURITY.md"
 
       - name: Verify kubectl is available on the VM
@@ -61,7 +61,7 @@ jobs:
           port: 60022
           script: |
             set -euo pipefail
-            cd shiftfestival1.0
+            cd shiftfestival
 
             if [[ ! -f setup/.env ]]; then
               echo "setup/.env is missing on the VM. Create it before deploying."
@@ -161,7 +161,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            cd shiftfestival1.0
+            cd shiftfestival
             kubectl get pods -A
             kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -50
 
