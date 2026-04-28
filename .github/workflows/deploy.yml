@@ -107,6 +107,7 @@ jobs:
       # The lock is always removed in STEP 11 (if: always()).
       # -----------------------------------------------------------------------
       - name: Set deploy lock (suppress rollback monitor during deploy)
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -128,6 +129,7 @@ jobs:
       # the fresh :latest images instead of staying pinned to the old SHA.
       # -----------------------------------------------------------------------
       - name: Clear sticky rollback pins from .env
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -165,6 +167,7 @@ jobs:
       #   which is unique and pullable as long as it exists in the registry.
       # -----------------------------------------------------------------------
       - name: Snapshot current image digests (pre-deploy baseline)
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -219,6 +222,7 @@ jobs:
       # --remove-orphans removes containers for services removed from compose.
       # -----------------------------------------------------------------------
       - name: Pull latest images and start stack
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -247,6 +251,7 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Run health checks
         id: healthcheck
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -333,7 +338,7 @@ jobs:
       # Also resets the rollback counter so MAX_ROLLBACKS is fresh.
       # -----------------------------------------------------------------------
       - name: Update .stable_tags after successful deploy
-        if: success()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -380,7 +385,7 @@ jobs:
       # by multi-line commit messages or backticks/quotes in the message body.
       # -----------------------------------------------------------------------
       - name: Notify Teams – deploy success
-        if: success()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         run: |
           COMMIT_SHA="${{ github.sha }}"
           # Sanitise commit message: keep first line only, strip chars that
@@ -451,7 +456,7 @@ jobs:
       # STEP 10a (FAILURE PATH): Collect logs from failed containers
       # -----------------------------------------------------------------------
       - name: Collect failure logs
-        if: failure()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -487,7 +492,7 @@ jobs:
       # docker compose up picks it up correctly from the local image store.
       # -----------------------------------------------------------------------
       - name: Rollback to pre-deploy snapshot
-        if: failure()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -555,7 +560,7 @@ jobs:
       # the lock is cleared even when earlier steps fail.
       # -----------------------------------------------------------------------
       - name: Remove deploy lock
-        if: always()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -572,7 +577,7 @@ jobs:
       # Same sanitisation as the success notification to avoid bad substitution.
       # -----------------------------------------------------------------------
       - name: Notify Teams – deploy failed + rollback executed
-        if: failure()
+        if: false # TEMPORARILY DISABLED – Kubernetes migration
         run: |
           COMMIT_SHA="${{ github.sha }}"
           COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}" \
