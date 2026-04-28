@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-integration
+  namespace: shift-festival
   annotations:
     keel.sh/policy: force
     keel.sh/trigger: poll
@@ -21,15 +22,9 @@ spec:
         image: ghcr.io/integrationproject-groep1/kassa:latest
         env:
         - name: ODOO_URL
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: ODOO_URL
+          value: "http://kassa-web-service:8069"
         - name: ODOO_DB
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: ODOO_DB
+          value: "odoo_kassa"
         - name: ODOO_USER
           valueFrom:
             secretKeyRef:
@@ -46,15 +41,9 @@ spec:
               name: shift-secrets
               key: ODOO_MASTER_PASS
         - name: RABBIT_HOST
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_HOST
+          value: "rabbitmq-service"
         - name: RABBIT_PORT
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_PORT
+          value: "5672"
         - name: RABBIT_USER
           valueFrom:
             secretKeyRef:
@@ -66,35 +55,17 @@ spec:
               name: shift-secrets
               key: RABBITMQKASSA_PASS
         - name: RABBIT_VHOST
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_VHOST
-        - name: RABBIT_INCOMING_QUEUE
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_INCOMING_QUEUE
+          value: "/"
         - name: RABBIT_EXCHANGE
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_EXCHANGE
+          value: "kassa.exchange"
+        - name: RABBIT_INCOMING_QUEUE
+          value: "kassa.incoming"
         - name: RABBIT_AUTO_SETUP_TOPOLOGY
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_AUTO_SETUP_TOPOLOGY
+          value: "false"
         - name: POLL_INTERVAL
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POLL_INTERVAL
+          value: "3"
         - name: BADGE_PAYMENT_METHOD_NAME
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: BADGE_PAYMENT_METHOD_NAME
+          value: "Badge Wallet"
         - name: TEAMS_WEBHOOK_KASSA
           valueFrom:
             secretKeyRef:
@@ -107,3 +78,10 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: outbox-data
+          mountPath: /app/outbox
+      volumes:
+      - name: outbox-data
+        persistentVolumeClaim:
+          claimName: kassa-outbox-pvc

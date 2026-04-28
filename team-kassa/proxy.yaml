@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-proxy
+  namespace: shift-festival
 spec:
   replicas: 1
   selector:
@@ -22,6 +23,13 @@ spec:
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: default.conf
           readOnly: true
+        resources:
+          requests:
+            memory: "32Mi"
+            cpu: "25m"
+          limits:
+            memory: "64Mi"
+            cpu: "100m"
       volumes:
       - name: config
         configMap:
@@ -31,6 +39,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kassa-proxy-service
+  namespace: shift-festival
 spec:
   type: NodePort
   selector:

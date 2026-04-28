@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-db
+  namespace: shift-festival
 spec:
   replicas: 1
   selector:
@@ -14,10 +15,12 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:15
+        image: postgres:14-alpine
         ports:
         - containerPort: 5432
         env:
+        - name: POSTGRES_DB
+          value: "odoo_kassa"
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
@@ -28,11 +31,6 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
-        - name: POSTGRES_DB
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_DB
         resources:
           requests:
             memory: "256Mi"
@@ -43,6 +41,14 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER
+          initialDelaySeconds: 15
+          periodSeconds: 10
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -52,9 +58,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kassa-db-service
+  namespace: shift-festival
 spec:
   selector:
     app: kassa-db
   ports:
     - port: 5432
       targetPort: 5432
+  type: ClusterIP

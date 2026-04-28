@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-web
+  namespace: shift-festival
   annotations:
     keel.sh/policy: force
     keel.sh/trigger: poll
@@ -16,66 +17,9 @@ spec:
       labels:
         app: kassa-web
     spec:
-      initContainers:
-      - name: fix-db-schema
-        image: postgres:15
-        env:
-        - name: PGHOST
-          value: "kassa-db-service"
-        - name: PGPORT
-          value: "5432"
-        - name: PGDATABASE
-          value: "odoo_kassa"
-        - name: PGUSER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_USER
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_PASSWORD
-        command:
-        - sh
-        - -c
-        - |
-          until pg_isready -h kassa-db-service -p 5432; do
-            echo "Waiting for database..."
-            sleep 3
-          done
-          psql -c "
-            ALTER TABLE IF EXISTS ir_model_fields
-              ADD COLUMN IF NOT EXISTS serialization_field_id INTEGER,
-              ADD COLUMN IF NOT EXISTS copy BOOLEAN DEFAULT true,
-              ADD COLUMN IF NOT EXISTS related CHARACTER VARYING,
-              ADD COLUMN IF NOT EXISTS related_field_id INTEGER,
-              ADD COLUMN IF NOT EXISTS index BOOLEAN DEFAULT false,
-              ADD COLUMN IF NOT EXISTS help TEXT,
-              ADD COLUMN IF NOT EXISTS track_visibility CHARACTER VARYING;
-          "
-          psql -c "
-            DO \$\$
-            BEGIN
-              IF EXISTS (
-                SELECT 1 FROM information_schema.columns
-                WHERE table_name = 'ir_model' AND column_name = 'name'
-                  AND data_type IN ('json', 'jsonb')
-              ) THEN
-                ALTER TABLE ir_model ALTER COLUMN name TYPE CHARACTER VARYING USING
-                  COALESCE(
-                    name->>'en_US',
-                    name->>'en',
-                    (SELECT value FROM jsonb_each_text(name) LIMIT 1),
-                    name::TEXT
-                  );
-              END IF;
-            END \$\$;
-          "
-          echo "Schema check complete"
       containers:
       - name: odoo
-        image: odoo:10
+        image: odoo:17
         args:
         - "-d"
         - "odoo_kassa"
@@ -98,6 +42,13 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         env:
@@ -124,9 +75,11 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kassa-web-service
+  namespace: shift-festival
 spec:
   selector:
     app: kassa-web
   ports:
     - port: 8069
       targetPort: 8069
+  type: ClusterIP
