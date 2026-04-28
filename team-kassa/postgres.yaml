@@ -13,9 +13,18 @@ spec:
       labels:
         app: kassa-db
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
       containers:
       - name: postgres
         image: postgres:14-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -41,6 +50,10 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run-postgres
+          mountPath: /var/run/postgresql
         livenessProbe:
           exec:
             command:
@@ -53,6 +66,10 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: kassa-db-data-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: run-postgres
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

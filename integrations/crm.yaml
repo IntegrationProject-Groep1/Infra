@@ -16,9 +16,18 @@ spec:
       labels:
         app: crm
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: crm
         image: ghcr.io/integrationproject-groep1/crm:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
@@ -99,6 +108,12 @@ spec:
             cpu: "200m"
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: SYSTEM_NAME
           value: "crm"
@@ -146,9 +161,18 @@ spec:
       labels:
         app: crm-db
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
       containers:
       - name: mysql
         image: mysql:8.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 3306
         env:
@@ -179,10 +203,14 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: crm-db-data-pvc
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
