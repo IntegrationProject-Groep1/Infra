@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-drupal
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend-drupal
+  template:
+    metadata:
+      labels:
+        app: frontend-drupal
+    spec:
+      containers:
+      - name: drupal
+        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: DRUPAL_DB_HOST
+          value: "frontend-db-service"
+        - name: DRUPAL_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_DB_NAME
+        - name: DRUPAL_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_DB_USER
+        - name: DRUPAL_DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_DB_PASS
+        - name: DRUPAL_DB_PASSWORD 
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_DB_PASS
+        - name: DRUPAL_BASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_BASE_URL
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQFRONTEND_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_USER
+        - name: RABBITMQFRONTEND_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_PASS
+        - name: RABBITMQFRONTEND_PREFIX
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_PREFIX
+        - name: TEAMS_WEBHOOK_FRONTEND
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: TEAMS_WEBHOOK_FRONTEND
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        env:
+        - name: SYSTEM_NAME
+          value: "frontend"
+        - name: TARGETS
+          value: "localhost:80"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_PASS
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-drupal-service
+spec:
+  selector:
+    app: frontend-drupal
+  ports:
+    - port: 80
+      targetPort: 80

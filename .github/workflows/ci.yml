@@ -1,36 +1,29 @@
 # =============================================================================
 # ci.yml
-# ShiftFestival – Infra Team
+# ShiftFestival - Infra Team
 #
 # PURPOSE:
 #   Validates the Infra repository on every push and pull request.
 #   Catches configuration errors, security issues, and bad practices
-#   BEFORE they reach the VM.
+#   BEFORE they reach the VM / Kubernetes cluster.
 #
 # JOBS:
-#   1. validate    – Syntax checks for docker-compose, YAML, nginx configs
-#   2. lint        – Bash script linting with shellcheck
-#   3. security    – Secret scanning, hardcoded credential detection
-#   4. docker-scan – Docker Compose security best-practice checks
+#   1. validate - Kustomize rendering and YAML syntax checks
+#   2. lint     - Bash script linting with shellcheck
+#   3. security - Secret scanning and Kubernetes misconfiguration checks
 # =============================================================================
 
 name: CI Pipeline
 
 on:
   push:
-    branches: [ "main", "dev", "prod" ]
-    tags: [ "v*" ]
+    branches: ["main", "dev", "prod"]
+    tags: ["v*"]
   pull_request:
-    branches: [ "main", "dev", "prod" ]
+    branches: ["main", "dev", "prod"]
   workflow_dispatch:
 
 jobs:
-
-  # ===========================================================================
-  # JOB 1: VALIDATE
-  # Checks syntax of all configuration files before anything is deployed.
-  # A broken docker-compose.yml or nginx config would take down the VM.
-  # ===========================================================================
   validate:
     name: Validate configuration files
     runs-on: ubuntu-latest
@@ -39,25 +32,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------------------------
-      # Docker Compose syntax validation
-      # "docker compose config" parses the file and exits non-zero on errors.
-      # We use a dummy .env so variable substitution does not fail in CI.
-      # -----------------------------------------------------------------------
-      - name: Validate docker-compose.yml syntax
-        run: |
-          echo "Validating docker-compose.yml..."
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.1
 
-          # Create a dummy .env with placeholder values so compose does not
-          # complain about missing variables during syntax validation.
-          # This does NOT expose real secrets — it only satisfies the parser.
-          cat > .env.ci << 'EOF'
+      - name: Render Kubernetes manifests
+        shell: bash
+        run: |
+          cat > setup/.env <<'EOF'
           RABBITMQ_DEFAULT_USER=ci_placeholder
           RABBITMQ_DEFAULT_PASS=ci_placeholder
           DB_USER=ci_placeholder
           DB_PASSWORD=ci_placeholder
           DB_NAME=ci_placeholder
-          EXTERNAL_DB_PORT=30004
           PGADMIN_EMAIL=ci@placeholder.com
           PGADMIN_PASSWORD=ci_placeholder
           DRUPAL_DB_ROOT_PASS=ci_placeholder
@@ -104,125 +92,69 @@ jobs:
           MYSQL_DATABASE=ci_placeholder
           MYSQL_USER=ci_placeholder
           MYSQL_PASSWORD=ci_placeholder
-          ES_ADMIN_USER=ci_placeholder
           ES_ADMIN_PASS=ci_placeholder
-          ES_MEM_LIMIT=512m
-          KIBANA_SYSTEM_PASS=ci_placeholder
-          IDENTITY_RABBIT_USER=ci_placeholder
-          IDENTITY_RABBIT_PASS=ci_placeholder
+          ELASTIC_PASSWORD=ci_placeholder
+          KIBANA_PUBLIC_BASE_URL=https://ci.placeholder.com
+          AZURE_CLIENT_ID=ci_placeholder
+          AZURE_CLIENT_SECRET=ci_placeholder
+          API_TOKEN_SECRET=ci_placeholder
+          TOKEN_ENCRYPTION_KEY=ci_placeholder
+          TEAMS_WEBHOOK_INFRA=https://ci.placeholder.com
+          TEAMS_WEBHOOK_FRONTEND=https://ci.placeholder.com
+          TEAMS_WEBHOOK_KASSA=https://ci.placeholder.com
+          TEAMS_WEBHOOK_CRM=https://ci.placeholder.com
+          TEAMS_WEBHOOK_PLANNING=https://ci.placeholder.com
+          TEAMS_WEBHOOK_FACTURATIE=https://ci.placeholder.com
+          TEAMS_WEBHOOK_MONITORING=https://ci.placeholder.com
+          BILLING_API_URL=https://ci.placeholder.com
+          SUPABASE_URL=https://ci.placeholder.com
+          SUPABASE_ANON_KEY=ci_placeholder
           EOF
 
-          cp .env.ci .env
-          docker compose config --quiet && echo "✅ docker-compose.yml is valid" \
-            || { echo "❌ docker-compose.yml has syntax errors"; exit 1; }
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests.yaml"
+          rm -f setup/.env
+          echo "✅ Kustomize render completed"
 
-      # -----------------------------------------------------------------------
-      # YAML lint – catches indentation errors, trailing spaces, etc.
-      # -----------------------------------------------------------------------
       - name: Install yamllint
         run: pip install yamllint --quiet
 
-      - name: Lint all YAML files
+      - name: Lint YAML files
+        shell: bash
         run: |
-          echo "Linting YAML files..."
-          yamllint -d "{
-            extends: relaxed,
-            rules: {
-              line-length: {max: 300},
-              truthy: disable,
-              comments: disable,
-              comments-indentation: disable,
-              indentation: disable,
-              braces: disable,
-              brackets: disable,
-              colons: disable,
-              commas: disable,
-              document-start: disable,
-              empty-lines: disable,
-              new-line-at-end-of-file: disable,
-              trailing-spaces: disable
-             }
-          }" docker-compose.yml \
-            && echo "✅ docker-compose.yml YAML is clean" \
-            || { echo "❌ YAML lint errors found"; exit 1; }
-    
-          find .github/workflows -name "*.yml" -exec \
-            yamllint -d "{extends: relaxed, rules: {line-length: {max: 300}, truthy: disable, comments: disable}}" {} \; \
-            && echo "✅ GitHub Actions workflows are valid YAML" \
-            || { echo "❌ Workflow YAML lint errors found"; exit 1; }
-
-      # -----------------------------------------------------------------------
-      # Nginx config validation
-      # We spin up a temporary nginx container to run nginx -t on each config.
-      # -----------------------------------------------------------------------
-      - name: Validate nginx configurations
-        run: |
-          echo "Validating nginx config files..."
-          NGINX_ERRORS=0
-          for conf in *.conf; do
-            [[ ! -f "${conf}" ]] && continue
-            # Skip rabbitmq.conf — not an nginx config
-            [[ "${conf}" == "rabbitmq.conf" ]] && continue
-            echo "  Checking: ${conf}"
-            # Use --dry-run flag via perl to just check nginx syntax keywords
-            if ! grep -qE "server\s*\{|location\s*" "${conf}"; then
-              echo "  ⚠️  ${conf} does not look like an nginx config, skipping"
-              continue
-            fi
-            echo "  ✅ ${conf} looks valid"
-          done
-          echo "✅ Nginx configs checked"
-
-  # ===========================================================================
-  # JOB 2: LINT
-  # Bash script linting with shellcheck.
-  # Catches common bash mistakes before they cause silent failures on the VM.
-  # ===========================================================================
-  lint:
-    name: Lint bash scripts
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+          find . \
+            -type f \
+            \( -name "*.yml" -o -name "*.yaml" \) \
+            -not -path "./.git/*" \
+            -print0 \
+            | xargs -0 yamllint -d "{
+              extends: relaxed,
+              rules: {
+                line-length: {max: 300},
+                truthy: disable,
+                comments: disable,
+                comments-indentation: disable,
+                indentation: disable,
+                braces: disable,
+                brackets: disable,
+                colons: disable,
+                commas: disable,
+                document-start: disable,
+                empty-lines: disable,
+                new-line-at-end-of-file: disable,
+                trailing-spaces: disable
+              }
+            }"
 
       - name: Install shellcheck
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
 
-      - name: Run shellcheck on all bash scripts
+      - name: Run shellcheck on scripts
+        shell: bash
         run: |
-          echo "Running shellcheck on scripts/..."
-          ERRORS=0
-
-          # Find all shell scripts recursively
           while IFS= read -r script; do
-            echo "  Checking: ${script}"
-            # SC2034: unused variables (common in config files, disable)
-            # SC1091: not following sourced files (can't follow .env in CI)
-            shellcheck \
-              --exclude=SC2034,SC1091 \
-              --severity=warning \
-              "${script}" \
-              && echo "  ✅ ${script}" \
-              || {
-                echo "  ❌ ${script} has shellcheck warnings/errors"
-                ERRORS=$((ERRORS + 1))
-              }
-          done < <(find scripts/ -name "*.sh" -type f 2>/dev/null)
+            shellcheck --exclude=SC2034,SC1091 --severity=warning "${script}"
+          done < <(find scripts -name "*.sh" -type f)
 
-          if [[ ${ERRORS} -gt 0 ]]; then
-            echo "❌ ${ERRORS} script(s) failed shellcheck"
-            exit 1
-          fi
-          echo "✅ All scripts passed shellcheck"
-
-  # ===========================================================================
-  # JOB 3: SECURITY
-  # Scans for secrets, hardcoded credentials, and security misconfigurations.
-  # This is critical — a leaked password in git is a serious incident.
-  # ===========================================================================
   security:
     name: Security scanning
     runs-on: ubuntu-latest
@@ -231,261 +163,75 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Fetch full history so secret scanners can check all commits
           fetch-depth: 0
 
-      # -----------------------------------------------------------------------
-      # Gitleaks – scans git history for accidentally committed secrets.
-      # Catches API keys, passwords, tokens before they spread.
-      # -----------------------------------------------------------------------
       - name: Scan for secrets with Gitleaks
         uses: gitleaks/gitleaks-action@v1.6.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # -----------------------------------------------------------------------
-      # Manual checks for common Infra-specific security mistakes.
-      # These catch things gitleaks might miss in config files.
-      # -----------------------------------------------------------------------
-      - name: Check for hardcoded credentials in config files
-        run: |
-          echo "Checking for hardcoded credentials..."
-          ERRORS=0
-
-          # Patterns that should NEVER appear in committed files
-          # We check all files except .env.example and CI configs
-          DANGEROUS_PATTERNS=(
-            "POSTGRES_PASSWORD=[a-zA-Z][a-zA-Z0-9]{3,}"  # hardcoded postgres password
-            "MYSQL_PASSWORD=[a-zA-Z][a-zA-Z0-9]{3,}"     # hardcoded mysql password
-            "secret_key=[a-zA-Z][a-zA-Z0-9]{3,}"            # hardcoded secret key
-          )
-
-          for pattern in "${DANGEROUS_PATTERNS[@]}"; do
-            # Exclude example files, this workflow file, and test fixtures
-            matches=$(grep -rEi "${pattern}" \
-              --include="*.yml" \
-              --include="*.yaml" \
-              --include="*.conf" \
-              --include="*.php" \
-              --exclude="*.example" \
-              --exclude-dir=".github" \
-              --exclude-dir="test-environment" \
-              . 2>/dev/null || true)
-
-            if [[ -n "${matches}" ]]; then
-              echo "❌ Potentially hardcoded credential found:"
-              echo "${matches}"
-              ERRORS=$((ERRORS + 1))
-            fi
-          done
-
-          if [[ ${ERRORS} -gt 0 ]]; then
-            echo "❌ Security check failed: hardcoded credentials detected"
-            exit 1
-          fi
-          echo "✅ No hardcoded credentials found"
-
-      # -----------------------------------------------------------------------
-      # Verify that .env files are not committed to the repository.
-      # A real .env with production passwords must NEVER be in git.
-      # -----------------------------------------------------------------------
-      - name: Verify .env files are not committed
-        run: |
-          echo "Checking for committed .env files..."
-
-          # Find any .env files that are tracked by git (not just present on disk)
-          COMMITTED_ENV=$(git ls-files | grep -E "^\.env$|/\.env$" || true)
-
-          if [[ -n "${COMMITTED_ENV}" ]]; then
-            echo "❌ CRITICAL: .env file is committed to the repository!"
-            echo "   Files found: ${COMMITTED_ENV}"
-            echo "   Remove with: git rm --cached .env"
-            exit 1
-          fi
-          echo "✅ No .env files are committed"
-
-      # -----------------------------------------------------------------------
-      # Trivy – scans docker-compose.yml for security misconfigurations.
-      # Catches: containers running as root, privileged mode, exposed secrets.
-      # -----------------------------------------------------------------------
-      - name: Scan docker-compose for misconfigurations with Trivy
+      - name: Scan Kubernetes manifests with Trivy
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: config
           scan-ref: .
-          trivy-config: .trivy.yaml
-          exit-code: 1   # Block merges on HIGH/CRITICAL findings
+          exit-code: 1
           severity: HIGH,CRITICAL
           format: table
 
-      # -----------------------------------------------------------------------
-      # Check that no container in docker-compose runs in privileged mode.
-      # Privileged containers can escape to the host – never acceptable.
-      # -----------------------------------------------------------------------
-      - name: Check for privileged containers
+      - name: Verify sensitive files are not committed
+        shell: bash
         run: |
-          echo "Checking for privileged containers in docker-compose.yml..."
-
-          if grep -i "privileged:\s*true" docker-compose.yml; then
-            echo "❌ CRITICAL: Privileged container found in docker-compose.yml!"
-            echo "   Privileged containers can escape to the host OS."
+          COMMITTED_ENV=$(git ls-files | grep -E '(^|/)\.env$|(^|/)setup/\.env$' || true)
+          if [[ -n "${COMMITTED_ENV}" ]]; then
+            echo "❌ .env files must not be committed"
+            echo "${COMMITTED_ENV}"
             exit 1
           fi
-          echo "✅ No privileged containers found"
+          echo "✅ No .env files are tracked"
 
-      # -----------------------------------------------------------------------
-      # Check that no container exposes port 22 (SSH) externally.
-      # Accidentally exposing SSH on a public port is a serious risk.
-      # -----------------------------------------------------------------------
-      - name: Check for dangerous port exposures
+      - name: Check for hardcoded credentials
+        shell: bash
         run: |
-          echo "Checking for dangerous port exposures..."
           ERRORS=0
-
-          # Port 22 should never be exposed via docker (the VM itself uses 60022)
-          if grep -E '"\d+:22"' docker-compose.yml; then
-            echo "❌ Port 22 (SSH) is exposed via docker-compose!"
-            ERRORS=$((ERRORS + 1))
-          fi
-
-          # Port 5432 (PostgreSQL) should not be exposed on 0.0.0.0
-          # (it uses a custom port 30004 intentionally, so we just warn)
-          if grep -E '"0\.0\.0\.0:5432"' docker-compose.yml; then
-            echo "⚠️  PostgreSQL port 5432 is exposed on all interfaces"
-          fi
+          while IFS= read -r pattern; do
+            matches=$(grep -rEi "${pattern}" \
+              --include="*.yml" \
+              --include="*.yaml" \
+              --include="*.conf" \
+              --include="*.sh" \
+              --exclude-dir=".git" \
+              --exclude-dir=".github" \
+              --exclude="*.example" \
+              . 2>/dev/null || true)
+            if [[ -n "${matches}" ]]; then
+              echo "❌ Potential hardcoded secret found:"
+              echo "${matches}"
+              ERRORS=$((ERRORS + 1))
+            fi
+          done <<'EOF'
+          [Pp]assword\s*[:=]\s*[A-Za-z0-9_@./-]{6,}
+          [Tt]oken\s*[:=]\s*[A-Za-z0-9_@./-]{10,}
+          [Ss]ecret\s*[:=]\s*[A-Za-z0-9_@./-]{10,}
+          EOF
 
           if [[ ${ERRORS} -gt 0 ]]; then
             exit 1
           fi
-          echo "✅ No dangerous port exposures found"
 
-  # ===========================================================================
-  # JOB 4: DOCKER-COMPOSE BEST PRACTICES
-  # Checks that the compose file follows ShiftFestival team conventions.
-  # ===========================================================================
-  docker-compose-checks:
-    name: Docker Compose best-practice checks
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # -----------------------------------------------------------------------
-      # Verify every Watchtower-enabled service uses a versioned image tag
-      # (not just :latest) in .stable_tags — enforced by deploy.yml,
-      # but we can check the compose file for obvious :latest abuse.
-      # -----------------------------------------------------------------------
-      - name: Check that infra images are pinned versions
+      - name: Check for obvious Kubernetes misconfigurations
+        shell: bash
         run: |
-          echo "Checking image pinning for infrastructure services..."
+          echo "Checking for privileged containers and dangerous host ports..."
 
-          # These infra images SHOULD be pinned to a specific version
-          # (not :latest) because auto-updates of infra components are risky.
-          SHOULD_BE_PINNED=(
-            "rabbitmq"
-            "postgres"
-            "elasticsearch"
-            "logstash"
-            "kibana"
-            "mariadb"
-          )
-
-          WARNINGS=0
-          for image in "${SHOULD_BE_PINNED[@]}"; do
-            # Check if this image is used with :latest tag
-            if grep -E "${image}:latest" docker-compose.yml 2>/dev/null; then
-              echo "⚠️  WARNING: ${image} is using :latest tag."
-              echo "   Consider pinning to a specific version for stability."
-              WARNINGS=$((WARNINGS + 1))
-            fi
-          done
-
-          if [[ ${WARNINGS} -gt 0 ]]; then
-            echo "⚠️  ${WARNINGS} infrastructure image(s) use :latest."
-            echo "   This is a warning, not a failure. Consider pinning versions."
-          else
-            echo "✅ Infrastructure images are using pinned versions"
+          if grep -RIn "privileged:[[:space:]]*true" --include="*.yml" --include="*.yaml" .; then
+            echo "❌ CRITICAL: privileged containers are not allowed"
+            exit 1
           fi
 
-      # -----------------------------------------------------------------------
-      # Verify all team services have a Watchtower label set explicitly.
-      # Missing labels mean Watchtower behaviour is undefined for that service.
-      # -----------------------------------------------------------------------
-      - name: Check Watchtower labels are set on all services
-        run: |
-          echo "Checking Watchtower labels..."
+          if grep -RInE 'nodePort:[[:space:]]*22|hostPort:[[:space:]]*22' --include="*.yml" --include="*.yaml" .; then
+            echo "❌ CRITICAL: SSH must not be exposed through Kubernetes services"
+            exit 1
+          fi
 
-          # Every service in docker-compose should have the watchtower label
-          # explicitly set to either true or false. We warn if any service
-          # is missing the label entirely.
-          python3 << 'PYTHON'
-          import yaml, sys
-
-          with open("docker-compose.yml") as f:
-              compose = yaml.safe_load(f)
-
-          services = compose.get("services", {})
-          missing_label = []
-          watchtower_label = "com.centurylinklabs.watchtower.enable"
-
-          for name, config in services.items():
-              labels = config.get("labels", {})
-              # Labels can be a list or a dict in docker-compose
-              if isinstance(labels, list):
-                  has_label = any(watchtower_label in l for l in labels)
-              elif isinstance(labels, dict):
-                  has_label = watchtower_label in labels
-              else:
-                  has_label = False
-
-              if not has_label:
-                  missing_label.append(name)
-
-          if missing_label:
-              print(f"⚠️  Services missing Watchtower label: {', '.join(missing_label)}")
-              print("   Add: com.centurylinklabs.watchtower.enable: 'true' or 'false'")
-          else:
-              print("✅ All services have explicit Watchtower labels")
-          PYTHON
-
-      # -----------------------------------------------------------------------
-      # Check that all services are connected to shift_net.
-      # A service not on shift_net cannot communicate with RabbitMQ.
-      # -----------------------------------------------------------------------
-      - name: Check network membership
-        run: |
-          echo "Checking all services are on shift_net..."
-
-          python3 << 'PYTHON'
-          import yaml, sys
-
-          with open("docker-compose.yml") as f:
-              compose = yaml.safe_load(f)
-
-          services = compose.get("services", {})
-          not_on_shift_net = []
-
-          # These services intentionally use elk-net only (kibana, kibana-proxy)
-          elk_only_exceptions = {"kibana", "kibana-proxy", "kibana_proxy"}
-
-          for name, config in services.items():
-              if name in elk_only_exceptions:
-                  continue
-              networks = config.get("networks", [])
-              if isinstance(networks, dict):
-                  network_names = list(networks.keys())
-              elif isinstance(networks, list):
-                  network_names = networks
-              else:
-                  network_names = []
-
-              if "shift_net" not in network_names:
-                  not_on_shift_net.append(name)
-
-          if not_on_shift_net:
-              print(f"⚠️  Services not on shift_net: {', '.join(not_on_shift_net)}")
-              print("   These services cannot reach RabbitMQ or other services.")
-          else:
-              print("✅ All services are connected to shift_net")
-          PYTHON
+          echo "✅ No obvious misconfigurations found"

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-agent
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: monitoring-agent
+  template:
+    metadata:
+      labels:
+        app: monitoring-agent
+    spec:
+      containers:
+      - name: monitoring-agent
+        image: ghcr.io/integrationproject-groep1/monitoring:latest
+        env:
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMONITORING_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMONITORING_PASS
+        - name: RABBITMQ_VHOST
+          value: "/"
+        - name: ELASTICSEARCH_HOST
+          value: "http://elasticsearch-service:9200"
+        - name: ELASTICSEARCH_USER
+          value: "elastic"
+        - name: ELASTICSEARCH_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ELASTIC_PASSWORD
+        - name: TEAMS_WEBHOOK_MONITORING
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: TEAMS_WEBHOOK_MONITORING
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

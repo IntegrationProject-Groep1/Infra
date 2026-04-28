@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facturatie-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: facturatie-db
+  template:
+    metadata:
+      labels:
+        app: facturatie-db
+    spec:
+      containers:
+      - name: mariadb
+        image: mariadb:10.11
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_ROOT_PASS
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_NAME
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_PASS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: facturatie-db-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: facturatie-db-service
+spec:
+  selector:
+    app: facturatie-db
+  ports:
+    - port: 3306
+      targetPort: 3306

@@ -1,37 +1,14 @@
 # =============================================================================
 # deploy.yml
-# ShiftFestival – Infra Team
+# ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Deploys the full stack to the Azure VM on every push to main (after CI
-#   passes) or on manual trigger. After bringing containers up it runs health
-#   checks, updates .stable_tags on success, and rolls back + notifies Teams
-#   on failure.
-#
-# FLOW:
-#   1.  Copy all repo files to VM via SCP
-#   2.  Make scripts executable
-#   3.  Clear any sticky rollback pins from .env (set by runtime-rollback.sh)
-#   4.  Snapshot current image digests → .previous_tags (SHA|TAG format)
-#   5.  docker compose pull && up -d
-#   6.  Health checks (max 3 attempts × 30s per service)
-#   7a. SUCCESS → update .stable_tags (SHA|TAG) → reset rollback counters → notify Teams
-#   7b. FAILURE → rollback to .previous_tags → notify Teams CRITICAL
-#
-# SHA|TAG FORMAT:
-#   Both .previous_tags and .stable_tags store entries as:
-#     service_name=sha256:abc123...|ghcr.io/org/repo:latest
-#   The SHA is used for reliable docker pull (immune to :latest drift).
-#   The readable tag is used for Teams notifications and log messages.
-#
-# REQUIRED GITHUB SECRETS:
-#   VM_HOST              – Azure VM hostname or IP
-#   VM_USER              – SSH user (e.g. ehbstudent)
-#   SSH_PRIVATE_KEY      – SSH private key for VM access
-#   TEAMS_WEBHOOK_INFRA  – Power Automate webhook URL for #Infra channel
+#   Deploys the Kubernetes stack to the Azure VM on every push to main after
+#   CI passes, or on manual trigger. After applying the manifests it runs
+#   rollout checks and notifies Teams on success or failure.
 # =============================================================================
 
-name: Deploy Infra to VM
+name: Deploy Infra to Kubernetes
 
 on:
   workflow_dispatch:
@@ -46,28 +23,14 @@ jobs:
   deploy:
     name: Deploy to Azure VM
     runs-on: ubuntu-latest
-
-    # Only deploy when:
-    # - Triggered manually via workflow_dispatch, OR
-    # - Triggered automatically after CI Pipeline succeeds
     if: >
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
-
-      # -----------------------------------------------------------------------
-      # STEP 1: Checkout repository
-      # Needed so SCP has the latest files to copy to the VM.
-      # -----------------------------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------------------------
-      # STEP 2: Copy all repo files to the VM via SCP
-      # Copies docker-compose.yml, scripts/, nginx configs, etc.
-      # The .env file lives ONLY on the VM and is never in git.
-      # -----------------------------------------------------------------------
       - name: Copy files to VM via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -77,17 +40,9 @@ jobs:
           port: 60022
           source: "./*"
           target: "shiftfestival1.0"
-          # Exclude files/directories that have no purpose on the VM:
-          #   .github/  – CI/CD pipeline definitions (only needed by GitHub)
-          #   assets/   – README images and GIFs
-          #   README.md – Documentation (only needed on GitHub)
-          #   *.md      – All markdown documentation files
-          exclude: ".github,assets,README.md,*.md,test-environment,CLAUDE.md"
+          exclude: ".github,assets,README.md,*.md,CLAUDE.md,DOCUMENTATION.md,SECURITY.md"
 
-      # -----------------------------------------------------------------------
-      # STEP 3: Make all scripts executable on the VM
-      # -----------------------------------------------------------------------
-      - name: Set script permissions
+      - name: Verify kubectl is available on the VM
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -95,19 +50,9 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            chmod +x shiftfestival1.0/scripts/*.sh
+            command -v kubectl >/dev/null 2>&1 || { echo "kubectl is not installed on the VM"; exit 1; }
 
-      # -----------------------------------------------------------------------
-      # STEP 3b: Set deploy lock
-      #
-      # Creates shiftfestival1.0/.deploy_in_progress so runtime-rollback.sh
-      # skips its check cycles during the deploy. Without this, the monitor
-      # fires CRITICAL alerts for every service that goes down during
-      # "docker compose up", spamming both #Infra and all team channels.
-      # The lock is always removed in STEP 11 (if: always()).
-      # -----------------------------------------------------------------------
-      - name: Set deploy lock (suppress rollback monitor during deploy)
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
+      - name: Apply manifests and wait for rollouts
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -115,284 +60,45 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            touch shiftfestival1.0/.deploy_in_progress
-            echo "Deploy lock set at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor suppressed."
-
-      # -----------------------------------------------------------------------
-      # STEP 4: Clear sticky rollback pins from .env
-      #
-      # When runtime-rollback.sh detects a crash, it writes a "sticky pin" into
-      # .env like: FRONTEND_DRUPAL_IMAGE=ghcr.io/...@sha256:abc123
-      # This prevents Watchtower from re-pulling the broken image.
-      #
-      # Before a new deploy, we MUST clear these pins so docker compose pulls
-      # the fresh :latest images instead of staying pinned to the old SHA.
-      # -----------------------------------------------------------------------
-      - name: Clear sticky rollback pins from .env
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
+            set -euo pipefail
             cd shiftfestival1.0
 
-            # Sticky pins written by runtime-rollback.sh look like:
-            #   FRONTEND_DRUPAL_IMAGE=ghcr.io/...@sha256:abc123
-            # We identify them by the _IMAGE= pattern.
-            if grep -qE '^[A-Z_]+_IMAGE=' .env 2>/dev/null; then
-              # Remove all _IMAGE= lines – they are runtime pins, not permanent config
-              sed -i -E '/^[A-Z_]+_IMAGE=/d' .env
-              echo "Sticky rollback pins cleared from .env"
-            else
-              echo "No sticky pins found in .env – nothing to clear"
-            fi
-
-      # -----------------------------------------------------------------------
-      # STEP 5: Snapshot current running image digests (pre-deploy baseline)
-      #
-      # We capture the EXACT image SHA currently running in each container.
-      # This is the "safety net": if the new deploy breaks something, we can
-      # roll back to precisely this version.
-      #
-      # FORMAT: service_name=sha256:abc123...|ghcr.io/org/repo:latest
-      #   - SHA (before |): used by docker pull for a reliable, exact pull
-      #   - Tag (after  |): used in Teams messages and log output for readability
-      #
-      # WHY {{.Image}} instead of {{index .RepoDigests 0}}:
-      #   RepoDigests can be empty if the image was built/tagged locally.
-      #   {{.Image}} always returns the internal SHA of the running image layer,
-      #   which is unique and pullable as long as it exists in the registry.
-      # -----------------------------------------------------------------------
-      - name: Snapshot current image digests (pre-deploy baseline)
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            cd shiftfestival1.0
-
-            # Only team services with GHCR images are snapshotted.
-            # Infrastructure images (rabbitmq, postgres, nginx) are pinned by
-            # version tag in docker-compose.yml and never rolled back automatically.
-            ROLLBACK_SERVICES=(
-              "frontend_drupal"
-              "fossbilling_app"
-              "fossbilling_connector"
-              "kassa_odoo"
-              "kassa_integratie"
-              "crm_receiver"
-              "planning_service"
-              "identity-service"
-            )
-
-            echo "# Pre-deploy snapshot – $(date '+%Y-%m-%d %H:%M:%S')" > .previous_tags
-
-            for service in "${ROLLBACK_SERVICES[@]}"; do
-              # {{.Image}} returns the internal SHA of the running image (e.g. sha256:abc123)
-              # This is always set, even for locally tagged images.
-              sha_image=$(docker inspect --format='{{.Image}}' "${service}" 2>/dev/null || echo "")
-
-              # {{.Config.Image}} returns the human-readable reference (e.g. ghcr.io/org/img:latest)
-              readable_tag=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
-
-              if [[ -n "${readable_tag}" && -n "${sha_image}" ]]; then
-                # Store as SHA|TAG for reliable rollback + readable logging
-                echo "${service}=${sha_image}|${readable_tag}" >> .previous_tags
-                echo "Snapshotted: ${service} = ${readable_tag} (${sha_image:0:19}...)"
-              elif [[ -n "${readable_tag}" ]]; then
-                # Fallback: no SHA available (e.g. first deploy), store tag twice
-                echo "${service}=${readable_tag}|${readable_tag}" >> .previous_tags
-                echo "Snapshotted (no SHA): ${service} = ${readable_tag}"
-              else
-                echo "Skipping ${service} – container not running (first deploy?)"
-              fi
-            done
-
-            echo "Snapshot complete. Contents of .previous_tags:"
-            cat .previous_tags
-
-      # -----------------------------------------------------------------------
-      # STEP 6: Pull latest images and start the full stack
-      # --remove-orphans removes containers for services removed from compose.
-      # -----------------------------------------------------------------------
-      - name: Pull latest images and start stack
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            cd shiftfestival1.0
-            echo "Pulling latest images..."
-            docker compose pull
-            echo "Starting stack..."
-            docker compose up -d --remove-orphans
-            echo "Stack started."
-
-      # -----------------------------------------------------------------------
-      # STEP 7: Health checks
-      #
-      # Gives containers 30s to initialise, then checks each service.
-      # Two check types:
-      #   docker_health → service has a HEALTHCHECK; we wait for "healthy"
-      #   running       → no HEALTHCHECK; we just verify the container is up
-      #
-      # Each service gets up to 3 attempts with 30s between retries.
-      # If any service fails all attempts → write .deploy_failure → exit 1
-      # This triggers the FAILURE PATH steps (8a, 8b, 8c).
-      # -----------------------------------------------------------------------
-      - name: Run health checks
-        id: healthcheck
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            cd shiftfestival1.0
-
-            echo "Waiting 30s for containers to initialise..."
-            sleep 30
-
-            # Format: "container_name:check_type"
-            SERVICES_TO_CHECK=(
-              "rabbitmq_broker:docker_health"
-              "integration_db:docker_health"
-              "elasticsearch:docker_health"
-              "frontend_drupal:running"
-              "fossbilling_app:running"
-              "fossbilling_connector:running"
-              "kassa_odoo:running"
-              "kassa_integratie:running"
-              "crm_receiver:running"
-              "planning_service:running"
-            )
-
-            MAX_RETRIES=3
-            RETRY_INTERVAL=30
-            FAILED_SERVICES=()
-
-            for entry in "${SERVICES_TO_CHECK[@]}"; do
-              container="${entry%%:*}"
-              check_type="${entry##*:}"
-              success=false
-
-              echo "--- Checking: ${container} (${check_type}) ---"
-
-              for attempt in $(seq 1 ${MAX_RETRIES}); do
-                echo "  Attempt ${attempt}/${MAX_RETRIES}..."
-
-                if [[ "${check_type}" == "docker_health" ]]; then
-                  health=$(docker inspect \
-                    --format='{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
-                    "${container}" 2>/dev/null || echo "not_found")
-                  echo "  Health status: ${health}"
-                  [[ "${health}" == "healthy" ]] && { success=true; break; }
-                else
-                  status=$(docker inspect \
-                    --format='{{.State.Status}}' \
-                    "${container}" 2>/dev/null || echo "not_found")
-                  echo "  Container status: ${status}"
-                  [[ "${status}" == "running" ]] && { success=true; break; }
-                fi
-
-                if [[ ${attempt} -lt ${MAX_RETRIES} ]]; then
-                  echo "  Not ready. Waiting ${RETRY_INTERVAL}s..."
-                  sleep ${RETRY_INTERVAL}
-                fi
-              done
-
-              if ! ${success}; then
-                echo "  FAILED: ${container} did not become healthy."
-                FAILED_SERVICES+=("${container}")
-              else
-                echo "  OK: ${container} is healthy."
-              fi
-            done
-
-            if [[ ${#FAILED_SERVICES[@]} -gt 0 ]]; then
-              echo "FAILED_SERVICES=${FAILED_SERVICES[*]}" > shiftfestival1.0/.deploy_failure
-              echo "Health check FAILED for: ${FAILED_SERVICES[*]}"
+            if [[ ! -f setup/.env ]]; then
+              echo "setup/.env is missing on the VM. Create it before deploying."
               exit 1
             fi
 
-            echo "All health checks passed!"
-            rm -f shiftfestival1.0/.deploy_failure
+            kubectl apply -k .
 
-      # -----------------------------------------------------------------------
-      # STEP 8 (SUCCESS PATH): Update .stable_tags
-      #
-      # Records the exact SHA|TAG of every service that is now running.
-      # runtime-rollback.sh uses .stable_tags as the rollback target when a
-      # container crashes after this deploy.
-      # Also resets the rollback counter so MAX_ROLLBACKS is fresh.
-      # -----------------------------------------------------------------------
-      - name: Update .stable_tags after successful deploy
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            cd shiftfestival1.0
+            kubectl rollout status deployment/rabbitmq-broker -n shift-festival --timeout=10m
+            kubectl rollout status deployment/postgredb -n shift-festival --timeout=10m
+            kubectl rollout status deployment/frontend-db -n shift-festival --timeout=10m
+            kubectl rollout status deployment/frontend-drupal -n shift-festival --timeout=10m
+            kubectl rollout status deployment/frontend-proxy -n shift-festival --timeout=10m
+            kubectl rollout status deployment/kassa-db -n shift-festival --timeout=10m
+            kubectl rollout status deployment/kassa-web -n shift-festival --timeout=10m
+            kubectl rollout status deployment/kassa-proxy -n shift-festival --timeout=10m
+            kubectl rollout status deployment/kassa-integration -n shift-festival --timeout=10m
+            kubectl rollout status deployment/facturatie-db -n shift-festival --timeout=10m
+            kubectl rollout status deployment/facturatie-app -n shift-festival --timeout=10m
+            kubectl rollout status deployment/facturatie-connector -n shift-festival --timeout=10m
+            kubectl rollout status deployment/facturatie-proxy -n shift-festival --timeout=10m
+            kubectl rollout status deployment/cloudflared -n shift-festival --timeout=10m
+            kubectl rollout status deployment/integration-crm -n shift-festival --timeout=10m
+            kubectl rollout status deployment/identity-service -n shift-festival --timeout=10m
+            kubectl rollout status deployment/integration-planning -n shift-festival --timeout=10m
+            kubectl rollout status deployment/kibana -n shift-festival --timeout=10m
+            kubectl rollout status deployment/logstash -n shift-festival --timeout=10m
+            kubectl rollout status deployment/monitoring-agent -n shift-festival --timeout=10m
+            kubectl rollout status statefulset/elasticsearch -n shift-festival --timeout=10m
 
-            ROLLBACK_SERVICES=(
-              "frontend_drupal"
-              "fossbilling_app"
-              "fossbilling_connector"
-              "kassa_odoo"
-              "kassa_integratie"
-              "crm_receiver"
-              "planning_service"
-              "identity-service"
-            )
+            kubectl get pods -n shift-festival
+            kubectl get svc -n shift-festival
 
-            echo "# Managed by deploy.yml – DO NOT EDIT MANUALLY" > .stable_tags
-            echo "# Last successful deploy: $(date '+%Y-%m-%d %H:%M:%S')" >> .stable_tags
-
-            for service in "${ROLLBACK_SERVICES[@]}"; do
-              sha_image=$(docker inspect --format='{{.Image}}' "${service}" 2>/dev/null || echo "")
-              readable_tag=$(docker inspect --format='{{.Config.Image}}' "${service}" 2>/dev/null || echo "")
-
-              if [[ -n "${readable_tag}" && -n "${sha_image}" ]]; then
-                echo "${service}=${sha_image}|${readable_tag}" >> .stable_tags
-                echo "Stable tag recorded: ${service} = ${readable_tag} (${sha_image:0:19}...)"
-              fi
-            done
-
-            # Reset rollback counters – this deploy is now the new stable baseline
-            echo "# Reset after successful deploy $(date '+%Y-%m-%d %H:%M:%S')" > .rollback_state
-            echo "Rollback counters reset."
-
-      # -----------------------------------------------------------------------
-      # STEP 9 (SUCCESS PATH): Notify Teams – deploy successful
-      #
-      # Uses Power Automate Adaptive Card format.
-      # IMPORTANT: COMMIT_MSG is sanitised to a single line with special
-      # characters removed to prevent bash "bad substitution" errors caused
-      # by multi-line commit messages or backticks/quotes in the message body.
-      # -----------------------------------------------------------------------
-      - name: Notify Teams – deploy success
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
+      - name: Notify Teams - deploy success
+        if: success()
         run: |
           COMMIT_SHA="${{ github.sha }}"
-          # Sanitise commit message: keep first line only, strip chars that
-          # break bash heredoc or JSON (backticks, backslashes, double quotes)
-          COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}" \
-            | head -1 \
-            | tr -d '`\\\"')
           ACTOR="${{ github.actor }}"
           REF="${{ github.ref_name }}"
 
@@ -408,7 +114,7 @@ jobs:
                 "body": [
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_SUCCESS_TITLE",
+                    "text": "✅ Deploy successful – Kubernetes rollout",
                     "weight": "Bolder",
                     "size": "Medium",
                     "color": "Good",
@@ -416,14 +122,14 @@ jobs:
                   },
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_SUCCESS_META",
+                    "text": "Branch: REF_PLACEHOLDER | Commit: SHA_PLACEHOLDER | By: ACTOR_PLACEHOLDER",
                     "isSubtle": true,
                     "size": "Small",
                     "wrap": true
                   },
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_SUCCESS_MSG",
+                    "text": "The Kubernetes manifests were applied successfully and the main workloads became ready.",
                     "wrap": true,
                     "isSubtle": true,
                     "spacing": "Medium"
@@ -435,28 +141,19 @@ jobs:
           TEAMS_EOF
           )
 
-          # Substitute placeholders safely (avoids heredoc variable expansion issues)
-          TITLE="✅ Deploy successful – ShiftFestival"
-          META="Branch: ${REF} | Commit: ${COMMIT_SHA:0:7} | By: ${ACTOR}"
-          PAYLOAD="${PAYLOAD//DEPLOY_SUCCESS_TITLE/$TITLE}"
-          PAYLOAD="${PAYLOAD//DEPLOY_SUCCESS_META/$META}"
-          PAYLOAD="${PAYLOAD//DEPLOY_SUCCESS_MSG/$COMMIT_MSG}"
+          PAYLOAD="${PAYLOAD//REF_PLACEHOLDER/$REF}"
+          PAYLOAD="${PAYLOAD//SHA_PLACEHOLDER/${COMMIT_SHA:0:7}}"
+          PAYLOAD="${PAYLOAD//ACTOR_PLACEHOLDER/$ACTOR}"
 
           if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            curl -s -o /dev/null -w "%{http_code}" \
               -H "Content-Type: application/json" \
               -d "${PAYLOAD}" \
-              "${{ secrets.TEAMS_WEBHOOK_INFRA }}")
-            echo "Teams notification sent (HTTP ${HTTP_STATUS})"
-          else
-            echo "No Teams webhook configured – skipping."
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
           fi
 
-      # -----------------------------------------------------------------------
-      # STEP 10a (FAILURE PATH): Collect logs from failed containers
-      # -----------------------------------------------------------------------
-      - name: Collect failure logs
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
+      - name: Collect cluster status on failure
+        if: failure()
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -465,124 +162,13 @@ jobs:
           port: 60022
           script: |
             cd shiftfestival1.0
+            kubectl get pods -A
+            kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -50
 
-            if [[ -f .deploy_failure ]]; then
-              source .deploy_failure
-              echo "Failed services: ${FAILED_SERVICES}"
-              for service in ${FAILED_SERVICES}; do
-                echo "=== Logs: ${service} ==="
-                docker logs --tail 30 "${service}" 2>&1 || echo "Could not retrieve logs."
-              done
-            else
-              echo "No .deploy_failure file found – health check may not have run."
-            fi
-
-      # -----------------------------------------------------------------------
-      # STEP 10b (FAILURE PATH): Roll back to pre-deploy snapshot
-      #
-      # Reads .previous_tags (written in STEP 5) and restores each service
-      # to the exact image SHA it was running before this deploy.
-      #
-      # FORMAT of .previous_tags: service=sha256:abc...|ghcr.io/org/img:latest
-      #   IFS='=' splits on the FIRST '=' only → value = "sha256:abc...|tag"
-      #   sha_image = everything before '|'  → used for docker pull
-      #   readable_tag = everything after '|' → used for docker tag + logging
-      #
-      # After pulling the SHA, we tag it with the readable reference so that
-      # docker compose up picks it up correctly from the local image store.
-      # -----------------------------------------------------------------------
-      - name: Rollback to pre-deploy snapshot
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            cd shiftfestival1.0
-
-            echo "=== ROLLBACK INITIATED ==="
-
-            if [[ ! -f .previous_tags ]]; then
-              echo "No .previous_tags file found – cannot roll back. Manual intervention required."
-              exit 0
-            fi
-
-            # Pause Watchtower to prevent it interfering during rollback
-            docker pause watchtower 2>/dev/null || echo "Watchtower not running."
-
-            ROLLBACK_COUNT=0
-
-            # IFS='=' splits "service=sha256:abc|tag:latest" into:
-            #   service = "service_name"
-            #   value   = "sha256:abc...|ghcr.io/org/img:latest"
-            while IFS='=' read -r service value; do
-              # Skip comment lines and empty lines
-              [[ "${service}" =~ ^#.*$ ]] && continue
-              [[ -z "${service}" ]] && continue
-
-              # Split value on '|' to get SHA and readable tag separately
-              sha_image="${value%%|*}"    # Everything before the first '|'
-              readable_tag="${value##*|}" # Everything after the last '|'
-
-              echo "Rolling back ${service}: ${readable_tag} (${sha_image:0:19}...)"
-
-              # Pull the exact SHA from the registry
-              if docker pull "${sha_image}" 2>/dev/null; then
-                # Tag the pulled SHA with the readable reference so compose finds it
-                docker tag "${sha_image}" "${readable_tag}" 2>/dev/null || true
-
-                # Restart only this service (--no-deps avoids restarting dependencies)
-                if docker compose up -d --no-deps "${service}" 2>/dev/null; then
-                  echo "  ✅ ${service} restored to ${readable_tag}"
-                  (( ROLLBACK_COUNT++ ))
-                else
-                  echo "  ❌ ${service}: compose up failed after pull"
-                fi
-              else
-                echo "  ❌ ${service}: could not pull ${sha_image} – skipping"
-              fi
-            done < .previous_tags
-
-            echo "Rollback complete. ${ROLLBACK_COUNT} service(s) restored."
-
-            # Unpause Watchtower now that the stack is back to the previous state
-            sleep 5
-            docker unpause watchtower 2>/dev/null || true
-            echo "Watchtower unpaused."
-
-      # -----------------------------------------------------------------------
-      # STEP 11: Remove deploy lock (ALWAYS runs – success or failure)
-      #
-      # Removes .deploy_in_progress so the rollback monitor resumes normal
-      # operation after the deploy finishes. Using if: always() guarantees
-      # the lock is cleared even when earlier steps fail.
-      # -----------------------------------------------------------------------
-      - name: Remove deploy lock
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          script: |
-            rm -f shiftfestival1.0/.deploy_in_progress
-            echo "Deploy lock removed at $(date '+%Y-%m-%d %H:%M:%S') – rollback monitor resumed."
-
-      # -----------------------------------------------------------------------
-      # STEP 10c (FAILURE PATH): Notify Teams – deploy failed
-      #
-      # Same sanitisation as the success notification to avoid bad substitution.
-      # -----------------------------------------------------------------------
-      - name: Notify Teams – deploy failed + rollback executed
-        if: false # TEMPORARILY DISABLED – Kubernetes migration
+      - name: Notify Teams - deploy failed
+        if: failure()
         run: |
           COMMIT_SHA="${{ github.sha }}"
-          COMMIT_MSG=$(printf '%s' "${{ github.event.head_commit.message }}" \
-            | head -1 \
-            | tr -d '`\\\"')
           ACTOR="${{ github.actor }}"
           REF="${{ github.ref_name }}"
 
@@ -598,7 +184,7 @@ jobs:
                 "body": [
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_FAIL_TITLE",
+                    "text": "❌ Deploy failed – Kubernetes rollout",
                     "weight": "Bolder",
                     "size": "Medium",
                     "color": "Attention",
@@ -606,23 +192,16 @@ jobs:
                   },
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_FAIL_META",
+                    "text": "Branch: REF_PLACEHOLDER | Commit: SHA_PLACEHOLDER | By: ACTOR_PLACEHOLDER",
                     "isSubtle": true,
                     "size": "Small",
                     "wrap": true
                   },
                   {
                     "type": "TextBlock",
-                    "text": "DEPLOY_FAIL_MSG",
+                    "text": "The manifest apply or a rollout check failed. Review the Actions log and cluster status output.",
                     "wrap": true,
                     "isSubtle": true,
-                    "spacing": "Medium"
-                  },
-                  {
-                    "type": "TextBlock",
-                    "text": "⚠️ Stack has been rolled back. Check GitHub Actions logs for details.",
-                    "wrap": true,
-                    "color": "Attention",
                     "spacing": "Medium"
                   }
                 ]
@@ -632,19 +211,13 @@ jobs:
           TEAMS_EOF
           )
 
-          TITLE="🔴 Deploy FAILED – rollback executed – ShiftFestival"
-          META="Branch: ${REF} | Commit: ${COMMIT_SHA:0:7} | By: ${ACTOR}"
-          PAYLOAD="${PAYLOAD//DEPLOY_FAIL_TITLE/$TITLE}"
-          PAYLOAD="${PAYLOAD//DEPLOY_FAIL_META/$META}"
-          PAYLOAD="${PAYLOAD//DEPLOY_FAIL_MSG/$COMMIT_MSG}"
+          PAYLOAD="${PAYLOAD//REF_PLACEHOLDER/$REF}"
+          PAYLOAD="${PAYLOAD//SHA_PLACEHOLDER/${COMMIT_SHA:0:7}}"
+          PAYLOAD="${PAYLOAD//ACTOR_PLACEHOLDER/$ACTOR}"
 
           if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            curl -s -o /dev/null -w "%{http_code}" \
               -H "Content-Type: application/json" \
               -d "${PAYLOAD}" \
-              "${{ secrets.TEAMS_WEBHOOK_INFRA }}")
-            echo "Teams notification sent (HTTP ${HTTP_STATUS})"
-          else
-            echo "No Teams webhook configured – skipping."
-            echo "CRITICAL: Deploy failed for ${REF} @ ${COMMIT_SHA:0:7}"
+              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
           fi

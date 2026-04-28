@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kassa-integration
+  annotations:
+    keel.sh/policy: force
+    keel.sh/trigger: poll
+    keel.sh/pollSchedule: "@every 5m"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kassa-integration
+  template:
+    metadata:
+      labels:
+        app: kassa-integration
+    spec:
+      containers:
+      - name: kassa-worker
+        image: ghcr.io/integrationproject-groep1/kassa:latest
+        env:
+        - name: ODOO_URL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_URL
+        - name: ODOO_DB
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_DB
+        - name: ODOO_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_USER
+        - name: ODOO_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_PASS
+        - name: ODOO_MASTER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_MASTER_PASS
+        - name: RABBIT_HOST
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_HOST
+        - name: RABBIT_PORT
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_PORT
+        - name: RABBIT_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_USER
+        - name: RABBIT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_PASS
+        - name: RABBIT_VHOST
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_VHOST
+        - name: RABBIT_INCOMING_QUEUE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_INCOMING_QUEUE
+        - name: RABBIT_EXCHANGE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_EXCHANGE
+        - name: RABBIT_AUTO_SETUP_TOPOLOGY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBIT_AUTO_SETUP_TOPOLOGY
+        - name: POLL_INTERVAL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POLL_INTERVAL
+        - name: BADGE_PAYMENT_METHOD_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: BADGE_PAYMENT_METHOD_NAME
+        - name: TEAMS_WEBHOOK_KASSA
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: TEAMS_WEBHOOK_KASSA
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

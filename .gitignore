@@ -1,11 +1,73 @@
-certs/
-pgdata/
+# =============================================================
+# Environment & Secrets - CRITICAL: Contains passwords & API keys
+# =============================================================
 .env
-dozzle-users.yml
-odoo.conf
-config_recovery.php
-.stable_tags
-.rollback_state
-rollback.lock
-.previous_tags
-.deploy_failure
+.env.local
+.env.*.local
+.env.*
+*.env
+setup/.env
+**/.env
+
+# Ensure setup directory .env is never tracked
+setup/.env*
+
+# Kubernetes secrets (contain credentials)
+**/secrets.yaml
+**/secret.yaml
+secrets/
+.secrets/
+definitions.json
+
+# Private keys and certificates
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa
+id_rsa.pub
+
+# AWS, Azure, GCP credentials
+~/.aws/
+~/.azure/
+~/.gcloud/
+credentials.json
+service-account-key.json
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.sublime-project
+.sublime-workspace
+
+# OS specific
+.DS_Store
+Thumbs.db
+*.log
+
+# Local development
+node_modules/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+build/
+
+# Temporary files
+*.tmp
+*.bak
+*.backup
+.temp/
+
+# Configuration files with hardcoded secrets
+config.local.yaml
+config.dev.yaml
+docker-compose.prod.yml
+kubeconfig
+.kubeconfig
