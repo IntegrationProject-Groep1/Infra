@@ -15,13 +15,23 @@ spec:
     spec:
       hostname: my-rabbit
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 999
+        runAsNonRoot: false # Tijdelijk op false zodat de init container root kan zijn
         fsGroup: 999
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 999:999 /var/lib/rabbitmq && chmod 600 /var/lib/rabbitmq/.erlang.cookie || true"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: rabbit-data
+          mountPath: /var/lib/rabbitmq
       containers:
       - name: rabbitmq
         image: rabbitmq:3-management-alpine
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
           allowPrivilegeEscalation: false
           capabilities:
             drop:

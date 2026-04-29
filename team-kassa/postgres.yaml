@@ -14,13 +14,23 @@ spec:
         app: kassa-db
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 70
+        runAsNonRoot: false
         fsGroup: 70
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:14-alpine
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
           allowPrivilegeEscalation: false
           capabilities:
             drop:
