@@ -12,9 +12,18 @@ spec:
       labels:
         app: facturatie-db
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
       containers:
       - name: mariadb
         image: mariadb:10.11
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 3306
         env:
@@ -48,10 +57,18 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/mysql
+        - name: tmp
+          mountPath: /tmp
+        - name: run-mysql
+          mountPath: /var/run/mysqld
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: facturatie-db-data-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: run-mysql
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -12,9 +12,18 @@ spec:
       labels:
         app: kibana
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       initContainers:
       - name: setup-kibana-user
         image: curlimages/curl:8.7.1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: ELASTIC_PASSWORD
           valueFrom:
@@ -34,9 +43,18 @@ spec:
             http://elasticsearch-service:9200/_security/user/kibana_system/_password \
             -d "{\"password\":\"${ELASTIC_PASSWORD}\"}"
           echo "kibana_system password configured"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
       containers:
       - name: kibana
         image: docker.elastic.co/kibana/kibana:8.17.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5601
         env:
@@ -61,6 +79,16 @@ spec:
           limits:
             memory: "1Gi"
             cpu: "1000m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: kibana-data
+          mountPath: /usr/share/kibana/data
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: kibana-data
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

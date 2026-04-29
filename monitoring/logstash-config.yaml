@@ -1,8 +1,9 @@
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
-  name: logstash-pipeline
-data:
+  name: logstash-pipeline-config
+type: Opaque
+stringData:
   logstash.conf: |
     input {
       rabbitmq {

@@ -12,9 +12,18 @@ spec:
       labels:
         app: logstash
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: logstash
         image: docker.elastic.co/logstash/logstash:8.17.0
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5044
           name: beats
@@ -56,10 +65,18 @@ spec:
           mountPath: /usr/share/logstash/pipeline/logstash.conf
           subPath: logstash.conf
           readOnly: true
+        - name: tmp
+          mountPath: /tmp
+        - name: logstash-data
+          mountPath: /usr/share/logstash/data
       volumes:
       - name: pipeline
-        configMap:
-          name: logstash-pipeline
+        secret:
+          secretName: logstash-pipeline-config
+      - name: tmp
+        emptyDir: {}
+      - name: logstash-data
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

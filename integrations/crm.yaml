@@ -205,11 +205,15 @@ spec:
           mountPath: /var/lib/mysql
         - name: tmp
           mountPath: /tmp
+        - name: run-mysql
+          mountPath: /var/run/mysqld
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: crm-db-data-pvc
       - name: tmp
+        emptyDir: {}
+      - name: run-mysql
         emptyDir: {}
 ---
 apiVersion: v1
