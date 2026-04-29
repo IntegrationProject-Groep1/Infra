@@ -75,6 +75,8 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: AZURE_CLIENT_SECRET
+        - name: TOKEN_CACHE_FILE
+          value: "/app/data/token_cache.json"
         - name: API_TOKEN_SECRET
           valueFrom:
             secretKeyRef:
@@ -97,6 +99,9 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: token-data
+          mountPath: /app/data
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         securityContext:
@@ -124,6 +129,10 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQ_PASS_PLANNING
+      volumes:
+      - name: token-data
+        persistentVolumeClaim:
+          claimName: planning-token-pvc
 ---
 apiVersion: v1
 kind: Service
@@ -153,18 +162,22 @@ spec:
         app: planning-db
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 70
         fsGroup: 70
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+        securityContext:
+          runAsUser: 0
       containers:
       - name: postgres
-        image: postgres:15-alpine
+        image: postgres:16-alpine
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 5432
         env:
@@ -193,16 +206,12 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
-        - name: tmp
-          mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: planning-db-data-pvc
-      - name: tmp
-        emptyDir: {}
       - name: run-postgres
         emptyDir: {}
 ---

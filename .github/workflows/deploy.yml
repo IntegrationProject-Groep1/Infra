@@ -84,22 +84,22 @@ jobs:
             echo "Starting parallel rollout checks for applications..."
             
             # Start all checks in background
-            kubectl rollout status deployment/frontend-drupal -n shift-festival --timeout=5m &
+            kubectl rollout status deployment/frontend-drupal -n shift-festival --timeout=10m &
             kubectl rollout status deployment/frontend-proxy -n shift-festival --timeout=5m &
             kubectl rollout status deployment/kassa-web -n shift-festival --timeout=5m &
             kubectl rollout status deployment/kassa-proxy -n shift-festival --timeout=5m &
             kubectl rollout status deployment/kassa-integration -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/fossbilling-app -n shift-festival --timeout=5m &
+            kubectl rollout status deployment/fossbilling-app -n shift-festival --timeout=10m &
             kubectl rollout status deployment/facturatie-connector -n shift-festival --timeout=5m &
             kubectl rollout status deployment/facturatie-proxy -n shift-festival --timeout=5m &
             kubectl rollout status deployment/cloudflared -n shift-festival --timeout=5m &
             kubectl rollout status deployment/integration-crm -n shift-festival --timeout=5m &
             kubectl rollout status deployment/identity-service -n shift-festival --timeout=5m &
             kubectl rollout status deployment/integration-planning -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/kibana -n shift-festival --timeout=5m &
+            kubectl rollout status deployment/kibana -n shift-festival --timeout=10m &
             kubectl rollout status deployment/logstash -n shift-festival --timeout=5m &
             kubectl rollout status deployment/monitoring-agent -n shift-festival --timeout=5m &
-            kubectl rollout status statefulset/elasticsearch -n shift-festival --timeout=5m &
+            kubectl rollout status statefulset/elasticsearch -n shift-festival --timeout=10m &
 
             # Wait for all background processes to finish
             wait

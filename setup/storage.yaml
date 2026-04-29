@@ -34,6 +34,17 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  name: frontend-drupal-files-pvc
+  namespace: shift-festival
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
   name: kassa-db-data-pvc
   namespace: shift-festival
 spec:
@@ -56,6 +67,28 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
+  name: fossbilling-data-pvc
+  namespace: shift-festival
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: fossbilling-uploads-pvc
+  namespace: shift-festival
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
   name: planning-db-data-pvc
   namespace: shift-festival
 spec:
@@ -63,6 +96,17 @@ spec:
   resources:
     requests:
       storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: planning-token-pvc
+  namespace: shift-festival
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

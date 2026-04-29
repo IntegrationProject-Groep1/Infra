@@ -15,6 +15,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        fsGroup: 1000
       initContainers:
       - name: setup-kibana-user
         image: curlimages/curl:8.7.1
@@ -34,15 +35,14 @@ spec:
         - sh
         - -c
         - |
-          until curl -s -o /dev/null -w "%{http_code}" http://elasticsearch-service:9200 | grep -q "200\|401"; do
+          until curl -s -u "elastic:${ELASTIC_PASSWORD}" http://elasticsearch-service:9200; do
             echo "Waiting for Elasticsearch..."
             sleep 5
           done
-          curl -s -X POST -u "elastic:${ELASTIC_PASSWORD}" \
+          echo "Elasticsearch is up. Setting up kibana_system user..."
+          curl -s -u "elastic:${ELASTIC_PASSWORD}" -X POST "http://elasticsearch-service:9200/_security/user/kibana_system/_password" \
             -H "Content-Type: application/json" \
-            http://elasticsearch-service:9200/_security/user/kibana_system/_password \
             -d "{\"password\":\"${ELASTIC_PASSWORD}\"}"
-          echo "kibana_system password configured"
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -54,7 +54,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false # Kibana heeft veel schrijfbare mappen nodig
         ports:
         - containerPort: 5601
         env:
@@ -67,18 +67,13 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: ELASTIC_PASSWORD
-        - name: SERVER_PUBLICBASEURL
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: KIBANA_PUBLIC_BASE_URL
         resources:
           requests:
             memory: "512Mi"
-            cpu: "200m"
+            cpu: "100m"
           limits:
             memory: "1Gi"
-            cpu: "1000m"
+            cpu: "500m"
         volumeMounts:
         - name: tmp
           mountPath: /tmp
@@ -95,10 +90,10 @@ kind: Service
 metadata:
   name: kibana-service
 spec:
-  type: NodePort
   selector:
     app: kibana
   ports:
     - port: 5601
       targetPort: 5601
       nodePort: 30061
+  type: NodePort

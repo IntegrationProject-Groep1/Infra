@@ -19,6 +19,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: drupal
         image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
@@ -58,16 +59,20 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: DRUPAL_BASE_URL
+        - name: DRUPAL_REVERSE_PROXY
+          value: "true"
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT
           value: "5672"
-        - name: RABBITMQFRONTEND_USER
+        - name: RABBITMQ_VHOST
+          value: "/"
+        - name: RABBITMQ_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQFRONTEND_USER
-        - name: RABBITMQFRONTEND_PASS
+        - name: RABBITMQ_PASS
           valueFrom:
             secretKeyRef:
               name: shift-secrets
@@ -89,6 +94,17 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        volumeMounts:
+        - name: drupal-files
+          mountPath: /var/www/html/sites/default/files
+        - name: apache-run
+          mountPath: /var/run/apache2
+        - name: apache-log
+          mountPath: /var/log/apache2
+        - name: apache-lock
+          mountPath: /var/lock/apache2
+        - name: tmp
+          mountPath: /tmp
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         securityContext:
@@ -116,6 +132,18 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQFRONTEND_PASS
+      volumes:
+      - name: drupal-files
+        persistentVolumeClaim:
+          claimName: frontend-drupal-files-pvc
+      - name: apache-run
+        emptyDir: {}
+      - name: apache-log
+        emptyDir: {}
+      - name: apache-lock
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
