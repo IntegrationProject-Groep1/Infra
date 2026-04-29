@@ -117,8 +117,8 @@ spec:
         - name: drupal-files
           mountPath: /var/www/html/sites/default/files
         - name: drupal-settings
-          mountPath: /var/www/html/sites/default/settings.local.php
-          subPath: settings.local.php
+          mountPath: /var/www/html/sites/default/settings.php
+          subPath: settings.php
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
