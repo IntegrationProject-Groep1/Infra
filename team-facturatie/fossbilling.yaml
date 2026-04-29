@@ -23,15 +23,16 @@ spec:
       initContainers:
       - name: init-data-dirs
         image: busybox
-        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod 0775 /data/cache /data/log /data/uploads"]
+        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 777 /data/cache /data/log && mkdir -p /uploads && chmod -R 777 /uploads"]
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
           allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: true
         volumeMounts:
         - name: foss-data
           mountPath: /data
+        - name: foss-uploads
+          mountPath: /uploads
       containers:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
