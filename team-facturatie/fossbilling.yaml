@@ -36,6 +36,10 @@ spec:
       containers:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
+        lifecycle:
+          postStart:
+            exec:
+              command: ["sh", "-c", "ln -sf /var/www/html/data/config.php /var/www/html/config.php"]
         securityContext:
           allowPrivilegeEscalation: true
           readOnlyRootFilesystem: false
