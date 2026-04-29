@@ -14,25 +14,24 @@ spec:
         app: elasticsearch
     spec:
       securityContext:
+        runAsNonRoot: false
         fsGroup: 1000
-        runAsNonRoot: true
-        runAsUser: 1000
       initContainers:
       - name: fix-permissions
         image: busybox
         command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
         securityContext:
-          allowPrivilegeEscalation: false
+          runAsUser: 0
           readOnlyRootFilesystem: true
         volumeMounts:
         - name: es-data
           mountPath: /usr/share/elasticsearch/data
-        - name: tmp
-          mountPath: /tmp
       containers:
       - name: elasticsearch
         image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
           allowPrivilegeEscalation: false
           capabilities:
             drop:

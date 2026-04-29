@@ -16,6 +16,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
+        fsGroup: 70
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -98,6 +99,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 5050
+        fsGroup: 5050
       containers:
       - name: pgadmin
         image: dpage/pgadmin4:latest

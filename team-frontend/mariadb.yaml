@@ -15,6 +15,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
+        fsGroup: 999
       containers:
       - name: mariadb
         image: mariadb:10.11
