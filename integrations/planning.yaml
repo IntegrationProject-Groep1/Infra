@@ -273,7 +273,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: PGADMIN_PASSWORD
+              key: PGADMIN_PASSWORD_PLANNING
         resources:
           requests:
             memory: "128Mi"
