@@ -105,6 +105,15 @@ spec:
     spec:
       securityContext:
         fsGroup: 5050
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 5050:5050 /var/lib/pgadmin"]
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: pgadmin-data
+          mountPath: /var/lib/pgadmin
       containers:
       - name: pgadmin
         image: dpage/pgadmin4:latest
