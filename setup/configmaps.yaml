@@ -64,6 +64,73 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
+  name: frontend-drupal-settings
+  namespace: shift-festival
+data:
+  settings.php: |
+    <?php
+
+    /**
+     * Drupal runtime configuration.
+     *
+     * Credentials are read from Kubernetes environment variables injected from
+     * shift-secrets by the frontend-drupal Deployment.
+     */
+
+    $databases['default']['default'] = [
+      'driver'    => 'mysql',
+      'database'  => getenv('DRUPAL_DB_NAME') ?: 'drupal',
+      'username'  => getenv('DRUPAL_DB_USER') ?: 'drupal_user',
+      'password'  => getenv('DRUPAL_DB_PASSWORD') ?: getenv('DRUPAL_DB_PASS') ?: '',
+      'host'      => getenv('DRUPAL_DB_HOST') ?: 'frontend-db-service',
+      'port'      => getenv('DRUPAL_DB_PORT') ?: '3306',
+      'prefix'    => '',
+      'namespace' => 'Drupal\\mysql\\Driver\\Database\\mysql',
+      'autoload'  => 'core/modules/mysql/src/Driver/Database/mysql/',
+    ];
+
+    $settings['hash_salt'] = getenv('DRUPAL_HASH_SALT') ?: 'local-dev-hash-salt-event-platform-2526';
+    $settings['update_free_access'] = FALSE;
+    $settings['config_sync_directory'] = 'sites/default/files/config_sync';
+    $settings['file_temp_path'] = '/tmp';
+
+    $settings['trusted_host_patterns'] = [
+      '^localhost$',
+      '^localhost(:[0-9]+)?$',
+      '^127\.0\.0\.1(:[0-9]+)?$',
+      '^integrationproject-2526s2-dag01\.westeurope\.cloudapp\.azure\.com(:[0-9]+)?$',
+      '^frontend\.desiderius\.me$',
+      '^.*$',
+    ];
+
+    if (getenv('DRUPAL_REVERSE_PROXY') === 'true') {
+      $settings['reverse_proxy'] = TRUE;
+      $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'];
+      $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
+      $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
+      $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
+
+      if ($base_url_env = getenv('DRUPAL_BASE_URL')) {
+        $base_url = $base_url_env;
+      }
+    }
+
+    ini_set('memory_limit', '512M');
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-rabbitmq-sender-services
+  namespace: shift-festival
+data:
+  rabbitmq_sender.services.yml: |
+    services:
+      rabbitmq_sender.client:
+        class: Drupal\rabbitmq_sender\RabbitMQClient
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
   name: facturatie-nginx-config
   namespace: shift-festival
 data:
