@@ -22,9 +22,29 @@ spec:
         runAsUser: 0
         fsGroup: 0
       initContainers:
+      - name: copy-app-files
+        image: fossbilling/fossbilling:latest
+        command:
+          - sh
+          - -c
+          - |
+            if [ -z "$(ls -A /mnt/html)" ]; then
+              cp -a /var/www/html/. /mnt/html/
+              echo "App files copied to PVC."
+            else
+              echo "App files already present, skipping copy."
+            fi
+        securityContext:
+          runAsNonRoot: false
+          runAsUser: 0
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: foss-html
+          mountPath: /mnt/html
       - name: init-data-dirs
         image: busybox
-        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && touch /data/config.php && chmod -R 777 /data/cache /data/log /data/config.php && mkdir -p /uploads && chmod -R 777 /uploads"]
+        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 777 /data/cache /data/log && mkdir -p /uploads && chmod -R 777 /uploads"]
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
@@ -69,11 +89,10 @@ spec:
             memory: "512Mi"
             cpu: "500m"
         volumeMounts:
+        - name: foss-html
+          mountPath: /var/www/html
         - name: foss-data
           mountPath: /var/www/html/data
-        - name: foss-data
-          mountPath: /var/www/html/config.php
-          subPath: config.php
         - name: foss-uploads
           mountPath: /var/www/html/data/uploads
         - name: apache-run
@@ -85,6 +104,9 @@ spec:
         - name: tmp
           mountPath: /tmp
       volumes:
+      - name: foss-html
+        persistentVolumeClaim:
+          claimName: fossbilling-html-pvc
       - name: foss-data
         persistentVolumeClaim:
           claimName: fossbilling-data-pvc
