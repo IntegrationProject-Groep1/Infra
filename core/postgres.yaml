@@ -14,18 +14,21 @@ spec:
         app: postgredb
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 70
         fsGroup: 70
+      initContainers:
+      - name: fix-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+        securityContext:
+          runAsUser: 0
       containers:
       - name: postgres
-        image: postgres:15-alpine
+        image: postgres:16-alpine
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
           allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 5432
         env:
@@ -54,16 +57,12 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
-        - name: tmp
-          mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: central-db-data-pvc
-      - name: tmp
-        emptyDir: {}
       - name: run-postgres
         emptyDir: {}
 ---
@@ -97,18 +96,15 @@ spec:
         app: pgadmin
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 5050
         fsGroup: 5050
       containers:
       - name: pgadmin
         image: dpage/pgadmin4:latest
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 5050
+          allowPrivilegeEscalation: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 80
         env:
@@ -132,12 +128,8 @@ spec:
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
-        - name: tmp
-          mountPath: /tmp
       volumes:
       - name: pgadmin-data
-        emptyDir: {}
-      - name: tmp
         emptyDir: {}
 ---
 apiVersion: v1
