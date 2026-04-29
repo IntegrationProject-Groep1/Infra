@@ -274,6 +274,8 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: PGADMIN_PASSWORD_PLANNING
+        - name: PGADMIN_CUSTOM_CONFIG_DISTRO_FILE
+          value: "/var/lib/pgadmin/config_distro.py"
         resources:
           requests:
             memory: "256Mi"

@@ -144,6 +144,8 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: PGADMIN_PASSWORD
+        - name: PGADMIN_CUSTOM_CONFIG_DISTRO_FILE
+          value: "/var/lib/pgadmin/config_distro.py"
         resources:
           requests:
             memory: "128Mi"
@@ -154,12 +156,16 @@ spec:
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
+        - name: pgadmin-log
+          mountPath: /var/log/pgadmin
         - name: tmp
           mountPath: /tmp
       volumes:
       - name: pgadmin-data
         persistentVolumeClaim:
           claimName: pgadmin-data-pvc
+      - name: pgadmin-log
+        emptyDir: {}
       - name: tmp
         emptyDir: {}
 ---
