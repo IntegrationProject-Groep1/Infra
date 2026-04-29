@@ -25,6 +25,11 @@ data:
   default.conf: |
     server {
         listen 80;
+        # Block access to the Odoo database manager — publicly accessible and dangerous
+        location /web/database/manager {
+            deny all;
+            return 403;
+        }
         location / {
             proxy_pass             http://kassa-web-service:8069;
             proxy_set_header       Host $http_host;
