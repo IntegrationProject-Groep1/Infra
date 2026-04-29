@@ -119,6 +119,9 @@ spec:
         - name: drupal-settings
           mountPath: /var/www/html/sites/default/settings.php
           subPath: settings.php
+        - name: rabbitmq-sender-services
+          mountPath: /var/www/html/modules/custom/rabbitmq_sender/rabbitmq_sender.services.yml
+          subPath: rabbitmq_sender.services.yml
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
@@ -161,6 +164,9 @@ spec:
       - name: drupal-settings
         configMap:
           name: frontend-drupal-settings
+      - name: rabbitmq-sender-services
+        configMap:
+          name: frontend-rabbitmq-sender-services
       - name: apache-run
         emptyDir: {}
       - name: apache-log
