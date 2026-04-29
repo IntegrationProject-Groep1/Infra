@@ -31,10 +31,6 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         args:
-        - "-d"
-        - "odoo_kassa"
-        - "-i"
-        - "base"
         - "--db_host=kassa-db-service"
         - "--db_port=5432"
         - "--db-filter=^odoo_kassa$"

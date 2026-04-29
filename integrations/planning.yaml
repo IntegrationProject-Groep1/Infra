@@ -175,7 +175,7 @@ spec:
           mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
-        image: postgres:16-alpine
+        image: postgres:15-alpine
         securityContext:
           runAsNonRoot: true
           runAsUser: 70

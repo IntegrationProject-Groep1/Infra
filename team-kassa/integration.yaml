@@ -70,7 +70,7 @@ spec:
         - name: RABBIT_INCOMING_QUEUE
           value: "kassa.incoming"
         - name: RABBIT_AUTO_SETUP_TOPOLOGY
-          value: "false"
+          value: "true"
         - name: RABBIT_DLX
           value: "kassa.exchange"
         - name: RABBIT_DLQ
