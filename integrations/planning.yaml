@@ -76,10 +76,7 @@ spec:
               name: shift-secrets
               key: AZURE_CLIENT_SECRET
         - name: TOKEN_CACHE_FILE
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: TOKEN_CACHE_FILE
+          value: "/app/data/token_cache.json"
         - name: API_TOKEN_SECRET
           valueFrom:
             secretKeyRef:
