@@ -26,7 +26,7 @@ spec:
         image: busybox
         command: ["sh", "-c"]
         args:
-        - 'printf "[options]\nadmin_passwd = %s\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf && chmod 644 /etc/odoo/odoo.conf'
+        - 'printf "[options]\nadmin_passwd = %s\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
         env:
         - name: ODOO_MASTER_PASS
           valueFrom:
@@ -34,7 +34,9 @@ spec:
               name: shift-secrets
               key: ODOO_MASTER_PASS
         securityContext:
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 101
+          allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
         volumeMounts:
         - name: odoo-conf

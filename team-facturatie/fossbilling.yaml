@@ -20,6 +20,18 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      initContainers:
+      - name: init-data-dirs
+        image: busybox
+        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod 0775 /data/cache /data/log /data/uploads"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: foss-data
+          mountPath: /data
       containers:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
@@ -28,7 +40,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 80
         env:
@@ -60,7 +72,7 @@ spec:
         - name: foss-data
           mountPath: /var/www/html/data
         - name: foss-uploads
-          mountPath: /var/www/html/uploads
+          mountPath: /var/www/html/data/uploads
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
