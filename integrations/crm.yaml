@@ -154,6 +154,8 @@ metadata:
   name: crm-db
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: crm-db
