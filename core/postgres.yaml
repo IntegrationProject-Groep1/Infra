@@ -107,10 +107,19 @@ spec:
         fsGroup: 5050
       initContainers:
       - name: fix-permissions
-        image: busybox
+        image: busybox:1.36
         command: ["sh", "-c", "chown -R 5050:5050 /var/lib/pgadmin"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "16Mi"
+          limits:
+            cpu: "50m"
+            memory: "32Mi"
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
