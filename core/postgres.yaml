@@ -140,7 +140,8 @@ spec:
           mountPath: /tmp
       volumes:
       - name: pgadmin-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: pgadmin-data-pvc
       - name: tmp
         emptyDir: {}
 ---
