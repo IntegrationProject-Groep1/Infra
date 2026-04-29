@@ -37,9 +37,6 @@ spec:
         image: fossbilling/fossbilling:latest
         securityContext:
           allowPrivilegeEscalation: true
-          capabilities:
-            drop:
-            - ALL
           readOnlyRootFilesystem: false
         ports:
         - containerPort: 80
