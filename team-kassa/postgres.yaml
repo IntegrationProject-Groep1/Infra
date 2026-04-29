@@ -5,6 +5,8 @@ metadata:
   namespace: shift-festival
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: kassa-db
@@ -14,19 +16,7 @@ spec:
         app: kassa-db
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 70
         fsGroup: 70
-      initContainers:
-      - name: fix-permissions
-        image: busybox
-        command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data && chown -R 70:70 /var/lib/postgresql/data"]
-        securityContext:
-          runAsUser: 0
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -39,7 +29,10 @@ spec:
         - containerPort: 5432
         env:
         - name: POSTGRES_DB
-          value: "odoo_kassa"
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_DB
         - name: POSTGRES_USER
           valueFrom:
             secretKeyRef:
