@@ -20,6 +20,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 101
+        fsGroup: 101
       containers:
       - name: odoo
         image: odoo:17

@@ -19,6 +19,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: planning
         image: ghcr.io/integrationproject-groep1/planning:latest
@@ -154,6 +155,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 70
+        fsGroup: 70
       containers:
       - name: postgres
         image: postgres:15-alpine

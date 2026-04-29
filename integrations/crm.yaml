@@ -19,6 +19,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        fsGroup: 1000
       containers:
       - name: crm
         image: ghcr.io/integrationproject-groep1/crm:latest
@@ -164,6 +165,7 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 999
+        fsGroup: 999
       containers:
       - name: mysql
         image: mysql:8.0
