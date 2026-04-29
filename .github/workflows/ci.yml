@@ -17,10 +17,10 @@ name: CI Pipeline
 
 on:
   push:
-    branches: ["main", "dev", "prod"]
+    branches: ["main", "dev", "prod", "fix/ci"]
     tags: ["v*"]
   pull_request:
-    branches: ["main", "dev", "prod"]
+    branches: ["main", "dev", "prod", "fix/ci"]
   workflow_dispatch:
 
 jobs:
