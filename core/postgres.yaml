@@ -22,6 +22,9 @@ spec:
         securityContext:
           runAsUser: 0
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:16-alpine
