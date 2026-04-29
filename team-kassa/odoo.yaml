@@ -76,6 +76,20 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
+        - name: HOST
+          value: "kassa-db-service"
+        - name: PORT
+          value: "5432"
+        - name: USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_USER
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_PASSWORD
         - name: ODOO_DB_HOST
           value: "kassa-db-service"
         - name: ODOO_DB_PORT
