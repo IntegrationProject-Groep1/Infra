@@ -22,6 +22,9 @@ spec:
         securityContext:
           runAsUser: 0
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: es-data
+          mountPath: /usr/share/elasticsearch/data
       containers:
       - name: elasticsearch
         image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
