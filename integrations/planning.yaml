@@ -284,10 +284,14 @@ spec:
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
+        - name: pgadmin-log
+          mountPath: /var/log/pgadmin
         - name: tmp
           mountPath: /tmp
       volumes:
       - name: pgadmin-data
+        emptyDir: {}
+      - name: pgadmin-log
         emptyDir: {}
       - name: tmp
         emptyDir: {}
