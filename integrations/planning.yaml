@@ -169,6 +169,7 @@ spec:
         command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
       containers:
       - name: postgres
         image: postgres:16-alpine
@@ -177,7 +178,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: false
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -206,12 +207,16 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: planning-db-data-pvc
+      - name: tmp
+        emptyDir: {}
       - name: run-postgres
         emptyDir: {}
 ---

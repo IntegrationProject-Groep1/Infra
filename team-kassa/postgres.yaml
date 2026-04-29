@@ -21,6 +21,7 @@ spec:
         command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -28,7 +29,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 70
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false # Postgres 15 is lastig met read-only root op sommige volumes
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -54,6 +55,8 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
         livenessProbe:
@@ -68,6 +71,8 @@ spec:
       - name: data
         persistentVolumeClaim:
           claimName: kassa-db-data-pvc
+      - name: tmp
+        emptyDir: {}
       - name: run-postgres
         emptyDir: {}
 ---

@@ -21,6 +21,7 @@ spec:
         command: ["sh", "-c", "chown -R 1000:1000 /usr/share/elasticsearch/data"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
       containers:
       - name: elasticsearch
         image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
@@ -31,7 +32,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: false # ES schrijft naar veel plekken, read-only is hier te complex
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 9200
           name: rest
