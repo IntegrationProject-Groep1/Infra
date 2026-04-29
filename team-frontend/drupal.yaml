@@ -116,6 +116,9 @@ spec:
         volumeMounts:
         - name: drupal-files
           mountPath: /var/www/html/sites/default/files
+        - name: drupal-settings
+          mountPath: /var/www/html/sites/default/settings.local.php
+          subPath: settings.local.php
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
@@ -155,6 +158,9 @@ spec:
       - name: drupal-files
         persistentVolumeClaim:
           claimName: frontend-drupal-files-pvc
+      - name: drupal-settings
+        configMap:
+          name: frontend-drupal-settings
       - name: apache-run
         emptyDir: {}
       - name: apache-log
