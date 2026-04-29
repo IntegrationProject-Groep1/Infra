@@ -51,25 +51,35 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         args:
-        - "--db_host=kassa-db-service"
-        - "--db_port=5432"
+        - "--db_name=$(ODOO_DB_NAME)"
+        - "--db_user=$(ODOO_DB_USER)"
+        - "--db_password=$(ODOO_DB_PASSWORD)"
+        - "--db_host=$(ODOO_DB_HOST)"
+        - "--db_port=$(ODOO_DB_PORT)"
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         ports:
         - containerPort: 8069
         env:
-        - name: HOST
-          value: "kassa-db-service"
-        - name: USER
+        - name: ODOO_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_DB
+        - name: ODOO_DB_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_USER
-        - name: PASSWORD
+        - name: ODOO_DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
+        - name: ODOO_DB_HOST
+          value: "kassa-db-service"
+        - name: ODOO_DB_PORT
+          value: "5432"
         resources:
           requests:
             memory: "512Mi"

@@ -10,12 +10,7 @@ data:
     management.tcp.port = 15672
     load_definitions = /etc/rabbitmq/definitions.json
 ---
-# NOTE: RabbitMQ user passwords must NOT be stored here.
-# Create a Secret named 'rabbitmq-definitions' from setup/.env instead:
-#   kubectl create secret generic rabbitmq-definitions \
-#     --from-file=definitions.json=setup/definitions.json \
-#     -n shift-festival
----
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
