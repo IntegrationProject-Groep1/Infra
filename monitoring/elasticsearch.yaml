@@ -25,6 +25,15 @@ spec:
         volumeMounts:
         - name: es-data
           mountPath: /usr/share/elasticsearch/data
+      - name: copy-config
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+        command: ["sh", "-c", "cp -rp /usr/share/elasticsearch/config/. /config-writable/"]
+        securityContext:
+          runAsUser: 1000
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: es-config
+          mountPath: /config-writable
       containers:
       - name: elasticsearch
         image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
@@ -69,11 +78,15 @@ spec:
           mountPath: /usr/share/elasticsearch/data
         - name: tmp
           mountPath: /tmp
+        - name: es-config
+          mountPath: /usr/share/elasticsearch/config
       volumes:
       - name: es-data
         persistentVolumeClaim:
           claimName: es-data-pvc
       - name: tmp
+        emptyDir: {}
+      - name: es-config
         emptyDir: {}
 ---
 apiVersion: v1

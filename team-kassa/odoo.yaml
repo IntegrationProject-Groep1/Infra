@@ -33,7 +33,7 @@ spec:
         args:
         - "-d"
         - "odoo_kassa"
-        - "-u"
+        - "-i"
         - "base"
         - "--db_host=kassa-db-service"
         - "--db_port=5432"
