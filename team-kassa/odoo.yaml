@@ -21,6 +21,24 @@ spec:
         runAsNonRoot: true
         runAsUser: 101
         fsGroup: 101
+      initContainers:
+      - name: setup-config
+        image: busybox
+        command: ["sh", "-c"]
+        args:
+        - 'printf "[options]\nadmin_passwd = %s\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf && chmod 644 /etc/odoo/odoo.conf'
+        env:
+        - name: ODOO_MASTER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_MASTER_PASS
+        securityContext:
+          runAsUser: 0
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: odoo-conf
+          mountPath: /etc/odoo
       containers:
       - name: odoo
         image: odoo:17
@@ -35,7 +53,6 @@ spec:
         - "--db_port=5432"
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
-        - "--admin-passwd=$(ODOO_MASTER_PASS)"
         ports:
         - containerPort: 8069
         env:
@@ -51,11 +68,6 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
-        - name: ODOO_MASTER_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: ODOO_MASTER_PASS
         resources:
           requests:
             memory: "512Mi"
@@ -68,6 +80,9 @@ spec:
           mountPath: /var/lib/odoo
         - name: tmp
           mountPath: /tmp
+        - name: odoo-conf
+          mountPath: /etc/odoo
+          readOnly: true
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         securityContext:
@@ -99,6 +114,8 @@ spec:
       - name: odoo-data
         emptyDir: {}
       - name: tmp
+        emptyDir: {}
+      - name: odoo-conf
         emptyDir: {}
 ---
 apiVersion: v1
