@@ -23,11 +23,12 @@ spec:
       initContainers:
       - name: init-data-dirs
         image: busybox
-        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 777 /data/cache /data/log && mkdir -p /uploads && chmod -R 777 /uploads"]
+        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && touch /data/config.php && chmod -R 777 /data/cache /data/log /data/config.php && mkdir -p /uploads && chmod -R 777 /uploads"]
         securityContext:
           runAsNonRoot: false
           runAsUser: 0
-          allowPrivilegeEscalation: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         volumeMounts:
         - name: foss-data
           mountPath: /data
@@ -36,13 +37,9 @@ spec:
       containers:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
-        lifecycle:
-          postStart:
-            exec:
-              command: ["sh", "-c", "ln -sf /var/www/html/data/config.php /var/www/html/config.php"]
         securityContext:
-          allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
@@ -73,6 +70,9 @@ spec:
         volumeMounts:
         - name: foss-data
           mountPath: /var/www/html/data
+        - name: foss-data
+          mountPath: /var/www/html/config.php
+          subPath: config.php
         - name: foss-uploads
           mountPath: /var/www/html/data/uploads
         - name: apache-run

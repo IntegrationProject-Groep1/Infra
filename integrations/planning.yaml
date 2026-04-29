@@ -259,8 +259,8 @@ spec:
         securityContext:
           runAsNonRoot: true
           runAsUser: 5050
-          allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
