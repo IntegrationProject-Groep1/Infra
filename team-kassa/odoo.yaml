@@ -51,11 +51,11 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         args:
-        - "--db-name=$(ODOO_DB_NAME)"
-        - "--db-user=$(ODOO_DB_USER)"
-        - "--db-password=$(ODOO_DB_PASSWORD)"
-        - "--db-host=$(ODOO_DB_HOST)"
-        - "--db-port=$(ODOO_DB_PORT)"
+        - "--database=$(ODOO_DB_NAME)"
+        - "--db_user=$(ODOO_DB_USER)"
+        - "--db_password=$(ODOO_DB_PASSWORD)"
+        - "--db_host=$(ODOO_DB_HOST)"
+        - "--db_port=$(ODOO_DB_PORT)"
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         ports:
