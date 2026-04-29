@@ -16,9 +16,18 @@ spec:
       labels:
         app: monitoring-agent
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: monitoring-agent
         image: ghcr.io/integrationproject-groep1/monitoring:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
@@ -57,3 +66,9 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}

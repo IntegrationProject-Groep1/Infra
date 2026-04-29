@@ -13,9 +13,18 @@ spec:
       labels:
         app: kassa-proxy
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
       containers:
       - name: nginx
         image: nginx:alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         volumeMounts:
@@ -23,6 +32,12 @@ spec:
           mountPath: /etc/nginx/conf.d/default.conf
           subPath: default.conf
           readOnly: true
+        - name: cache
+          mountPath: /var/cache/nginx
+        - name: run
+          mountPath: /var/run
+        - name: tmp
+          mountPath: /tmp
         resources:
           requests:
             memory: "32Mi"
@@ -34,6 +49,12 @@ spec:
       - name: config
         configMap:
           name: kassa-nginx-config
+      - name: cache
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

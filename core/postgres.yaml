@@ -13,9 +13,18 @@ spec:
       labels:
         app: postgredb
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
       containers:
       - name: postgres
         image: postgres:15-alpine
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -44,10 +53,18 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run-postgres
+          mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: central-db-data-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: run-postgres
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -78,9 +95,18 @@ spec:
       labels:
         app: pgadmin
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 5050
       containers:
       - name: pgadmin
         image: dpage/pgadmin4:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
@@ -101,6 +127,16 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: pgadmin-data
+          mountPath: /var/lib/pgadmin
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: pgadmin-data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

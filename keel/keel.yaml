@@ -21,9 +21,6 @@ rules:
   resources: ["pods", "replicationcontrollers", "replicasets", "deployments", "daemonsets", "statefulsets", "jobs", "cronjobs"]
   verbs: ["get", "list", "watch", "update", "patch"]
 - apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
 ---
@@ -58,9 +55,18 @@ spec:
         app: keel
     spec:
       serviceAccountName: keel
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
       containers:
       - name: keel
         image: keelhq/keel:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         imagePullPolicy: Always
         command: ["/bin/keel"]
         env:
@@ -79,6 +85,12 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "100m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

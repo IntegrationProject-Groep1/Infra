@@ -12,10 +12,19 @@ spec:
       labels:
         app: cloudflared
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:2024.12.2
         args: ["tunnel", "--no-autoupdate", "run", "--protocol", "http2"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
         env:
         - name: TUNNEL_TOKEN
           valueFrom:
@@ -29,3 +38,9 @@ spec:
           limits:
             memory: "128Mi"
             cpu: "200m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
