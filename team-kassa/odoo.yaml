@@ -35,6 +35,7 @@ spec:
         - "--db_port=5432"
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
+        - "--admin-passwd=$(ODOO_MASTER_PASS)"
         ports:
         - containerPort: 8069
         env:
@@ -50,6 +51,11 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: POSTGRES_PASSWORD
+        - name: ODOO_MASTER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_MASTER_PASS
         resources:
           requests:
             memory: "512Mi"
