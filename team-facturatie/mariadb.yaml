@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: facturatie-db
+  namespace: shift-festival
 spec:
   replicas: 1
   selector:
@@ -62,6 +63,10 @@ spec:
           mountPath: /tmp
         - name: run-mysql
           mountPath: /var/run/mysqld
+        - name: mariadb-config
+          mountPath: /etc/mysql/conf.d/custom.cnf
+          subPath: custom.cnf
+          readOnly: true
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -70,6 +75,9 @@ spec:
         emptyDir: {}
       - name: run-mysql
         emptyDir: {}
+      - name: mariadb-config
+        configMap:
+          name: facturatie-mariadb-config
 ---
 apiVersion: v1
 kind: Service
