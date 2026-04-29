@@ -17,17 +17,17 @@ spec:
         app: fossbilling-app
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
+        runAsNonRoot: false
+        runAsUser: 0
+        fsGroup: 0
       initContainers:
       - name: init-data-dirs
         image: busybox
         command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod 0775 /data/cache /data/log /data/uploads"]
         securityContext:
-          runAsNonRoot: true
-          runAsUser: 1000
-          allowPrivilegeEscalation: false
+          runAsNonRoot: false
+          runAsUser: 0
+          allowPrivilegeEscalation: true
           readOnlyRootFilesystem: true
         volumeMounts:
         - name: foss-data
@@ -36,10 +36,7 @@ spec:
       - name: fossbilling
         image: fossbilling/fossbilling:latest
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+          allowPrivilegeEscalation: true
           readOnlyRootFilesystem: false
         ports:
         - containerPort: 80
