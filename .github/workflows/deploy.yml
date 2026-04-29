@@ -12,9 +12,6 @@ name: Deploy Infra to Kubernetes
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   workflow_run:
     workflows: ["CI Pipeline"]
     types:
@@ -28,8 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'push' ||
-      (github.event_name == 'workflow_run' && (github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure'))
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
 
     steps:
       - name: Checkout code
