@@ -54,7 +54,7 @@ spec:
           capabilities:
             drop:
             - ALL
-          readOnlyRootFilesystem: false # Kibana heeft veel schrijfbare mappen nodig
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5601
         env:

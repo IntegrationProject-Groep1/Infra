@@ -21,6 +21,7 @@ spec:
         command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
       containers:
       - name: postgres
         image: postgres:16-alpine
@@ -28,7 +29,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 70
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 5432
         env:
@@ -57,12 +58,16 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
       volumes:
       - name: data
         persistentVolumeClaim:
           claimName: central-db-data-pvc
+      - name: tmp
+        emptyDir: {}
       - name: run-postgres
         emptyDir: {}
 ---
@@ -104,7 +109,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 5050
           allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: false
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
         env:
@@ -128,8 +133,16 @@ spec:
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
+        - name: tmp
+          mountPath: /tmp
+        - name: pgadmin-config
+          mountPath: /pgadmin4
       volumes:
       - name: pgadmin-data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      - name: pgadmin-config
         emptyDir: {}
 ---
 apiVersion: v1
