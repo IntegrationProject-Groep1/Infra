@@ -13,8 +13,6 @@ spec:
       labels:
         app: kassa-db
     spec:
-      securityContext:
-        fsGroup: 70
       initContainers:
       - name: fix-permissions
         image: busybox
@@ -29,10 +27,8 @@ spec:
       - name: postgres
         image: postgres:15-alpine
         securityContext:
-          runAsNonRoot: true
-          runAsUser: 70
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 5432
         env:

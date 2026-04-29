@@ -13,8 +13,6 @@ spec:
       labels:
         app: postgredb
     spec:
-      securityContext:
-        fsGroup: 70
       initContainers:
       - name: fix-permissions
         image: busybox
