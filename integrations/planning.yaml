@@ -177,6 +177,8 @@ spec:
       - name: postgres
         image: postgres:16-alpine
         securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
           allowPrivilegeEscalation: false
           capabilities:
             drop:

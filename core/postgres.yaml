@@ -13,6 +13,8 @@ spec:
       labels:
         app: postgredb
     spec:
+      securityContext:
+        fsGroup: 70
       initContainers:
       - name: fix-permissions
         image: busybox
@@ -25,7 +27,7 @@ spec:
           mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
-        image: postgres:16-alpine
+        image: postgres:15-alpine
         securityContext:
           runAsNonRoot: true
           runAsUser: 70
@@ -110,7 +112,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 5050
           allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         ports:
         - containerPort: 80
         env:
@@ -136,14 +138,10 @@ spec:
           mountPath: /var/lib/pgadmin
         - name: tmp
           mountPath: /tmp
-        - name: pgadmin-config
-          mountPath: /pgadmin4
       volumes:
       - name: pgadmin-data
         emptyDir: {}
       - name: tmp
-        emptyDir: {}
-      - name: pgadmin-config
         emptyDir: {}
 ---
 apiVersion: v1

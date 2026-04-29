@@ -69,7 +69,7 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: kassa-db-data-pvc
+          claimName: kassa-db-data-pvc-v2
       - name: tmp
         emptyDir: {}
       - name: run-postgres

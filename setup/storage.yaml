@@ -45,7 +45,7 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: kassa-db-data-pvc
+  name: kassa-db-data-pvc-v2
   namespace: shift-festival
 spec:
   accessModes: ["ReadWriteOnce"]
