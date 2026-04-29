@@ -23,6 +23,7 @@ spec:
         command: ["sh", "-c", "chown -R 999:999 /var/lib/rabbitmq && chmod 600 /var/lib/rabbitmq/.erlang.cookie || true"]
         securityContext:
           runAsUser: 0
+          readOnlyRootFilesystem: true
         volumeMounts:
         - name: rabbit-data
           mountPath: /var/lib/rabbitmq
