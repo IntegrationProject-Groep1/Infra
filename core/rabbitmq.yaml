@@ -19,6 +19,18 @@ spec:
       securityContext:
         runAsNonRoot: true
         fsGroup: 999
+      initContainers:
+      - name: fix-cookie-permissions
+        image: busybox
+        command: ["sh", "-c", "if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: rabbit-data
+          mountPath: /var/lib/rabbitmq
       containers:
       - name: rabbitmq
         image: rabbitmq:3-management-alpine
@@ -36,6 +48,8 @@ spec:
         - containerPort: 15672
           name: mgmt
         env:
+        - name: RABBITMQ_ERLANG_COOKIE
+          value: "c-is-for-cookie-thats-good-enough-for-me"
         - name: RABBITMQ_DEFAULT_USER
           valueFrom:
             secretKeyRef:
