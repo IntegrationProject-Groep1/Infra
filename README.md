@@ -174,4 +174,4 @@ Any significant infra change must update:
 - CLAUDE.md (process, architecture, CI/CD expectations)
 - SECURITY.md when the change has security impact
 
-IntegrationProject-Groep1 · ShiftFestival 2026 · Erasmushogeschool Brussel
+IntegrationProject-Groep1 · ShiftFestival 2026 · Infra · Erasmushogeschool Brussel
