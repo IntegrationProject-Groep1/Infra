@@ -66,6 +66,22 @@ spec:
           mountPath: /tmp
         - name: run-rabbitmq
           mountPath: /var/run/rabbitmq
+        livenessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - -q
+            - check_running
+          initialDelaySeconds: 60
+          periodSeconds: 15
+        readinessProbe:
+          exec:
+            command:
+            - rabbitmq-diagnostics
+            - -q
+            - check_running
+          initialDelaySeconds: 20
+          periodSeconds: 10
       volumes:
       - name: rabbit-data
         persistentVolumeClaim:

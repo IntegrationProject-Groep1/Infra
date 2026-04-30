@@ -109,6 +109,11 @@ spec:
         - name: odoo-conf
           mountPath: /etc/odoo
           readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 8069
+          initialDelaySeconds: 10
+          periodSeconds: 5
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         securityContext:
