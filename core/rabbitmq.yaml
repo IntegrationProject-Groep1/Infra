@@ -20,17 +20,6 @@ spec:
         runAsNonRoot: true
         fsGroup: 999
       initContainers:
-      - name: wipe-old-data-one-time
-        image: busybox
-        command: ["sh", "-c", "rm -rf /var/lib/rabbitmq/mnesia/*"]
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 999
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - name: rabbit-data
-          mountPath: /var/lib/rabbitmq
       - name: fix-cookie-permissions
         image: busybox
         command: ["sh", "-c", "if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi"]
@@ -102,13 +91,10 @@ spec:
           initialDelaySeconds: 120
           periodSeconds: 20
         readinessProbe:
-          exec:
-            command:
-            - rabbitmq-diagnostics
-            - -q
-            - check_running
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          tcpSocket:
+            port: 5672
+          initialDelaySeconds: 10
+          periodSeconds: 5
       volumes:
       - name: rabbit-data
         persistentVolumeClaim:
