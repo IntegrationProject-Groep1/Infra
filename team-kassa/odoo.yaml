@@ -51,7 +51,6 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         args:
-        - "--database=$(ODOO_DB_NAME)"
         - "--db_user=$(ODOO_DB_USER)"
         - "--db_password=$(ODOO_DB_PASSWORD)"
         - "--db_host=$(ODOO_DB_HOST)"
