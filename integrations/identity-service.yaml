@@ -57,7 +57,7 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: IDENTITY_RABBIT_USER
-        - name: RABBITMQ_PASS
+        - name: RABBITMQ_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
