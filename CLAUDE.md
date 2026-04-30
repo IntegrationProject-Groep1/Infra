@@ -83,6 +83,8 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 ## Key Constraints
 
 - **Never commit `setup/.env`** — real secrets live only on the VM or in the secret store.
+- **Database workloads should use `strategy: type: Recreate`** — this prevents volume mount conflicts (Multi-Attach errors) when updating deployments using ReadWriteOnce PVCs.
+- **Strictly adhere to non-root policies** — avoid `runAsUser: 0` in initContainers. Use `fsGroup` in the pod's securityContext to manage volume permissions instead of root-level `chown` commands.
 - **All Kubernetes manifests must render with `kubectl kustomize .`**.
 - **NodePorts must stay within the assigned ranges** for each team.
 - **Team-prefixed RabbitMQ queues** are mandatory; shared heartbeat routing keeps its own convention.
