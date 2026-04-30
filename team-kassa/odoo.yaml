@@ -26,7 +26,7 @@ spec:
         image: busybox
         command: ["sh", "-c"]
         args:
-        - 'printf "[options]\nadmin_passwd = %s\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
+        - 'printf "[options]\nadmin_passwd = %s\ndb_host = kassa-db-service\ndb_port = 5432\ndata_dir = /var/lib/odoo\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
         env:
         - name: ODOO_MASTER_PASS
           valueFrom:
