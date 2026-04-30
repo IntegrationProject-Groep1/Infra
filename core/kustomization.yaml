@@ -4,4 +4,3 @@ resources:
   - postgres.yaml
   - rabbitmq.yaml
   - cloudflared.yaml
-  - kubernetes-dashboard.yaml
