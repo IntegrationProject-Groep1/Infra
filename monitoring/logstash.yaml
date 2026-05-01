@@ -83,7 +83,7 @@ spec:
         emptyDir: {}
       - name: logstash-settings
         configMap:
-          name: logstash-pipeline
+          name: logstash-settings
 ---
 apiVersion: v1
 kind: Service
