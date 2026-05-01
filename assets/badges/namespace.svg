@@ -1,0 +1,12 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="194" height="20" role="img" aria-label="namespace: shift-festival">
+  <title>namespace: shift-festival</title>
+  <clipPath id="r"><rect width="194" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="84" height="20" fill="#0b1f2a"/>
+    <rect x="84" width="110" height="20" fill="#6264a7"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+    <text x="42" y="14.5">namespace</text>
+    <text x="139" y="14.5">shift-festival</text>
+  </g>
+</svg>
