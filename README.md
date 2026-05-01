@@ -22,8 +22,14 @@
   <a href="../../actions/workflows/deploy.yml"><img alt="Deploy" src="https://img.shields.io/badge/Deploy-auto%20on%20main-0a7ea4?style=flat-square&logo=kubernetes&logoColor=white&labelColor=0b1f2a"></a>
   <a href="SECURITY.md"><img alt="Security" src="https://img.shields.io/badge/Security-Trivy%20%2B%20Gitleaks-c53030?style=flat-square&logo=snyk&logoColor=white&labelColor=0b1f2a"></a>
   <a href="DOCUMENTATION.md"><img alt="Docs" src="https://img.shields.io/badge/Docs-Up%20to%20date-2f855a?style=flat-square&logo=readthedocs&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="Namespace" src="https://img.shields.io/badge/Namespace-shift--festival-6264a7?style=flat-square&logo=kubernetes&logoColor=white&labelColor=0b1f2a"></a>
   <a href="#"><img alt="License" src="https://img.shields.io/badge/License-Internal-7c3aed?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=0b1f2a"></a>
+</p>
+
+<p align="center">
+  <img alt="namespace" src="assets/badges/namespace.svg">
+  <img alt="teams" src="assets/badges/teams.svg">
+  <img alt="strategy" src="assets/badges/strategy.svg">
+  <img alt="rollback" src="assets/badges/rollback.svg">
 </p>
 
 <p align="center">
@@ -37,18 +43,23 @@
 
 1. [Why this repo exists](#why-this-repo-exists)
 2. [Quick Start](#quick-start)
-3. [Architecture at a Glance](#architecture-at-a-glance)
-4. [Repository Layout](#repository-layout)
-5. [CI/CD Pipeline](#cicd-pipeline)
-6. [Deployment & Operations](#deployment--operations)
-7. [NodePort Allocation](#nodeport-allocation)
-8. [Conventions for Teams](#conventions-for-teams)
-9. [Adding a New Service](#adding-a-new-service)
-10. [Rollback & Recovery](#rollback--recovery)
-11. [Documentation Rules](#documentation-rules)
-12. [Maintainers & Support](#maintainers--support)
+3. [Team Services Overview](#team-services-overview)
+4. [Architecture at a Glance](#architecture-at-a-glance)
+5. [Repository Layout](#repository-layout)
+6. [CI/CD Pipeline](#cicd-pipeline)
+7. [Deployment & Operations](#deployment--operations)
+8. [NodePort Allocation](#nodeport-allocation)
+9. [Conventions for Teams](#conventions-for-teams)
+10. [Adding a New Service](#adding-a-new-service)
+11. [Rollback & Recovery](#rollback--recovery)
+12. [Documentation Rules](#documentation-rules)
+13. [Maintainers & Support](#maintainers--support)
 
 ---
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
+</p>
 
 ## Why this repo exists
 
@@ -89,6 +100,25 @@ kubectl get svc  -n shift-festival
 ```
 
 For an emergency manual deploy, use **GitHub Actions → "Deploy Infra to Kubernetes" → Run workflow → main**.
+
+---
+
+## Team Services Overview
+
+Every team workload runs in the `shift-festival` namespace. The table below is the single reference for port ranges, technology stack, and where to find each team's manifests.
+
+| Team | Technology | NodePort Range | Manifest folder | Heartbeat |
+|------|-----------|---------------|----------------|-----------|
+| **Frontend** | Drupal + MariaDB + Nginx | `30020–30029` | `team-frontend/` | Yes |
+| **Kassa** | Odoo + PostgreSQL + Nginx | `30030–30039` | `team-kassa/` | Yes |
+| **Facturatie** | FossBilling + MariaDB + Nginx | `30010–30019` | `team-facturatie/` | Yes |
+| **CRM** | Salesforce receiver | `30040–30049` | `integrations/crm.yaml` | Yes |
+| **Planning** | Office 365 integration | `30050–30059` | `integrations/planning.yaml` | Yes |
+| **Identity** | UUID service | `30070–30100` | `integrations/identity-service.yaml` | Yes |
+| **Monitoring** | ELK (Elasticsearch + Logstash + Kibana) | `30060–30069` | `monitoring/` | — |
+| **Keel** | Image updater | — (own namespace) | `keel/` | — |
+
+> Heartbeat sidecars report liveness over RabbitMQ to the monitoring agent. Do not remove them from team deployments.
 
 ---
 
@@ -219,6 +249,10 @@ Infra/
 ```
 
 ---
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
+</p>
 
 ## CI/CD Pipeline
 
@@ -393,6 +427,10 @@ Every significant change must keep documentation in sync. This applies to humans
 Documentation is written in **English**, must be detailed enough that a new team member can act on it without follow-up questions, and must stay in sync with the code.
 
 ---
+
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
+</p>
 
 ## Maintainers & Support
 
