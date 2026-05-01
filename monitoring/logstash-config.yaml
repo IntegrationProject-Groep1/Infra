@@ -12,10 +12,10 @@ stringData:
         user => "${RABBITMQ_USER}"
         password => "${RABBITMQ_PASS}"
         vhost => "/"
-        queue => "monitoring.logs"
+        queue => "heartbeat"
         durable => true
         auto_delete => false
-        codec => "json"
+        codec => "plain"
       }
     }
     output {
