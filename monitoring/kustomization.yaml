@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - elasticsearch.yaml
   - logstash-config.yaml
+  - logstash-settings.yaml
   - logstash.yaml
   - kibana.yaml
   - monitoring-agent.yaml
