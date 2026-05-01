@@ -49,7 +49,10 @@ spec:
           name: mgmt
         env:
         - name: RABBITMQ_ERLANG_COOKIE
-          value: "c-is-for-cookie-thats-good-enough-for-me"
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQ_ERLANG_COOKIE
         - name: RABBITMQ_DEFAULT_USER
           valueFrom:
             secretKeyRef:
