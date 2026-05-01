@@ -72,7 +72,7 @@ spec:
         - name: RABBIT_AUTO_SETUP_TOPOLOGY
           value: "true"
         - name: RABBIT_DLX
-          value: "kassa.exchange"
+          value: "kassa.dlx"
         - name: RABBIT_DLQ
           value: "kassa.incoming.dlq"
         - name: RABBIT_DLX_ROUTING_KEY

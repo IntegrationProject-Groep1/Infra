@@ -1,0 +1,12 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="128" height="20" role="img" aria-label="teams: 8 services">
+  <title>teams: 8 services</title>
+  <clipPath id="r"><rect width="128" height="20" rx="3" fill="#fff"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="52" height="20" fill="#0b1f2a"/>
+    <rect x="52" width="76" height="20" fill="#1A73E8"/>
+  </g>
+  <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="11">
+    <text x="26" y="14.5">teams</text>
+    <text x="90" y="14.5">8 services</text>
+  </g>
+</svg>

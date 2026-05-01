@@ -5,6 +5,8 @@ metadata:
   namespace: shift-festival
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: postgredb
@@ -15,16 +17,6 @@ spec:
     spec:
       securityContext:
         fsGroup: 70
-      initContainers:
-      - name: fix-permissions
-        image: busybox
-        command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data && chown -R 70:70 /var/lib/postgresql/data"]
-        securityContext:
-          runAsUser: 0
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -65,6 +57,22 @@ spec:
           mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -105,24 +113,6 @@ spec:
     spec:
       securityContext:
         fsGroup: 5050
-      initContainers:
-      - name: fix-permissions
-        image: busybox:1.36
-        command: ["sh", "-c", "chown -R 5050:5050 /var/lib/pgadmin"]
-        securityContext:
-          runAsUser: 0
-          readOnlyRootFilesystem: true
-          allowPrivilegeEscalation: false
-        resources:
-          requests:
-            cpu: "10m"
-            memory: "16Mi"
-          limits:
-            cpu: "50m"
-            memory: "32Mi"
-        volumeMounts:
-        - name: pgadmin-data
-          mountPath: /var/lib/pgadmin
       containers:
       - name: pgadmin
         image: dpage/pgadmin4:latest
@@ -144,6 +134,8 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: PGADMIN_PASSWORD
+        - name: PGADMIN_CUSTOM_CONFIG_DISTRO_FILE
+          value: "/var/lib/pgadmin/config_distro.py"
         resources:
           requests:
             memory: "128Mi"
@@ -154,12 +146,16 @@ spec:
         volumeMounts:
         - name: pgadmin-data
           mountPath: /var/lib/pgadmin
+        - name: pgadmin-log
+          mountPath: /var/log/pgadmin
         - name: tmp
           mountPath: /tmp
       volumes:
       - name: pgadmin-data
         persistentVolumeClaim:
           claimName: pgadmin-data-pvc
+      - name: pgadmin-log
+        emptyDir: {}
       - name: tmp
         emptyDir: {}
 ---

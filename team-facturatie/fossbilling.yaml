@@ -167,6 +167,23 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         env:
+        - name: DB_HOST
+          value: "facturatie-db-service"
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_NAME
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_USER
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_PASS
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT

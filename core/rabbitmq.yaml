@@ -5,6 +5,8 @@ metadata:
   namespace: shift-festival
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: rabbitmq
@@ -15,14 +17,16 @@ spec:
     spec:
       hostname: my-rabbit
       securityContext:
-        runAsNonRoot: false # Tijdelijk op false zodat de init container root kan zijn
+        runAsNonRoot: true
         fsGroup: 999
       initContainers:
-      - name: fix-permissions
+      - name: fix-cookie-permissions
         image: busybox
-        command: ["sh", "-c", "chown -R 999:999 /var/lib/rabbitmq && chmod 600 /var/lib/rabbitmq/.erlang.cookie || true"]
+        command: ["sh", "-c", "if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi"]
         securityContext:
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 999
+          allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
         volumeMounts:
         - name: rabbit-data
@@ -44,6 +48,8 @@ spec:
         - containerPort: 15672
           name: mgmt
         env:
+        - name: RABBITMQ_ERLANG_COOKIE
+          value: "c-is-for-cookie-thats-good-enough-for-me"
         - name: RABBITMQ_DEFAULT_USER
           valueFrom:
             secretKeyRef:
@@ -76,6 +82,16 @@ spec:
           mountPath: /tmp
         - name: run-rabbitmq
           mountPath: /var/run/rabbitmq
+        livenessProbe:
+          tcpSocket:
+            port: 5672
+          initialDelaySeconds: 120
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: 5672
+          initialDelaySeconds: 10
+          periodSeconds: 5
       volumes:
       - name: rabbit-data
         persistentVolumeClaim:

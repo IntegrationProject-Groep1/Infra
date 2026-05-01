@@ -153,6 +153,8 @@ metadata:
   name: planning-db
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: planning-db
@@ -163,16 +165,6 @@ spec:
     spec:
       securityContext:
         fsGroup: 70
-      initContainers:
-      - name: fix-permissions
-        image: busybox
-        command: ["sh", "-c", "mkdir -p /var/lib/postgresql/data && chown -R 70:70 /var/lib/postgresql/data"]
-        securityContext:
-          runAsUser: 0
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
       containers:
       - name: postgres
         image: postgres:15-alpine
@@ -216,6 +208,22 @@ spec:
           mountPath: /tmp
         - name: run-postgres
           mountPath: /var/run/postgresql
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
       volumes:
       - name: data
         persistentVolumeClaim:
@@ -274,6 +282,8 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: PGADMIN_PASSWORD_PLANNING
+        - name: PGADMIN_CUSTOM_CONFIG_DISTRO_FILE
+          value: "/var/lib/pgadmin/config_distro.py"
         resources:
           requests:
             memory: "256Mi"

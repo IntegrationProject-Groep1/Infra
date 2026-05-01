@@ -62,8 +62,7 @@ spec:
             cpu: "500m"
         volumeMounts:
         - name: pipeline
-          mountPath: /usr/share/logstash/pipeline/logstash.conf
-          subPath: logstash.conf
+          mountPath: /usr/share/logstash/pipeline
           readOnly: true
         - name: tmp
           mountPath: /tmp
