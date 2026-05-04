@@ -1,0 +1,266 @@
+# =============================================================================
+# pr-integration.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Spins up a real Kubernetes cluster (kind - Kubernetes in Docker) on every
+#   pull request targeting main or dev, applies both overlays, and verifies
+#   that all manifests are accepted by the Kubernetes API without errors.
+#
+# WHAT THIS CATCHES:
+#   - Kustomize render failures (broken patches, missing bases, bad YAML)
+#   - Kubernetes API schema errors (wrong field names, bad apiVersion, etc.)
+#   - Resource conflicts (duplicate names, bad selectors)
+#   - Missing ConfigMap/Secret references that Kubernetes validates at apply time
+#
+# WHAT THIS DOES NOT CATCH:
+#   - Whether pods actually start (images are private and not pulled in CI)
+#   - Runtime application errors
+#   - Network connectivity between services
+#
+# RUNS ON: pull_request to main or dev  (never on direct pushes)
+# =============================================================================
+
+name: PR Integration Test (kind)
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  kind-integration:
+    name: Deploy to kind cluster
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # -----------------------------------------------------------------------
+      # 1. Spin up a local Kubernetes cluster using kind (Kubernetes in Docker)
+      # -----------------------------------------------------------------------
+      - name: Create kind cluster
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: sf-pr-test
+          wait: 120s
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: v1.30.1
+
+      # -----------------------------------------------------------------------
+      # 2. Write placeholder secrets so Kustomize secretGenerator can render
+      # -----------------------------------------------------------------------
+      - name: Write placeholder .env for prod overlay
+        shell: bash
+        run: |
+          cat > overlays/prod/.env <<'EOF'
+          RABBITMQ_DEFAULT_USER=ci_placeholder
+          RABBITMQ_DEFAULT_PASS=ci_placeholder
+          EXTERNAL_DB_PORT=30004
+          DB_USER=ci_placeholder
+          DB_PASSWORD=ci_placeholder
+          DB_NAME=ci_placeholder
+          PGADMIN_EMAIL=ci@placeholder.com
+          PGADMIN_PASSWORD=ci_placeholder
+          TEAMS_WEBHOOK_INFRA=https://ci.placeholder.com
+          TEAMS_WEBHOOK_FRONTEND=https://ci.placeholder.com
+          TEAMS_WEBHOOK_KASSA=https://ci.placeholder.com
+          TEAMS_WEBHOOK_CRM=https://ci.placeholder.com
+          TEAMS_WEBHOOK_PLANNING=https://ci.placeholder.com
+          TEAMS_WEBHOOK_FACTURATIE=https://ci.placeholder.com
+          TEAMS_WEBHOOK_MONITORING=https://ci.placeholder.com
+          DRUPAL_DB_ROOT_PASS=ci_placeholder
+          DRUPAL_DB_NAME=drupal
+          DRUPAL_DB_USER=drupal_user
+          DRUPAL_DB_PASS=ci_placeholder
+          DRUPAL_BASE_URL=https://ci.placeholder.com
+          RABBITMQFRONTEND_USER=ci_placeholder
+          RABBITMQFRONTEND_PASS=ci_placeholder
+          ES_ADMIN_USER=ci_placeholder
+          ES_ADMIN_PASS=ci_placeholder
+          ES_MEM_LIMIT=512m
+          KIBANA_SYSTEM_PASS=ci_placeholder
+          KIBANA_PUBLIC_BASE_URL=https://ci.placeholder.com
+          RABBITMQMONITORING_USER=ci_placeholder
+          RABBITMQMONITORING_PASS=ci_placeholder
+          FOSSBILLING_DB_NAME=ci_placeholder
+          FOSSBILLING_DB_USER=ci_placeholder
+          FOSSBILLING_DB_PASS=ci_placeholder
+          RABBITMQFACTURATIE_USER=ci_placeholder
+          RABBITMQFACTURATIE_PASS=ci_placeholder
+          POSTGRES_DB=ci_placeholder
+          POSTGRES_USER=ci_placeholder
+          POSTGRES_PASSWORD=ci_placeholder
+          ODOO_URL=https://ci.placeholder.com
+          ODOO_DB=ci_placeholder
+          ODOO_USER=ci_placeholder
+          ODOO_PASS=ci_placeholder
+          ODOO_MASTER_PASS=ci_placeholder
+          RABBITMQKASSA_USER=ci_placeholder
+          RABBITMQKASSA_PASS=ci_placeholder
+          RABBITMQCRM_USER=ci_placeholder
+          RABBITMQCRM_PASS=ci_placeholder
+          RABBITMQCRM_PASSRAW=ci_placeholder
+          SF_INSTANCE_URL=https://ci.placeholder.com
+          SF_CLIENT_ID=ci_placeholder
+          SF_CLIENT_SECRET=ci_placeholder
+          SF_REFRESH_TOKEN=ci_placeholder
+          MYSQL_HOST=ci_placeholder
+          MYSQL_PORT=3306
+          MYSQL_DATABASE=ci_placeholder
+          MYSQL_USER=ci_placeholder
+          MYSQL_PASSWORD=ci_placeholder
+          RABBITMQPLANNING_USER=ci_placeholder
+          RABBITMQPLANNING_PASS=ci_placeholder
+          IDENTITY_RABBIT_USER=ci_placeholder
+          IDENTITY_RABBIT_PASS=ci_placeholder
+          RABBIT_HOST=rabbitmq-broker-service
+          RABBIT_PORT=5672
+          RABBIT_VHOST=/
+          RABBIT_AUTO_SETUP_TOPOLOGY=false
+          RABBIT_EXCHANGE=ci_placeholder
+          RABBIT_INCOMING_QUEUE=ci_placeholder
+          POLL_INTERVAL=10
+          CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder
+          AZURE_CLIENT_ID=ci_placeholder
+          AZURE_CLIENT_SECRET=ci_placeholder
+          API_TOKEN_SECRET=ci_placeholder
+          TOKEN_ENCRYPTION_KEY=ci_placeholder
+          BILLING_API_URL=https://ci.placeholder.com
+          SUPABASE_URL=https://ci.placeholder.com
+          SUPABASE_ANON_KEY=ci_placeholder
+          EOF
+
+      - name: Write placeholder .env for dev overlay
+        shell: bash
+        run: cp overlays/prod/.env overlays/dev/.env
+
+      # -----------------------------------------------------------------------
+      # 3. Apply prod overlay — includes namespace, secrets, all services
+      # -----------------------------------------------------------------------
+      - name: Apply prod overlay (shift-festival)
+        run: |
+          echo "Applying overlays/prod to kind cluster..."
+          kubectl apply -k overlays/prod
+          echo "✅ overlays/prod applied without Kubernetes API errors"
+
+      # -----------------------------------------------------------------------
+      # 4. Apply Keel (image updater, prod-only, own keel namespace)
+      # -----------------------------------------------------------------------
+      - name: Apply Keel
+        run: |
+          echo "Applying keel/..."
+          kubectl apply -k keel
+          echo "✅ keel applied without errors"
+
+      # -----------------------------------------------------------------------
+      # 5. Apply dev overlay — separate namespace, same base
+      # -----------------------------------------------------------------------
+      - name: Apply dev overlay (shift-festival-dev)
+        run: |
+          echo "Applying overlays/dev to kind cluster..."
+          kubectl apply -k overlays/dev
+          echo "✅ overlays/dev applied without Kubernetes API errors"
+
+      # -----------------------------------------------------------------------
+      # 6. Verify resources were created in both namespaces
+      # -----------------------------------------------------------------------
+      - name: Verify resources exist in shift-festival
+        run: |
+          echo "=== Deployments (prod) ==="
+          kubectl get deployments -n shift-festival
+          echo ""
+          echo "=== StatefulSets (prod) ==="
+          kubectl get statefulsets -n shift-festival
+          echo ""
+          echo "=== Services (prod) ==="
+          kubectl get services -n shift-festival
+          echo ""
+          echo "=== PersistentVolumeClaims (prod) ==="
+          kubectl get pvc -n shift-festival
+          echo ""
+          echo "=== Secrets (prod) ==="
+          kubectl get secrets -n shift-festival
+
+      - name: Verify resources exist in shift-festival-dev
+        run: |
+          echo "=== Deployments (dev) ==="
+          kubectl get deployments -n shift-festival-dev
+          echo ""
+          echo "=== Services (dev) ==="
+          kubectl get services -n shift-festival-dev
+          echo ""
+          echo "=== Secrets (dev) ==="
+          kubectl get secrets -n shift-festival-dev
+
+      - name: Verify Keel resources exist
+        run: |
+          echo "=== Keel ==="
+          kubectl get all -n keel
+
+      # -----------------------------------------------------------------------
+      # 7. Count expected resources — fail if Kubernetes silently dropped any
+      # -----------------------------------------------------------------------
+      - name: Check minimum resource counts
+        shell: bash
+        run: |
+          ERRORS=0
+
+          DEPLOYMENTS=$(kubectl get deployments -n shift-festival --no-headers 2>/dev/null | wc -l)
+          echo "Deployments in shift-festival: ${DEPLOYMENTS}"
+          if [[ "${DEPLOYMENTS}" -lt 10 ]]; then
+            echo "❌ Expected at least 10 deployments, got ${DEPLOYMENTS}"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          SERVICES=$(kubectl get services -n shift-festival --no-headers 2>/dev/null | wc -l)
+          echo "Services in shift-festival: ${SERVICES}"
+          if [[ "${SERVICES}" -lt 5 ]]; then
+            echo "❌ Expected at least 5 services, got ${SERVICES}"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          DEV_DEPLOYMENTS=$(kubectl get deployments -n shift-festival-dev --no-headers 2>/dev/null | wc -l)
+          echo "Deployments in shift-festival-dev: ${DEV_DEPLOYMENTS}"
+          if [[ "${DEV_DEPLOYMENTS}" -lt 10 ]]; then
+            echo "❌ Expected at least 10 deployments in dev, got ${DEV_DEPLOYMENTS}"
+            ERRORS=$((ERRORS + 1))
+          fi
+
+          if [[ "${ERRORS}" -gt 0 ]]; then
+            echo ""
+            echo "❌ Resource count check failed — some manifests may not have applied correctly"
+            exit 1
+          fi
+
+          echo "✅ Resource count check passed"
+
+      # -----------------------------------------------------------------------
+      # 8. Always show final state for debugging
+      # -----------------------------------------------------------------------
+      - name: Show full cluster state (always)
+        if: always()
+        run: |
+          echo "========================================"
+          echo "  PROD NAMESPACE (shift-festival)"
+          echo "========================================"
+          kubectl get all -n shift-festival || true
+          echo ""
+          echo "========================================"
+          echo "  DEV NAMESPACE (shift-festival-dev)"
+          echo "========================================"
+          kubectl get all -n shift-festival-dev || true
+          echo ""
+          echo "========================================"
+          echo "  KEEL NAMESPACE"
+          echo "========================================"
+          kubectl get all -n keel || true
+          echo ""
+          echo "========================================"
+          echo "  RECENT EVENTS (prod)"
+          echo "========================================"
+          kubectl get events -n shift-festival \
+            --sort-by=.metadata.creationTimestamp 2>/dev/null | tail -30 || true
