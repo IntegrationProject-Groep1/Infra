@@ -71,7 +71,7 @@ spec:
         command: ["/bin/keel"]
         env:
         - name: NAMESPACE
-          value: ""
+          value: "shift-festival"
         - name: POLL
           value: "1"
         - name: WEBHOOK_ENDPOINT

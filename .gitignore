@@ -6,11 +6,13 @@
 .env.*.local
 .env.*
 *.env
-setup/.env
 **/.env
 
-# Ensure setup directory .env is never tracked
-setup/.env*
+# Overlay and base setup secrets — never commit the actual .env files
+overlays/prod/.env
+overlays/dev/.env
+base/setup/.env
+base/setup/.env*
 
 # Kubernetes secrets (contain credentials)
 **/secrets.yaml

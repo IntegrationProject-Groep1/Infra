@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shift-festival-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: shift-secrets
+    envs:
+      - .env
