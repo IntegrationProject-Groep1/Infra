@@ -30,7 +30,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: cloudflare-tunnel-secret
-              key: tunnel-token
+              key: CLOUDFLARE_TUNNEL_TOKEN
         resources:
           requests:
             memory: "64Mi"
