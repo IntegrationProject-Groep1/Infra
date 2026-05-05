@@ -111,8 +111,10 @@ jobs:
           SUPABASE_ANON_KEY=ci_placeholder
           EOF
 
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > setup/.env.cloudflare
+
           kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests.yaml"
-          rm -f setup/.env
+          rm -f setup/.env setup/.env.cloudflare
           echo "✅ Kustomize render completed"
 
       - name: Install yamllint
