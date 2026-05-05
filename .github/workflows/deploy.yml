@@ -68,6 +68,11 @@ jobs:
               exit 1
             fi
 
+            kubectl create secret generic cloudflare-tunnel-secret \
+              --from-literal=tunnel-token="${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
+              --namespace=shift-festival \
+              --dry-run=client -o yaml | kubectl apply -f -
+
             kubectl apply -k .
 
             # --- STAGE 1: Core Dependencies (Wait for these first) ---

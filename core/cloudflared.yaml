@@ -29,8 +29,8 @@ spec:
         - name: TUNNEL_TOKEN
           valueFrom:
             secretKeyRef:
-              name: shift-secrets
-              key: CLOUDFLARE_TUNNEL_TOKEN
+              name: cloudflare-tunnel-secret
+              key: tunnel-token
         resources:
           requests:
             memory: "64Mi"
