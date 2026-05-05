@@ -125,7 +125,7 @@ stringData:
         }
 
         if "heartbeats" in [tags] {
-          if [system] not in ["planning", "crm", "kassa", "facturatie", "monitoring", "frontend", "mailing"] {
+          if [system] not in ["planning", "crm", "kassa", "facturatie", "monitoring", "frontend", "mailing", "identity-service"] {
             mutate {
               add_field => { "parse_error" => "unknown_system" }
               add_tag   => ["quarantine", "unknown_system"]
