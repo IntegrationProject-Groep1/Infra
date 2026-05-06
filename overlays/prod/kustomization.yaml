@@ -14,9 +14,6 @@ secretGenerator:
   - name: shift-secrets
     envs:
       - .env
-  - name: cloudflare-tunnel-secret
-    envs:
-      - .env.cloudflare
 
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
