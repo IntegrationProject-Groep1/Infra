@@ -59,8 +59,8 @@ jobs:
       #
       # kind runs a full Kubernetes API server + scheduler + controller-manager
       # inside a Docker container on the GitHub Actions runner. Every kubectl
-      # command after this step hits a real Kubernetes API, not a mock.
-      # -----------------------------------------------------------------------      - name: Create kind cluster
+      # command after this step hits a real Kubernetes API, not a mock.      # -----------------------------------------------------------------------
+      - name: Create kind cluster
         uses: helm/kind-action@v1.10.0
         with:
           cluster_name: sf-pr-test
