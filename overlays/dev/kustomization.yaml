@@ -11,6 +11,23 @@ generatorOptions:
   disableNameSuffixHash: true
 
 secretGenerator:
-  - name: shift-secrets
+  - name: shift-secrets-dev
     envs:
       - .env
+
+replacements:
+- source:
+    kind: Secret
+    name: shift-secrets-dev
+    fieldPath: metadata.name
+  targets:
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - spec.template.spec.containers.[].env.[].valueFrom.secretKeyRef.name
+    - spec.template.spec.initContainers.[].env.[].valueFrom.secretKeyRef.name
+  - select:
+      kind: StatefulSet
+    fieldPaths:
+    - spec.template.spec.containers.[].env.[].valueFrom.secretKeyRef.name
+    - spec.template.spec.initContainers.[].env.[].valueFrom.secretKeyRef.name
