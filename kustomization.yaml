@@ -8,4 +8,4 @@ kind: Kustomization
 # After that update, this root file can be removed.
 resources:
   - overlays/prod
-  - keel
+  - keel/keel.yaml
