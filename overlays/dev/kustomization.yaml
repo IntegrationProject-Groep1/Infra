@@ -15,13 +15,109 @@ secretGenerator:
     envs:
       - .env
 
-patches:
+patchesJson6902:
   - target:
+      group: ""
       kind: Service
+      name: crm-receiver-service
     patch: |-
       - op: replace
         path: /spec/type
         value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: elasticsearch-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: facturatie-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: frontend-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: kassa-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: kibana-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: pgadmin-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: planning-pgadmin-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: planning-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      kind: Service
+      name: rabbitmq-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+      - op: remove
+        path: /spec/ports/1/nodePort
 
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
