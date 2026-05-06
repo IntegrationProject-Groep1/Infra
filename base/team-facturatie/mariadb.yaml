@@ -30,26 +30,36 @@ spec:
         ports:
         - containerPort: 3306
         env:
-        - name: MYSQL_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: FOSSBILLING_DB_ROOT_PASS
-        - name: MYSQL_DATABASE
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: FOSSBILLING_DB_NAME
-        - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: FOSSBILLING_DB_USER
-        - name: MYSQL_PASSWORD
+        - name: MARIADB_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: FOSSBILLING_DB_PASS
+        - name: MARIADB_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_NAME
+        - name: MARIADB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_USER
+        - name: MARIADB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_PASS
+        livenessProbe:
+          exec:
+            command: ["/usr/bin/mariadb-admin", "ping", "-h", "localhost"]
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command: ["/usr/bin/mariadb-admin", "ping", "-h", "localhost"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
         resources:
           requests:
             memory: "256Mi"
