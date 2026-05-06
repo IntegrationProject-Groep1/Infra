@@ -55,3 +55,33 @@ jobs:
             ghcr.io/${{ steps.repo_name.outputs.value }}:${{ steps.vars.outputs.tag }}
             ghcr.io/${{ steps.repo_name.outputs.value }}:${{ github.event.workflow_run.head_sha }}
 
+  deploy:
+    name: Deploy to Kubernetes
+    needs: build-and-push
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: SSH and Deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+            cd shiftfestival
+            
+            # Update infra manifests
+            git pull origin main
+            
+            # Determine overlay based on the branch of the team repo
+            if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
+              OVERLAY="overlays/prod"
+            else
+              OVERLAY="overlays/dev"
+            fi
+            
+            echo "Deploying using $OVERLAY..."
+            kubectl apply -k $OVERLAY
+
