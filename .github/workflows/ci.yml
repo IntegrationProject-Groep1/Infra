@@ -115,7 +115,8 @@ jobs:
           BILLING_API_URL=https://ci.placeholder.com
           SUPABASE_URL=https://ci.placeholder.com
           SUPABASE_ANON_KEY=ci_placeholder
-          EXTERNAL_DB_PORT=30004          CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder
+          EXTERNAL_DB_PORT=30004
+          CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder
           EOF
 
           # Ensure base/setup env exists for root kustomization validation
