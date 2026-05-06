@@ -130,33 +130,6 @@ spec:
           mountPath: /var/lock/apache2
         - name: tmp
           mountPath: /tmp
-      - name: heartbeat
-        image: ghcr.io/integrationproject-groep1/heartbeat:latest
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        env:
-        - name: SYSTEM_NAME
-          value: "frontend"
-        - name: TARGETS
-          value: "localhost:80"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
-        - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQFRONTEND_USER
-        - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQFRONTEND_PASS
       volumes:
       - name: drupal-files
         persistentVolumeClaim:

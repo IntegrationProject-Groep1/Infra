@@ -16,11 +16,11 @@ Kubernetes cluster. Three product teams (Frontend, Kassa, Facturatie) each run
 an application + database, glued together by a central message broker
 (RabbitMQ) and a shared monitoring stack (Elasticsearch + Kibana + Dozzle).
 
-Everything is managed with **Kustomize**. There is one root
-`kustomization.yaml` that pulls in every layer in the correct order; each
-subdirectory has its own `kustomization.yaml` listing its resources.
+Everything is managed with **Kustomize**. The project uses a **base/overlay** structure:
 
-All resources live in a single namespace: **`shift-festival`**.
+- `base/` — core manifests (shared between all environments).
+- `overlays/prod/` — production environment (namespace: `shift-festival`).
+- `overlays/dev/` — development environment (namespace: `shift-festival-dev`).
 
 ### High-level dataflow
 
@@ -28,7 +28,7 @@ All resources live in a single namespace: **`shift-festival`**.
               ┌──────────────────────┐
               │     End users        │
               └──────────┬───────────┘
-                         │  HTTPS (NodePort)
+                         │  HTTPS (Cloudflare/NodePort)
        ┌─────────────────┼─────────────────┐
        ▼                 ▼                 ▼
   ┌─────────┐       ┌─────────┐       ┌─────────────┐
@@ -37,14 +37,15 @@ All resources live in a single namespace: **`shift-festival`**.
   └────┬────┘       └────┬────┘       └─────┬───────┘
        │ MariaDB         │ Postgres         │ MariaDB
        │                 │                  │
-       │   heartbeat     │   heartbeat      │   heartbeat
-       └─────────┬───────┴──────────┬───────┘
-                 │                  │
-                 ▼                  ▼
-           ┌──────────┐        ┌──────────────────┐
-           │ RabbitMQ │◀──────▶│ Integrations     │
-           └──────────┘        │ (CRM, Planning)  │
-                               └──────────────────┘
+  ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
+  │Heartbeat│       │Heartbeat│       │Heartbeat│ (Standalone Services)
+  └────┬────┘       └────┬────┘       └────┬────┘
+       │                 │                  │
+       ▼                 ▼                  ▼
+  ┌──────────┐        ┌──────────────────┐
+  │ RabbitMQ │◀──────▶│ Integrations     │
+  └──────────┘        │ (CRM, Planning)  │
+                      └──────────────────┘
 
    Cross-cutting:  Dozzle (container logs)  •  Elasticsearch + Kibana
 ```
@@ -53,21 +54,19 @@ All resources live in a single namespace: **`shift-festival`**.
 
 ## 2. Layered architecture
 
-The deployment is organized in five layers. Each layer depends only on layers
-above it. The root `kustomization.yaml` enforces this order.
+The deployment is organized in several folders. The root `kustomization.yaml` acts as an entry point for production and Keel.
 
-| Order | Folder              | Purpose                                                |
-|-------|---------------------|--------------------------------------------------------|
-| 1     | `setup/`            | Namespace, persistent volumes, secrets, ConfigMaps     |
-| 2     | `core/`             | RabbitMQ message broker, Dozzle log viewer             |
-| 3     | `team-frontend/`    | Drupal CMS + MariaDB + Nginx proxy                     |
-| 3     | `team-kassa/`       | Odoo ERP + PostgreSQL + Nginx proxy                    |
-| 3     | `team-facturatie/`  | FossBilling + MariaDB + Nginx proxy                    |
-| 4     | `integrations/`     | CRM and Planning workers (RabbitMQ consumers)          |
-| 5     | `monitoring/`       | Elasticsearch, Kibana (and planned Logstash)           |
+| Folder              | Purpose                                                |
+|---------------------|--------------------------------------------------------|
+| `base/`             | Core manifests shared across environments.             |
+| `overlays/prod/`    | Production configuration (namespace `shift-festival`). |
+| `overlays/dev/`     | Dev configuration (namespace `shift-festival-dev`).    |
+| `keel/`             | Keel automated deployment tool.                        |
 
-Always deploy with `kubectl apply -k .` from the repo root so Kustomize
-respects this ordering. `kubectl apply -f` does not.
+### Environment Selection
+- **Production:** `kubectl apply -k overlays/prod`
+- **Development:** `kubectl apply -k overlays/dev`
+
 
 ---
 
@@ -270,27 +269,19 @@ Facturatie is not yet exposed.
 
 ---
 
-## 6. The heartbeat sidecar pattern
+## 6. Standalone Heartbeat Services
 
-Every public-facing application Pod (Drupal, Odoo, FossBilling) and every
-integration worker (CRM, Planning) runs a second container alongside the main
-app:
+Heartbeats are deployed as standalone services rather than sidecars. This ensures they operate independently of the main application lifecycle and provides more reliable monitoring signals.
+
+Every application has a corresponding heartbeat deployment (e.g., `kassa-heartbeat`, `frontend-heartbeat`). These heartbeats probe the application's Service URL and publish liveness data to RabbitMQ.
 
 - Image: `ghcr.io/integrationproject-groep1/heartbeat:latest`
 - Env:
   - `SYSTEM_NAME` — short identifier (`frontend`, `kassa`, `facturatie`,
     `crm`, `planning`).
-  - `TARGETS` — local URL the sidecar polls, typically `localhost:<app-port>`.
-    Because the two containers share a Pod network namespace, the sidecar
-    reaches the app over `localhost`.
+  - `TARGETS` — Service URL the heartbeat polls, e.g., `kassa-web-service:8069`.
   - `RABBITMQ_HOST` — `rabbitmq-service`.
 
-The sidecar pings its target and publishes the result to RabbitMQ. This gives
-the team a single feed of "is each system alive" without each app having to
-implement reporting itself.
-
-If you add a new application, add a heartbeat sidecar with the appropriate
-`SYSTEM_NAME` and `TARGETS`.
 
 ---
 

@@ -4,4 +4,5 @@ resources:
   - mariadb-config.yaml
   - mariadb.yaml
   - fossbilling.yaml
+  - heartbeat.yaml
   - proxy.yaml

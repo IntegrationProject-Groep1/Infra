@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rabbitmq-config
-  namespace: shift-festival
 data:
   rabbitmq.conf: |
     loopback_users.guest = false
@@ -15,7 +14,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: kassa-nginx-config
-  namespace: shift-festival
 data:
   default.conf: |
     server {
@@ -41,7 +39,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: frontend-nginx-config
-  namespace: shift-festival
 data:
   default.conf: |
     server {
@@ -60,7 +57,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: frontend-drupal-settings
-  namespace: shift-festival
 data:
   settings.php: |
     <?php
@@ -116,7 +112,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: frontend-rabbitmq-sender-services
-  namespace: shift-festival
 data:
   rabbitmq_sender.services.yml: |
     services:
@@ -127,7 +122,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: facturatie-nginx-config
-  namespace: shift-festival
 data:
   default.conf: |
     server {
