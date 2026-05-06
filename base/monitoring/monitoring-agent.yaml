@@ -59,6 +59,16 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_MONITORING
+        livenessProbe:
+          tcpSocket:
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          tcpSocket:
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             memory: "128Mi"

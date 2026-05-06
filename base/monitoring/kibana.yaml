@@ -67,6 +67,18 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: ELASTIC_PASSWORD
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 5601
+          initialDelaySeconds: 30
+          periodSeconds: 10
         resources:
           requests:
             memory: "512Mi"
