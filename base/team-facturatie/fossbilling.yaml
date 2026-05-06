@@ -176,17 +176,17 @@ spec:
         env:
         - name: DB_HOST
           value: "facturatie-db-service"
-        - name: DB_NAME
+        - name: MYSQL_DATABASE
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: FOSSBILLING_DB_NAME
-        - name: DB_USER
+        - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: FOSSBILLING_DB_USER
-        - name: DB_PASS
+        - name: MYSQL_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
