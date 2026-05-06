@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-db
-  namespace: shift-festival
 spec:
   replicas: 1
   strategy:
@@ -83,7 +82,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kassa-db-service
-  namespace: shift-festival
 spec:
   selector:
     app: kassa-db

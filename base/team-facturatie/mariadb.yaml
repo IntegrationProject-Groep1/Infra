@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: facturatie-db
-  namespace: shift-festival
 spec:
   replicas: 1
   strategy:

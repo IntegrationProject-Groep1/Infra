@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kassa-integration
-  namespace: shift-festival
   annotations:
     keel.sh/policy: force
     keel.sh/trigger: poll
