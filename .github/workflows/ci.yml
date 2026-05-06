@@ -114,10 +114,12 @@ jobs:
           TEAMS_WEBHOOK_MONITORING=https://ci.placeholder.com
           BILLING_API_URL=https://ci.placeholder.com
           SUPABASE_URL=https://ci.placeholder.com
-          SUPABASE_ANON_KEY=ci_placeholder
-          EXTERNAL_DB_PORT=30004
+          SUPABASE_ANON_KEY=ci_placeholder          EXTERNAL_DB_PORT=30004
           CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder
           EOF
+
+          # Create placeholder for cloudflare secret in prod overlay
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/prod/.env.cloudflare
 
           # Ensure base/setup env exists for root kustomization validation
           mkdir -p base/setup
@@ -128,9 +130,7 @@ jobs:
           kubectl kustomize overlays/prod > "${RUNNER_TEMP}/rendered-manifests-prod.yaml"
           
           echo "Rendering root manifests..."
-          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"
-
-          rm -f overlays/prod/.env base/setup/.env base/setup/.env.cloudflare
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"          rm -f overlays/prod/.env overlays/prod/.env.cloudflare base/setup/.env base/setup/.env.cloudflare
           echo "✅ Kustomize render completed"
 
       - name: Install yamllint
