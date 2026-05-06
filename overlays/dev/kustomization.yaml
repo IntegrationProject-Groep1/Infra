@@ -15,6 +15,14 @@ secretGenerator:
     envs:
       - .env
 
+patchesJson6902:
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
     newTag: dev
