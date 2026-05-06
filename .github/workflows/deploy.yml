@@ -68,6 +68,9 @@ jobs:
               exit 1
             fi
 
+            echo "CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
+              > ~/shiftfestival/setup/.env.cloudflare
+
             kubectl apply -k .
 
             # --- STAGE 1: Core Dependencies (Wait for these first) ---

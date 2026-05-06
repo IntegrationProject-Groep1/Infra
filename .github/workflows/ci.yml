@@ -121,6 +121,10 @@ jobs:
 
           kubectl kustomize overlays/prod > "${RUNNER_TEMP}/rendered-manifests.yaml"
           rm -f overlays/prod/.env
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > setup/.env.cloudflare
+
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests.yaml"
+          rm -f setup/.env setup/.env.cloudflare
           echo "✅ Kustomize render completed"
 
       - name: Install yamllint

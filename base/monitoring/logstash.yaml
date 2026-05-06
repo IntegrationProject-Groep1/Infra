@@ -34,21 +34,23 @@ spec:
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT
           value: "5672"
-        - name: RABBITMQ_USER
+        - name: RABBITMQMONITORING_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQMONITORING_USER
-        - name: RABBITMQ_PASS
+        - name: RABBITMQMONITORING_PASS
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQMONITORING_PASS
-        - name: ELASTICSEARCH_HOST
+        - name: RABBITMQ_VHOST
+          value: "/"
+        - name: ELASTICSEARCH_HOSTS
           value: "http://elasticsearch-service:9200"
-        - name: ELASTICSEARCH_USER
+        - name: ES_ADMIN_USER
           value: "elastic"
-        - name: ELASTICSEARCH_PASSWORD
+        - name: ES_ADMIN_PASS
           valueFrom:
             secretKeyRef:
               name: shift-secrets

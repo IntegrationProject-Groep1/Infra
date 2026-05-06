@@ -136,12 +136,14 @@ spec:
               key: PGADMIN_PASSWORD
         - name: PGADMIN_CUSTOM_CONFIG_DISTRO_FILE
           value: "/var/lib/pgadmin/config_distro.py"
+        - name: PGADMIN_SERVER_JSON_FILE
+          value: "/var/lib/pgadmin/servers.json"
         resources:
           requests:
             memory: "128Mi"
             cpu: "50m"
           limits:
-            memory: "256Mi"
+            memory: "512Mi"
             cpu: "200m"
         volumeMounts:
         - name: pgadmin-data
@@ -150,6 +152,9 @@ spec:
           mountPath: /var/log/pgadmin
         - name: tmp
           mountPath: /tmp
+        - name: pgadmin-servers
+          mountPath: /var/lib/pgadmin/servers.json
+          subPath: servers.json
       volumes:
       - name: pgadmin-data
         persistentVolumeClaim:
@@ -158,6 +163,29 @@ spec:
         emptyDir: {}
       - name: tmp
         emptyDir: {}
+      - name: pgadmin-servers
+        configMap:
+          name: pgadmin-servers
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-servers
+data:
+  servers.json: |
+    {
+      "Servers": {
+        "1": {
+          "Name": "Shared PostgreSQL",
+          "Group": "Servers",
+          "Host": "postgredb-service",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "admin",
+          "SSLMode": "prefer"
+        }
+      }
+    }
 ---
 apiVersion: v1
 kind: Service
