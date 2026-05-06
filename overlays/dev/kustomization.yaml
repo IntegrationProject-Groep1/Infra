@@ -15,8 +15,13 @@ secretGenerator:
     envs:
       - .env
 
-patchesStrategicMerge:
-  - service-clusterip-patch.yaml
+patches:
+  - target:
+      kind: Service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
 
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
