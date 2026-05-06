@@ -298,6 +298,9 @@ spec:
           mountPath: /var/log/pgadmin
         - name: tmp
           mountPath: /tmp
+        - name: pgadmin-servers
+          mountPath: /pgadmin4/servers.json
+          subPath: servers.json
       volumes:
       - name: pgadmin-data
         emptyDir: {}
@@ -305,6 +308,29 @@ spec:
         emptyDir: {}
       - name: tmp
         emptyDir: {}
+      - name: pgadmin-servers
+        configMap:
+          name: planning-pgadmin-servers
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: planning-pgadmin-servers
+data:
+  servers.json: |
+    {
+      "Servers": {
+        "1": {
+          "Name": "Planning DB",
+          "Group": "Servers",
+          "Host": "planning-db-service",
+          "Port": 5432,
+          "MaintenanceDB": "planning",
+          "Username": "planning_user",
+          "SSLMode": "prefer"
+        }
+      }
+    }
 ---
 apiVersion: v1
 kind: Service
