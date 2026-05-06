@@ -167,7 +167,7 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         env:
-        - name: MYSQL_HOST
+        - name: DB_HOST
           value: "facturatie-db-service"
         - name: MYSQL_DATABASE
           valueFrom:
