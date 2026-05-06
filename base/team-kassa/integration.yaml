@@ -85,6 +85,16 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_KASSA
+        livenessProbe:
+          exec:
+            command: ["ls", "/app"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command: ["ls", "/app"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             memory: "128Mi"
