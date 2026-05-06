@@ -31,3 +31,21 @@ replacements:
     fieldPaths:
     - spec.template.spec.containers.[].env.[].valueFrom.secretKeyRef.name
     - spec.template.spec.initContainers.[].env.[].valueFrom.secretKeyRef.name
+
+images:
+  - name: ghcr.io/integrationproject-groep1/heartbeat
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/crm
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/identity-service
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/planning
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/facturatie
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/kassa
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/monitoring
+    newTag: dev
