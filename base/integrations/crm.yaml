@@ -107,33 +107,6 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
-      - name: heartbeat
-        image: ghcr.io/integrationproject-groep1/heartbeat:latest
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        env:
-        - name: SYSTEM_NAME
-          value: "crm"
-        - name: TARGETS
-          value: "localhost:3000"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
-        - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQCRM_USER
-        - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQCRM_PASSRAW
 ---
 apiVersion: v1
 kind: Service

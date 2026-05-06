@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crm-heartbeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crm-heartbeat
+  template:
+    metadata:
+      labels:
+        app: crm-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "crm"
+        - name: TARGETS
+          value: "crm-receiver-service:3000"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQCRM_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQCRM_PASSRAW
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: identity-heartbeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: identity-heartbeat
+  template:
+    metadata:
+      labels:
+        app: identity-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "identity-service"
+        - name: TARGETS
+          value: "identity-service:3000"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQ_DEFAULT_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQ_DEFAULT_PASS
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: planning-heartbeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: planning-heartbeat
+  template:
+    metadata:
+      labels:
+        app: planning-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "planning"
+        - name: TARGETS
+          value: "planning-service:3000"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQ_USER_PLANNING
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQ_PASS_PLANNING

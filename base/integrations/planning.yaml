@@ -102,33 +102,6 @@ spec:
         volumeMounts:
         - name: token-data
           mountPath: /app/data
-      - name: heartbeat
-        image: ghcr.io/integrationproject-groep1/heartbeat:latest
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        env:
-        - name: SYSTEM_NAME
-          value: "planning"
-        - name: TARGETS
-          value: "localhost:3000"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
-        - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_USER_PLANNING
-        - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_PASS_PLANNING
       volumes:
       - name: token-data
         persistentVolumeClaim:
