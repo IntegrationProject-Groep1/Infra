@@ -180,8 +180,8 @@ data:
           "Group": "Servers",
           "Host": "postgredb-service",
           "Port": 5432,
-          "MaintenanceDB": "postgres",
-          "Username": "postgres",
+          "MaintenanceDB": "integration_db",
+          "Username": "admin",
           "SSLMode": "prefer"
         }
       }
