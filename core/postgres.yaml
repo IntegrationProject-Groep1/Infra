@@ -181,7 +181,7 @@ data:
           "Host": "postgredb-service",
           "Port": 5432,
           "MaintenanceDB": "postgres",
-          "Username": "postgres",
+          "Username": "admin",
           "SSLMode": "prefer"
         }
       }
