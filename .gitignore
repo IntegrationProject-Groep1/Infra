@@ -14,6 +14,11 @@ overlays/dev/.env
 base/setup/.env
 base/setup/.env*
 
+# Allow .env.example files as templates
+!overlays/prod/.env.example
+!overlays/dev/.env.example
+!base/setup/.env.example
+
 # Kubernetes secrets (contain credentials)
 **/secrets.yaml
 **/secret.yaml
