@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kassa-heartbeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kassa-heartbeat
+  template:
+    metadata:
+      labels:
+        app: kassa-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "kassa"
+        - name: TARGETS
+          value: "kassa-web-service:8069"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_PASS
