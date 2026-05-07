@@ -19,11 +19,14 @@ base/               Shared manifests — no namespace set here
   monitoring/       ELK stack + monitoring agent
 
 overlays/
-  prod/             namespace: shift-festival  (includes Keel)
+  prod/             namespace: shift-festival
   dev/              namespace: shift-festival-dev
 
-keel/               Image updater (deployed via prod overlay only)
-scripts/            Rollback + notification scripts
+argocd/             ArgoCD installation manifests + Application CRDs
+  applications/     prod-app.yaml and dev-app.yaml (point ArgoCD at overlays/)
+  image-updater/    ArgoCD Image Updater (replaces Keel)
+keel/               DEPRECATED — image updater replaced by ArgoCD Image Updater
+scripts/            Bootstrap + notification scripts
 docs/               Architecture and process documentation
 ```
 
@@ -63,8 +66,9 @@ The stack runs on Kubernetes and is composed of:
 - **RabbitMQ** — Central async message broker; team services communicate through team-prefixed queues (for example `kassa.orders` and `crm.customer.created`).
 - **PostgreSQL** — Shared database for the identity service and other shared workloads.
 - **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging and observability.
-- **Cloudflared** — Secure external access tunnel for selected services.
-- **Keel** — Image updater automation, deployed only to prod via `overlays/prod`.
+- **Cloudflared** — Secure external access tunnel for selected services. Routes are managed in the Cloudflare Zero Trust dashboard (token-based, no local config file).
+- **ArgoCD** — GitOps controller installed in the `argocd` namespace. Watches the Git repo and auto-syncs changes to the cluster. Exposed at `argocd.desiderius.me` via Cloudflare Tunnel.
+- **ArgoCD Image Updater** — Polls GHCR for new image tags and writes back the updated tag to Git, triggering an ArgoCD sync. Replaces Keel.
 
 **Team Services:**
 - Frontend (Drupal, ports 30020–30029)
@@ -79,7 +83,7 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 **Namespaces:**
 - `shift-festival` — prod application namespace
 - `shift-festival-dev` — dev application namespace
-- `keel` — separate namespace for the image updater
+- `argocd` — ArgoCD controller and Image Updater
 
 ## CI/CD Pipeline
 
@@ -91,36 +95,48 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 5. Scan Kubernetes manifests with Trivy in `config` mode.
 6. Verify `.env` files are not committed and that obvious hardcoded secrets are absent.
 
-**Deploy — prod (push to `main`, after CI passes):**
-1. SCP repo files to the VM (excludes `.github/`, `assets/`, and markdown docs).
-2. Verify `overlays/prod/.env` exists on the VM.
-3. Run `kubectl apply -k overlays/prod` from the repository root.
-4. Wait for rollout completion and capture pod/service status.
-5. Notify Teams on success or failure.
+**Deploy — GitOps via ArgoCD (primary mechanism):**
+ArgoCD watches the Git repo directly and auto-syncs on every commit:
+- `main` branch → `shift-festival` namespace (prod)
+- `dev` branch → `shift-festival-dev` namespace (dev)
 
-**Deploy — dev (push to `dev` branch):**
-1. SCP repo files to the VM.
-2. Verify `overlays/dev/.env` exists on the VM.
-3. Run `kubectl apply -k overlays/dev`.
-4. Wait for rollout completion.
+Self-healing is enabled: any manual cluster change is reverted within ~3 minutes.
+
+**Deploy — via GitHub Actions (secondary/emergency):**
+The `.github/workflows/deploy.yml` SCP pipeline still runs but no longer applies manifests directly. It is retained for:
+- Emergency access to the VM
+- Secret refresh: running `./scripts/create-secret.sh setup/.env <namespace>` when secrets change
+
+**Image updates:**
+ArgoCD Image Updater polls GHCR every 2 minutes. When a new `prod` or `dev` tag is detected, it commits the new tag to Git, which triggers an ArgoCD sync. The per-team `pipelines/deploy.yml` build pipelines are unchanged.
+
+**Secrets Bootstrap (one-time per environment):**
+Secrets are not managed by kustomize — ArgoCD does not have filesystem access to `.env` files. Run once on the VM:
+```bash
+./scripts/create-secret.sh setup/.env shift-festival
+./scripts/create-secret.sh setup/.env shift-festival-dev
+```
+Re-run whenever `setup/.env` changes.
 
 ## Rollback and Recovery
 
-- Preferred rollback is `kubectl rollout undo deployment/<name> -n shift-festival`.
-- Namespace-wide recovery should be done by re-applying the last known-good Git commit.
-- Keep all manifests versioned in Git; do not hand-edit the VM.
-- The legacy Docker Compose rollback scripts in `scripts/` are kept for reference only and should not be extended for new Kubernetes work.
+- **Single deployment rollback**: `argocd app rollback shift-festival-prod <revision>` (find the revision in the ArgoCD UI History tab at `argocd.desiderius.me`).
+- **Namespace-wide recovery**: Revert the Git commit and push — ArgoCD auto-syncs within minutes.
+- **Self-healing**: ArgoCD reverts manual `kubectl` changes automatically. Do not hand-edit the cluster.
+- **Crash scenario**: Kubernetes restarts the pod; ArgoCD marks the app Degraded. Investigate logs, push a fix to Git, ArgoCD syncs it.
+- `scripts/runtime-rollback.sh` is deprecated — do not run it. ArgoCD covers its use cases.
 
 ## Key Constraints
 
 - **Never commit `.env` files** — real secrets live only on the VM. Templates are in `overlays/prod/.env.example` and `overlays/dev/.env.example`.
+- **Secrets are NOT managed by kustomize secretGenerator** — use `./scripts/create-secret.sh setup/.env <namespace>` to bootstrap the `shift-secrets` Secret per environment. ArgoCD ignores this Secret.
+- **Do not add `keel.sh/` annotations to new deployments** — ArgoCD Image Updater handles image polling.
+- **ArgoCD is the source of truth** — do not run `kubectl apply -k` directly on the VM. ArgoCD auto-syncs from Git; manual applies will be reverted by self-healing.
 - **Database workloads should use `strategy: type: Recreate`** — this prevents volume mount conflicts (Multi-Attach errors) when updating deployments using ReadWriteOnce PVCs.
 - **Strictly adhere to non-root policies** — avoid `runAsUser: 0` in initContainers. Use `fsGroup` in the pod's securityContext to manage volume permissions instead of root-level `chown` commands.
 - **All Kubernetes manifests must render with `kubectl kustomize overlays/prod`** (or `overlays/dev`).
 - **NodePorts must stay within the assigned ranges** for each team.
 - **Team-prefixed RabbitMQ queues** are mandatory; shared heartbeat routing keeps its own convention.
-- **Do not manually edit the VM** — the deploy pipeline overwrites the runtime tree on each deploy.
-- **Keel is prod-only** — never add the `keel/` reference to the dev overlay.
 
 ## Documentation Requirements
 
