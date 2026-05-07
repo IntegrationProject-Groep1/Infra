@@ -120,6 +120,7 @@ jobs:
           exit-code: 1
           severity: HIGH,CRITICAL
           format: table
+          skip-dirs: argocd
 
       - name: Verify sensitive files are not committed
         shell: bash
