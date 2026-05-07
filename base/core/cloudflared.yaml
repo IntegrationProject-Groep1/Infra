@@ -18,25 +18,13 @@ spec:
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:2024.12.2
-        args: ["tunnel", "--no-autoupdate", "run", "--metrics", "0.0.0.0:2000", "--protocol", "http2"]
+        args: ["tunnel", "--no-autoupdate", "run", "--protocol", "http2"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
           readOnlyRootFilesystem: true
-        livenessProbe:
-          httpGet:
-            path: /ready
-            port: 2000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 2000
-          initialDelaySeconds: 5
-          periodSeconds: 10
         env:
         - name: TUNNEL_TOKEN
           valueFrom:
