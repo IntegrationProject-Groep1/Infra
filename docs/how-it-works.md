@@ -112,6 +112,27 @@ When ArgoCD (or a developer locally) runs `kubectl kustomize overlays/prod`, Kus
 
 Without overlays, you would need two full copies of every manifest — one for prod, one for dev. Every change would have to be made twice, and the environments would slowly drift apart. With overlays, there is zero duplication. Every change to `base/` automatically applies to both environments the next time ArgoCD syncs.
 
+### What this means for you as a developer
+
+The overlay system means **you never touch the Infra repo** during normal development or deployment. The full workflow from your perspective:
+
+**During development:**
+1. Push to the `dev` branch in your own team repo
+2. CI builds a Docker image and pushes it to GHCR with the `:dev` tag
+3. ArgoCD Image Updater detects the new image (within 2 minutes) and commits the new tag to the Infra repo
+4. ArgoCD syncs the dev overlay → your new code is live in `shift-festival-dev` within ~5 minutes of your push
+
+You can verify by checking the ArgoCD UI or running `kubectl get pods -n shift-festival-dev`.
+
+**When releasing to production:**
+1. Create a release tag (`v1.2.3`) on `main` in your team repo — only after dev has been stable
+2. CI pipeline runs and must pass
+3. A new Docker image is built and pushed with the `:prod` tag
+4. ArgoCD Image Updater detects it, commits to the Infra repo, ArgoCD syncs the prod overlay
+5. Your change is live in `shift-festival` within ~5 minutes of the tag
+
+**The key point:** the overlays handle the namespace routing automatically. The `:dev` image goes to `shift-festival-dev`, the `:prod` image goes to `shift-festival`. You do not configure this — it is wired up in the overlays and ArgoCD Applications. As a developer, you only control when something gets deployed by choosing when to push to `dev` or create a release tag.
+
 ---
 
 ## 4. Two environments — prod and dev
