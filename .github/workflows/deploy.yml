@@ -82,6 +82,11 @@ jobs:
             echo "CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
               > ${{ env.OVERLAY }}/.env.cloudflare
 
+            # Sync cloudflare-tunnel-secret from GitHub Secrets into the cluster
+            kubectl create secret generic cloudflare-tunnel-secret \
+              --from-literal=CLOUDFLARE_TUNNEL_TOKEN="${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
+              -n ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
             kubectl apply -k ${{ env.OVERLAY }}
 
             # ArgoCD manages rollout health and self-healing from this point.
