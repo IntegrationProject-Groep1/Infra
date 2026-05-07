@@ -94,6 +94,11 @@ jobs:
       # because the ghcr.io images require authentication or do not yet exist.
       # This is expected and does not affect the exit code of kubectl apply.
       # -----------------------------------------------------------------------
+      - name: Create placeholder env files for secretGenerators
+        run: |
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/prod/.env.cloudflare
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/dev/.env.cloudflare
+
       - name: Apply prod overlay (shift-festival)
         run: kubectl apply -k overlays/prod
 
@@ -106,6 +111,10 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Apply dev overlay (shift-festival-dev)
         run: kubectl apply -k overlays/dev
+
+      - name: Cleanup placeholder env files
+        run: |
+          rm -f overlays/prod/.env.cloudflare overlays/dev/.env.cloudflare
 
       # -----------------------------------------------------------------------
       # STEP 4 — Verify key named resources exist
