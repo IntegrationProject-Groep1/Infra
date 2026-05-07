@@ -84,43 +84,17 @@ jobs:
 
             kubectl apply -k ${{ env.OVERLAY }}
 
-            # --- STAGE 1: Core Dependencies (Wait for these first) ---
-            echo "Waiting for core dependencies in ${{ env.NAMESPACE }}..."
+            # ArgoCD manages rollout health and self-healing from this point.
+            # We only verify the critical shared infrastructure comes up cleanly.
+            echo "Waiting for core infrastructure in ${{ env.NAMESPACE }}..."
             kubectl rollout status deployment/rabbitmq-broker -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/postgredb -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/frontend-db -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/kassa-db -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/facturatie-db -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/planning-db -n ${{ env.NAMESPACE }} --timeout=5m
-            kubectl rollout status deployment/crm-db -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/postgredb       -n ${{ env.NAMESPACE }} --timeout=5m
 
-            # --- STAGE 2: Applications (Parallel checks) ---
-            echo "Starting parallel rollout checks for applications in ${{ env.NAMESPACE }}..."
-            
-            # Start all checks in background
-            kubectl rollout status deployment/frontend-drupal -n ${{ env.NAMESPACE }} --timeout=10m &
-            kubectl rollout status deployment/frontend-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/kassa-web -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/kassa-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/kassa-integration -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/fossbilling-app -n ${{ env.NAMESPACE }} --timeout=10m &
-            kubectl rollout status deployment/facturatie-connector -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/facturatie-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/cloudflared -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/integration-crm -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/identity-service -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/integration-planning -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/kibana -n ${{ env.NAMESPACE }} --timeout=10m &
-            kubectl rollout status deployment/logstash -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status deployment/monitoring-agent -n ${{ env.NAMESPACE }} --timeout=5m &
-            kubectl rollout status statefulset/elasticsearch -n ${{ env.NAMESPACE }} --timeout=10m &
-
-            # Wait for all background processes to finish
-            wait
-            echo "All deployments successfully rolled out!"
+            echo "Manifests applied. ArgoCD will track full rollout health."
+            echo "Check status at: https://argocd.desiderius.me"
 
             kubectl get pods -n ${{ env.NAMESPACE }}
-            kubectl get svc -n ${{ env.NAMESPACE }}
+            kubectl get svc  -n ${{ env.NAMESPACE }}
 
 
 #      - name: Notify Teams - deploy success
