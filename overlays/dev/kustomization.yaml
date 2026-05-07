@@ -7,6 +7,14 @@ resources:
   - ../../base
   - namespace.yaml
 
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: cloudflare-tunnel-secret
+    literals:
+      - CLOUDFLARE_TUNNEL_TOKEN=dev_not_used
+
 patches:
   - target:
       group: apps
