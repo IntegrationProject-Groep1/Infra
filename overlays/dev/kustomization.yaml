@@ -7,17 +7,10 @@ resources:
   - ../../base
   - namespace.yaml
 
-generatorOptions:
-  disableNameSuffixHash: true
-
-secretGenerator:
-  - name: shift-secrets
-    envs:
-      - .env
-
-patchesJson6902:
+patches:
   - target:
       group: ""
+      version: v1
       kind: Service
       name: crm-receiver-service
     patch: |-
@@ -28,6 +21,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: elasticsearch-service
     patch: |-
@@ -38,6 +32,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: facturatie-proxy-service
     patch: |-
@@ -48,6 +43,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: frontend-proxy-service
     patch: |-
@@ -58,6 +54,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: kassa-proxy-service
     patch: |-
@@ -68,6 +65,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: kibana-service
     patch: |-
@@ -78,6 +76,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: pgadmin-service
     patch: |-
@@ -88,6 +87,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: planning-pgadmin-service
     patch: |-
@@ -98,6 +98,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: planning-service
     patch: |-
@@ -108,6 +109,7 @@ patchesJson6902:
         path: /spec/ports/0/nodePort
   - target:
       group: ""
+      version: v1
       kind: Service
       name: rabbitmq-service
     patch: |-

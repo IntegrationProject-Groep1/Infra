@@ -7,14 +7,6 @@ resources:
   - ../../base
   - namespace.yaml
 
-generatorOptions:
-  disableNameSuffixHash: true
-
-secretGenerator:
-  - name: shift-secrets
-    envs:
-      - .env
-
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
     newTag: prod
