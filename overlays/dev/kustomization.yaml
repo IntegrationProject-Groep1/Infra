@@ -7,7 +7,24 @@ resources:
   - ../../base
   - namespace.yaml
 
+generatorOptions:
+  disableNameSuffixHash: true
+
+secretGenerator:
+  - name: cloudflare-tunnel-secret
+    envs:
+      - .env.cloudflare
+
 patches:
+  - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: cloudflared
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
   - target:
       group: ""
       version: v1
