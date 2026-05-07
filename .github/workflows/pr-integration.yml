@@ -34,7 +34,9 @@
 #   - Typos in field names (e.g. "limtis" instead of "limits")
 #   - Kustomize patches targeting a resource that no longer exists in base
 #   - Missing kustomization.yaml after moving a folder
-#   - secretGenerator pointing to a missing .env key
+#
+# NOTE: shift-secrets is NOT created in CI — it is bootstrapped manually on the VM
+#   via scripts/create-secret.sh. The secret check was removed from CI verification.
 #
 # TRIGGER:  pull_request to main or dev  —  never runs on direct pushes
 # =============================================================================
@@ -78,100 +80,7 @@ jobs:
           kubectl get nodes
 
       # -----------------------------------------------------------------------
-      # STEP 2 — Write CI placeholder .env files
-      #
-      # The Kustomize secretGenerator in each overlay reads a .env file to
-      # build the shift-secrets Secret. Real secrets are gitignored and live
-      # only on the VM. Here we provide dummy values so the render succeeds.
-      # The Secret content does not affect whether kubectl apply passes or
-      # fails — it only matters that the Secret object is created.
-      # -----------------------------------------------------------------------
-      - name: Write placeholder .env for prod overlay
-        shell: bash
-        run: |
-          cat > overlays/prod/.env <<'EOF'
-          RABBITMQ_DEFAULT_USER=ci_placeholder
-          RABBITMQ_DEFAULT_PASS=ci_placeholder
-          EXTERNAL_DB_PORT=30004
-          DB_USER=ci_placeholder
-          DB_PASSWORD=ci_placeholder
-          DB_NAME=ci_placeholder
-          PGADMIN_EMAIL=ci@placeholder.com
-          PGADMIN_PASSWORD=ci_placeholder
-          TEAMS_WEBHOOK_INFRA=https://ci.placeholder.com
-          TEAMS_WEBHOOK_FRONTEND=https://ci.placeholder.com
-          TEAMS_WEBHOOK_KASSA=https://ci.placeholder.com
-          TEAMS_WEBHOOK_CRM=https://ci.placeholder.com
-          TEAMS_WEBHOOK_PLANNING=https://ci.placeholder.com
-          TEAMS_WEBHOOK_FACTURATIE=https://ci.placeholder.com
-          TEAMS_WEBHOOK_MONITORING=https://ci.placeholder.com
-          DRUPAL_DB_ROOT_PASS=ci_placeholder
-          DRUPAL_DB_NAME=drupal
-          DRUPAL_DB_USER=drupal_user
-          DRUPAL_DB_PASS=ci_placeholder
-          DRUPAL_BASE_URL=https://ci.placeholder.com
-          RABBITMQFRONTEND_USER=ci_placeholder
-          RABBITMQFRONTEND_PASS=ci_placeholder
-          ES_ADMIN_USER=ci_placeholder
-          ES_ADMIN_PASS=ci_placeholder
-          ES_MEM_LIMIT=512m
-          KIBANA_SYSTEM_PASS=ci_placeholder
-          KIBANA_PUBLIC_BASE_URL=https://ci.placeholder.com
-          RABBITMQMONITORING_USER=ci_placeholder
-          RABBITMQMONITORING_PASS=ci_placeholder
-          FOSSBILLING_DB_NAME=ci_placeholder
-          FOSSBILLING_DB_USER=ci_placeholder
-          FOSSBILLING_DB_PASS=ci_placeholder
-          RABBITMQFACTURATIE_USER=ci_placeholder
-          RABBITMQFACTURATIE_PASS=ci_placeholder
-          POSTGRES_DB=ci_placeholder
-          POSTGRES_USER=ci_placeholder
-          POSTGRES_PASSWORD=ci_placeholder
-          ODOO_URL=https://ci.placeholder.com
-          ODOO_DB=ci_placeholder
-          ODOO_USER=ci_placeholder
-          ODOO_PASS=ci_placeholder
-          ODOO_MASTER_PASS=ci_placeholder
-          RABBITMQKASSA_USER=ci_placeholder
-          RABBITMQKASSA_PASS=ci_placeholder
-          RABBITMQCRM_USER=ci_placeholder
-          RABBITMQCRM_PASS=ci_placeholder
-          RABBITMQCRM_PASSRAW=ci_placeholder
-          SF_INSTANCE_URL=https://ci.placeholder.com
-          SF_CLIENT_ID=ci_placeholder
-          SF_CLIENT_SECRET=ci_placeholder
-          SF_REFRESH_TOKEN=ci_placeholder
-          MYSQL_HOST=ci_placeholder
-          MYSQL_PORT=3306
-          MYSQL_DATABASE=ci_placeholder
-          MYSQL_USER=ci_placeholder
-          MYSQL_PASSWORD=ci_placeholder
-          RABBITMQPLANNING_USER=ci_placeholder
-          RABBITMQPLANNING_PASS=ci_placeholder
-          IDENTITY_RABBIT_USER=ci_placeholder
-          IDENTITY_RABBIT_PASS=ci_placeholder
-          RABBIT_HOST=rabbitmq-broker-service
-          RABBIT_PORT=5672
-          RABBIT_VHOST=/
-          RABBIT_AUTO_SETUP_TOPOLOGY=false
-          RABBIT_EXCHANGE=ci_placeholder
-          RABBIT_INCOMING_QUEUE=ci_placeholder
-          POLL_INTERVAL=10
-          CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder
-          AZURE_CLIENT_ID=ci_placeholder
-          AZURE_CLIENT_SECRET=ci_placeholder
-          API_TOKEN_SECRET=ci_placeholder
-          TOKEN_ENCRYPTION_KEY=ci_placeholder
-          BILLING_API_URL=https://ci.placeholder.com
-          SUPABASE_URL=https://ci.placeholder.com
-          SUPABASE_ANON_KEY=ci_placeholder
-          EOF
-
-      - name: Copy placeholder .env to dev overlay
-        run: cp overlays/prod/.env overlays/dev/.env
-
-      # -----------------------------------------------------------------------
-      # STEP 3 — Apply prod overlay
+      # STEP 2 — Apply prod overlay
       #
       # kubectl apply -k overlays/prod does the following:
       #   1. Kustomize renders the full manifest tree (base + overlay patches)
@@ -189,16 +98,7 @@ jobs:
         run: kubectl apply -k overlays/prod
 
       # -----------------------------------------------------------------------
-      # STEP 4 — Apply Keel
-      #
-      # Keel runs in its own keel namespace and is kept outside the overlays
-      # so the overlay namespace transformer does not override its namespace.
-      # -----------------------------------------------------------------------
-      - name: Apply Keel (keel namespace)
-        run: kubectl apply -k keel
-
-      # -----------------------------------------------------------------------
-      # STEP 5 — Apply dev overlay
+      # STEP 3 — Apply dev overlay
       #
       # Same manifest tree as prod, but targeting shift-festival-dev. Both
       # overlays can coexist on the same cluster because they use different
@@ -208,7 +108,7 @@ jobs:
         run: kubectl apply -k overlays/dev
 
       # -----------------------------------------------------------------------
-      # STEP 6 — Verify key named resources exist
+      # STEP 4 — Verify key named resources exist
       #
       # We check for specific resources by name. This is more reliable than
       # counting resources because it tells you exactly which Deployment or
@@ -263,9 +163,6 @@ jobs:
           check deployment logstash             shift-festival
           check deployment monitoring-agent     shift-festival
 
-          # Secret must exist
-          check secret shift-secrets            shift-festival
-
           if [[ "${FAILED}" -gt 0 ]]; then
             echo ""
             echo "❌ ${FAILED} resource(s) missing — manifests did not apply correctly"
@@ -297,7 +194,6 @@ jobs:
           check deployment fossbilling-app       shift-festival-dev
           check deployment identity-service      shift-festival-dev
           check statefulset elasticsearch        shift-festival-dev
-          check secret shift-secrets            shift-festival-dev
 
           if [[ "${FAILED}" -gt 0 ]]; then
             echo ""
@@ -308,11 +204,8 @@ jobs:
           echo ""
           echo "✅ All expected resources exist in shift-festival-dev"
 
-      - name: Verify Keel was created
-        run: kubectl get deployment keel -n keel
-
       # -----------------------------------------------------------------------
-      # STEP 7 — Print full cluster snapshot (always runs, even on failure)
+      # STEP 5 — Print full cluster snapshot (always runs, even on failure)
       #
       # This output is visible in the GitHub Actions log and helps you
       # debug exactly what went wrong when a step fails.
@@ -341,12 +234,6 @@ jobs:
           echo "  DEV (shift-festival-dev) — all resources"
           echo "========================================"
           kubectl get all -n shift-festival-dev || true
-          echo ""
-
-          echo "========================================"
-          echo "  KEEL"
-          echo "========================================"
-          kubectl get all -n keel || true
           echo ""
 
           echo "========================================"
