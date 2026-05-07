@@ -149,6 +149,23 @@ Both environments run on the same cluster but are fully isolated by Kubernetes n
 
 The purpose of the dev environment is to catch problems before they reach production. Every change should be tested in dev first. A release tag on `main` should only be created after dev has been stable.
 
+### How to access your dev service
+
+Both prod and dev are exposed via the same Cloudflare Tunnel — no NodePorts needed for dev. The tunnel runs as a pod in each namespace and routes traffic from a public subdomain directly to the Kubernetes Service inside that namespace.
+
+| Service | Production URL | Development URL |
+|---|---|---|
+| Frontend (Drupal) | `frontend.desiderius.me` | `dev-frontend.desiderius.me` |
+| Kassa (Odoo) | `kassa.desiderius.me` | `dev-kassa.desiderius.me` |
+| Facturatie (FossBilling) | `facturatie.desiderius.me` | `dev-facturatie.desiderius.me` |
+| CRM | `crm.desiderius.me` | `dev-crm.desiderius.me` |
+| Planning | `planning.desiderius.me` | `dev-planning.desiderius.me` |
+| ArgoCD | `argocd.desiderius.me` | — (infra only) |
+
+> The exact dev subdomain format (`dev-kassa` vs `kassa-dev`) is configured by the infra team in the Cloudflare Zero Trust dashboard and may differ from the table above. Check with the infra team if a URL does not resolve.
+
+**As a developer:** you do not configure anything for this. Once Tom has set up the tunnel routes in the Cloudflare dashboard, your dev service is reachable at the dev URL automatically — as long as your pod is running in `shift-festival-dev`. Push to your `dev` branch, wait ~5 minutes, and open the dev URL in your browser.
+
 ---
 
 ## 5. ArgoCD — GitOps controller
