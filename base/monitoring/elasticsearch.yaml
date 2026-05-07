@@ -58,17 +58,23 @@ spec:
         - name: ES_JAVA_OPTS
           value: "-Xms1g -Xmx1g"
         livenessProbe:
-          httpGet:
-            path: /_cluster/health?local=true
-            port: 9200
+          exec:
+            command:
+              - sh
+              - -c
+              - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
           initialDelaySeconds: 60
           periodSeconds: 20
+          failureThreshold: 5
         readinessProbe:
-          httpGet:
-            path: /_cluster/health?local=true
-            port: 9200
+          exec:
+            command:
+              - sh
+              - -c
+              - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
           initialDelaySeconds: 30
           periodSeconds: 10
+          failureThreshold: 5
         resources:
           requests:
             memory: "1Gi"
