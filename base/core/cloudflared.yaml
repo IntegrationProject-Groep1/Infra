@@ -18,7 +18,7 @@ spec:
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:2024.12.2
-        args: ["tunnel", "--no-autoupdate", "run", "--protocol", "http2"]
+        args: ["tunnel", "--metrics", "0.0.0.0:2000", "--no-autoupdate", "run", "--protocol", "http2"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
