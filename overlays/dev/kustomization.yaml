@@ -12,8 +12,8 @@ generatorOptions:
 
 secretGenerator:
   - name: cloudflare-tunnel-secret
-    literals:
-      - CLOUDFLARE_TUNNEL_TOKEN=dev_not_used
+    envs:
+      - .env.cloudflare
 
 patches:
   - target:
