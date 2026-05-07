@@ -43,11 +43,14 @@ jobs:
           # secretGenerator has been removed — overlays no longer need .env files to render.
           # Secrets are bootstrapped separately via scripts/create-secret.sh on the VM.
 
+          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/prod/.env.cloudflare
+
           echo "Rendering base..."
           kubectl kustomize base > /dev/null
 
           echo "Rendering overlays/prod..."
           kubectl kustomize overlays/prod > "${RUNNER_TEMP}/rendered-manifests-prod.yaml"
+          rm -f overlays/prod/.env.cloudflare
 
           echo "Rendering overlays/dev..."
           kubectl kustomize overlays/dev > "${RUNNER_TEMP}/rendered-manifests-dev.yaml"

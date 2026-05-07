@@ -9,6 +9,15 @@ resources:
 
 patches:
   - target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: cloudflared
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
       group: ""
       version: v1
       kind: Service
