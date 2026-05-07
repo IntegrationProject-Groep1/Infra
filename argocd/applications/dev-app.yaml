@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shift-festival-dev
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: >-
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:dev,
+      kassa=ghcr.io/integrationproject-groep1/kassa:dev,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie:dev,
+      crm=ghcr.io/integrationproject-groep1/crm:dev,
+      planning=ghcr.io/integrationproject-groep1/planning:dev,
+      identity=ghcr.io/integrationproject-groep1/identity-service:dev,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:dev,
+      monitoring=ghcr.io/integrationproject-groep1/monitoring:dev
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-branch: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/integrationproject-groep1/Infra.git
+    targetRevision: dev
+    path: overlays/dev
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shift-festival-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: shift-secrets
+      jsonPointers:
+        - /data

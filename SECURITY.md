@@ -47,7 +47,7 @@ Selected services use NodePorts within assigned team ranges (30000–30100). Acc
 
 ## 4. Secret & Config Management
 
-- **Secrets:** Credentials are managed as Kubernetes Secrets, generated via Kustomize `secretGenerator` from a local (non-committed) `.env` file.
+- **Secrets:** Credentials are managed as Kubernetes Secrets, bootstrapped manually via `scripts/create-secret.sh` from a local (non-committed) `setup/.env` file. ArgoCD is configured to ignore the `shift-secrets` Secret so it is not managed or pruned by GitOps sync.
 - **Config:** Application settings are managed via ConfigMaps.
 - **Zero-Secret Commits:** Git history is protected. No secrets are stored in the repository. CI pipelines run Gitleaks to enforce this.
 
@@ -55,10 +55,11 @@ Selected services use NodePorts within assigned team ranges (30000–30100). Acc
 
 ## 5. Deployment & Release Security
 
-- **Image Updates (Keel):** Automated image updates are managed by Keel, ensuring services run the latest patched versions from GHCR.
+- **Image Updates (ArgoCD Image Updater):** Automated image updates are managed by ArgoCD Image Updater, which polls GHCR and commits new tags back to Git, triggering an ArgoCD sync. Replaces Keel.
+- **GitOps (ArgoCD):** All cluster state is managed from Git. ArgoCD self-healing reverts manual cluster changes. The `argocd/` directory contains pinned upstream manifests (v2.11.0).
 - **CI Security Gate:**
   - `yamllint`: Ensures manifest structural integrity.
-  - `Trivy`: Scans Kubernetes manifests for security misconfigurations.
+  - `Trivy`: Scans Kubernetes manifests for security misconfigurations. The `argocd/` directory is excluded from Trivy scanning — see finding A1 below.
   - `Gitleaks`: Prevents secret leakage in Git history.
 - **Deployment Strategy:** Database workloads use the `Recreate` strategy to ensure stable volume transitions and prevent "Multi-Attach" errors.
 
@@ -70,6 +71,13 @@ Selected services use NodePorts within assigned team ranges (30000–30100). Acc
 - [x] **H7 — Root InitContainers:** Root-level `fix-permissions` containers have been removed. Permissions are handled via `fsGroup`.
 - [x] **H8 — Database Conflicts:** `Recreate` strategy prevents concurrent volume access errors.
 - [x] **H9 — Hardcoded Passwords:** All database passwords moved to K8s Secrets.
+
+### Accepted / Suppressed Findings
+
+- [x] **A1 — Trivy: ArgoCD upstream manifest findings (KSV-0041, KSV-0044, KSV-0046, KSV-0118)**
+  - **Affected file:** `argocd/install.yaml` and `argocd/image-updater/install.yaml` (upstream vendor manifests, pinned at v2.11.0 / v0.15.1)
+  - **Findings:** Broad ClusterRole RBAC permissions (KSV-0041, KSV-0044, KSV-0046) and missing pod security contexts (KSV-0118) in ArgoCD's own deployments.
+  - **Decision:** Accepted. ArgoCD requires cluster-wide RBAC to function as a GitOps controller — these permissions are intentional and documented by the ArgoCD project. The security context findings are in upstream code we do not modify. The `argocd/` directory is excluded from Trivy scanning (`skip-dirs: argocd` in `ci.yml`). The pinned version is reviewed on each upgrade.
 
 ### Open Bevindingen / Toekomstige Verbeteringen
 - [ ] **M1 — NetworkPolicies:** Implement Egress/Ingress policies to restrict inter-pod communication (e.g., only the frontend can talk to the frontend-db).

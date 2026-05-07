@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: facturatie-heartbeat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: facturatie-heartbeat
+  template:
+    metadata:
+      labels:
+        app: facturatie-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "facturatie"
+        - name: TARGETS
+          value: "facturatie-app-service:80"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFACTURATIE_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFACTURATIE_PASS

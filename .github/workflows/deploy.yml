@@ -18,6 +18,7 @@ on:
       - completed
     branches:
       - main
+      - dev
 
 jobs:
   deploy:
@@ -30,6 +31,16 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set environment variables
+        run: |
+          if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
+            echo "OVERLAY=overlays/prod" >> $GITHUB_ENV
+            echo "NAMESPACE=shift-festival" >> $GITHUB_ENV
+          else
+            echo "OVERLAY=overlays/dev" >> $GITHUB_ENV
+            echo "NAMESPACE=shift-festival-dev" >> $GITHUB_ENV
+          fi
 
       - name: Copy files to VM via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -71,45 +82,46 @@ jobs:
             echo "CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
               > ~/shiftfestival/setup/.env.cloudflare
 
-            kubectl apply -k .
+            kubectl apply -k ${{ env.OVERLAY }}
 
             # --- STAGE 1: Core Dependencies (Wait for these first) ---
-            echo "Waiting for core dependencies..."
-            kubectl rollout status deployment/rabbitmq-broker -n shift-festival --timeout=5m
-            kubectl rollout status deployment/postgredb -n shift-festival --timeout=5m
-            kubectl rollout status deployment/frontend-db -n shift-festival --timeout=5m
-            kubectl rollout status deployment/kassa-db -n shift-festival --timeout=5m
-            kubectl rollout status deployment/facturatie-db -n shift-festival --timeout=5m
-            kubectl rollout status deployment/planning-db -n shift-festival --timeout=5m
-            kubectl rollout status deployment/crm-db -n shift-festival --timeout=5m
+            echo "Waiting for core dependencies in ${{ env.NAMESPACE }}..."
+            kubectl rollout status deployment/rabbitmq-broker -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/postgredb -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/frontend-db -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/kassa-db -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/facturatie-db -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/planning-db -n ${{ env.NAMESPACE }} --timeout=5m
+            kubectl rollout status deployment/crm-db -n ${{ env.NAMESPACE }} --timeout=5m
 
             # --- STAGE 2: Applications (Parallel checks) ---
-            echo "Starting parallel rollout checks for applications..."
+            echo "Starting parallel rollout checks for applications in ${{ env.NAMESPACE }}..."
             
             # Start all checks in background
-            kubectl rollout status deployment/frontend-drupal -n shift-festival --timeout=10m &
-            kubectl rollout status deployment/frontend-proxy -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/kassa-web -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/kassa-proxy -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/kassa-integration -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/fossbilling-app -n shift-festival --timeout=10m &
-            kubectl rollout status deployment/facturatie-connector -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/facturatie-proxy -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/cloudflared -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/integration-crm -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/identity-service -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/integration-planning -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/kibana -n shift-festival --timeout=10m &
-            kubectl rollout status deployment/logstash -n shift-festival --timeout=5m &
-            kubectl rollout status deployment/monitoring-agent -n shift-festival --timeout=5m &
-            kubectl rollout status statefulset/elasticsearch -n shift-festival --timeout=10m &
+            kubectl rollout status deployment/frontend-drupal -n ${{ env.NAMESPACE }} --timeout=10m &
+            kubectl rollout status deployment/frontend-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/kassa-web -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/kassa-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/kassa-integration -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/fossbilling-app -n ${{ env.NAMESPACE }} --timeout=10m &
+            kubectl rollout status deployment/facturatie-connector -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/facturatie-proxy -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/cloudflared -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/integration-crm -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/identity-service -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/integration-planning -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/kibana -n ${{ env.NAMESPACE }} --timeout=10m &
+            kubectl rollout status deployment/logstash -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status deployment/monitoring-agent -n ${{ env.NAMESPACE }} --timeout=5m &
+            kubectl rollout status statefulset/elasticsearch -n ${{ env.NAMESPACE }} --timeout=10m &
 
             # Wait for all background processes to finish
             wait
             echo "All deployments successfully rolled out!"
 
-            kubectl get pods -n shift-festival
-            kubectl get svc -n shift-festival
+            kubectl get pods -n ${{ env.NAMESPACE }}
+            kubectl get svc -n ${{ env.NAMESPACE }}
+
 
 #      - name: Notify Teams - deploy success
 #        if: success()

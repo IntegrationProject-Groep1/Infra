@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kassa-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kassa-web
+  template:
+    metadata:
+      labels:
+        app: kassa-web
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        fsGroup: 101
+      initContainers:
+      - name: setup-config
+        image: busybox
+        command: ["sh", "-c"]
+        args:
+        - 'printf "[options]\nadmin_passwd = %s\ndb_host = kassa-db-service\ndb_port = 5432\ndata_dir = /var/lib/odoo\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
+        env:
+        - name: ODOO_MASTER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_MASTER_PASS
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 101
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - name: odoo-conf
+          mountPath: /etc/odoo
+      containers:
+      - name: odoo
+        image: odoo:17
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        args:
+        - "--db_user=$(ODOO_DB_USER)"
+        - "--db_password=$(ODOO_DB_PASSWORD)"
+        - "--db_host=$(ODOO_DB_HOST)"
+        - "--db_port=$(ODOO_DB_PORT)"
+        - "--db-filter=^odoo_kassa$"
+        - "--proxy-mode"
+        ports:
+        - containerPort: 8069
+        env:
+        - name: ODOO_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_DB
+        - name: ODOO_DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_USER
+        - name: ODOO_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_PASSWORD
+        - name: HOST
+          value: "kassa-db-service"
+        - name: PORT
+          value: "5432"
+        - name: USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_USER
+        - name: PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_PASSWORD
+        - name: ODOO_DB_HOST
+          value: "kassa-db-service"
+        - name: ODOO_DB_PORT
+          value: "5432"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        volumeMounts:
+        - name: odoo-data
+          mountPath: /var/lib/odoo
+        - name: tmp
+          mountPath: /tmp
+        - name: odoo-conf
+          mountPath: /etc/odoo
+          readOnly: true
+        readinessProbe:
+          tcpSocket:
+            port: 8069
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      volumes:
+      - name: odoo-data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      - name: odoo-conf
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kassa-web-service
+spec:
+  selector:
+    app: kassa-web
+  ports:
+    - port: 8069
+      targetPort: 8069
+  type: ClusterIP

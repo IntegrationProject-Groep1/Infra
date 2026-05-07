@@ -1,9 +1,0 @@
-apiVersion: kustomize.config.k8s.io/v1beta1
-kind: Kustomization
-resources:
-  - elasticsearch.yaml
-  - logstash-config.yaml
-  - logstash-settings.yaml
-  - logstash.yaml
-  - kibana.yaml
-  - monitoring-agent.yaml

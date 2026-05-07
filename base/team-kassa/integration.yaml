@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kassa-integration
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kassa-integration
+  template:
+    metadata:
+      labels:
+        app: kassa-integration
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: kassa-worker
+        image: ghcr.io/integrationproject-groep1/kassa:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: ODOO_URL
+          value: "http://kassa-web-service:8069"
+        - name: ODOO_DB
+          value: "odoo_kassa"
+        - name: ODOO_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_USER
+        - name: ODOO_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_PASS
+        - name: ODOO_MASTER_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_MASTER_PASS
+        - name: RABBIT_HOST
+          value: "rabbitmq-service"
+        - name: RABBIT_PORT
+          value: "5672"
+        - name: RABBIT_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_USER
+        - name: RABBIT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_PASS
+        - name: RABBIT_VHOST
+          value: "/"
+        - name: RABBIT_EXCHANGE
+          value: "kassa.exchange"
+        - name: RABBIT_INCOMING_QUEUE
+          value: "kassa.incoming"
+        - name: RABBIT_AUTO_SETUP_TOPOLOGY
+          value: "true"
+        - name: RABBIT_DLX
+          value: "kassa.dlx"
+        - name: RABBIT_DLQ
+          value: "kassa.incoming.dlq"
+        - name: RABBIT_DLX_ROUTING_KEY
+          value: "kassa.incoming.dlq"
+        - name: POLL_INTERVAL
+          value: "3"
+        - name: BADGE_PAYMENT_METHOD_NAME
+          value: "Badge Wallet"
+        - name: TEAMS_WEBHOOK_KASSA
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: TEAMS_WEBHOOK_KASSA
+        livenessProbe:
+          exec:
+            command: ["ls", "/app"]
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command: ["ls", "/app"]
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: outbox-data
+          mountPath: /app/outbox
+      volumes:
+      - name: outbox-data
+        persistentVolumeClaim:
+          claimName: kassa-outbox-pvc

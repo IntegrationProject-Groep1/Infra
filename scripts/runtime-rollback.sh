@@ -1,5 +1,10 @@
 #!/bin/bash
 # =============================================================================
+# DEPRECATED: This script is no longer used.
+# ArgoCD self-healing now handles cluster drift detection and recovery.
+# For crash rollbacks use: argocd app rollback shift-festival-prod <revision>
+# Kept for reference only — do not extend or run as a daemon.
+# =============================================================================
 # runtime-rollback.sh
 # ShiftFestival – Infra Team
 #

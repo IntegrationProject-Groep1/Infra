@@ -1,0 +1,140 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shift-festival-dev
+
+resources:
+  - ../../base
+  - namespace.yaml
+
+patches:
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: crm-receiver-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: elasticsearch-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: facturatie-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: frontend-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: kassa-proxy-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: kibana-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: pgadmin-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: planning-pgadmin-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: planning-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      group: ""
+      version: v1
+      kind: Service
+      name: rabbitmq-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+      - op: remove
+        path: /spec/ports/1/nodePort
+
+images:
+  - name: ghcr.io/integrationproject-groep1/heartbeat
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/crm
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/identity-service
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/planning
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/facturatie
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/kassa
+    newTag: dev
+  - name: ghcr.io/integrationproject-groep1/monitoring
+    newTag: dev

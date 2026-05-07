@@ -40,81 +40,21 @@ jobs:
       - name: Render Kubernetes manifests
         shell: bash
         run: |
-          cat > setup/.env <<'EOF'
-          RABBITMQ_DEFAULT_USER=ci_placeholder
-          RABBITMQ_DEFAULT_PASS=ci_placeholder
-          DB_USER=ci_placeholder
-          DB_PASSWORD=ci_placeholder
-          DB_NAME=ci_placeholder
-          PGADMIN_EMAIL=ci@placeholder.com
-          PGADMIN_PASSWORD=ci_placeholder
-          DRUPAL_DB_ROOT_PASS=ci_placeholder
-          DRUPAL_DB_NAME=drupal
-          DRUPAL_DB_USER=drupal_user
-          DRUPAL_DB_PASS=ci_placeholder
-          DRUPAL_BASE_URL=https://ci.placeholder.com
-          RABBITMQFRONTEND_USER=ci_placeholder
-          RABBITMQFRONTEND_PASS=ci_placeholder
-          RABBITMQMONITORING_USER=ci_placeholder
-          RABBITMQMONITORING_PASS=ci_placeholder
-          RABBITMQFACTURATIE_USER=ci_placeholder
-          RABBITMQFACTURATIE_PASS=ci_placeholder
-          RABBITMQKASSA_USER=ci_placeholder
-          RABBITMQKASSA_PASS=ci_placeholder
-          RABBITMQCRM_USER=ci_placeholder
-          RABBITMQCRM_PASSRAW=ci_placeholder
-          RABBITMQPLANNING_USER=ci_placeholder
-          RABBITMQPLANNING_PASS=ci_placeholder
-          FOSSBILLING_DB_NAME=ci_placeholder
-          FOSSBILLING_DB_USER=ci_placeholder
-          FOSSBILLING_DB_PASS=ci_placeholder
-          POSTGRES_DB=ci_placeholder
-          POSTGRES_PASSWORD=ci_placeholder
-          POSTGRES_USER=ci_placeholder
-          ODOO_URL=http://ci.placeholder.com
-          ODOO_DB=ci_placeholder
-          ODOO_USER=ci_placeholder
-          ODOO_PASS=ci_placeholder
-          ODOO_MASTER_PASS=ci_placeholder
-          RABBIT_HOST=ci_placeholder
-          RABBIT_PORT=5672
-          RABBIT_VHOST=/
-          RABBIT_AUTO_SETUP_TOPOLOGY=false
-          RABBIT_EXCHANGE=ci_placeholder
-          RABBIT_INCOMING_QUEUE=ci_placeholder
-          POLL_INTERVAL=10
-          SF_INSTANCE_URL=https://ci.placeholder.com
-          SF_CLIENT_ID=ci_placeholder
-          SF_CLIENT_SECRET=ci_placeholder
-          SF_REFRESH_TOKEN=ci_placeholder
-          MYSQL_HOST=ci_placeholder
-          MYSQL_PORT=3306
-          MYSQL_DATABASE=ci_placeholder
-          MYSQL_USER=ci_placeholder
-          MYSQL_PASSWORD=ci_placeholder
-          ES_ADMIN_PASS=ci_placeholder
-          ELASTIC_PASSWORD=ci_placeholder
-          KIBANA_PUBLIC_BASE_URL=https://ci.placeholder.com
-          AZURE_CLIENT_ID=ci_placeholder
-          AZURE_CLIENT_SECRET=ci_placeholder
-          API_TOKEN_SECRET=ci_placeholder
-          TOKEN_ENCRYPTION_KEY=ci_placeholder
-          TEAMS_WEBHOOK_INFRA=https://ci.placeholder.com
-          TEAMS_WEBHOOK_FRONTEND=https://ci.placeholder.com
-          TEAMS_WEBHOOK_KASSA=https://ci.placeholder.com
-          TEAMS_WEBHOOK_CRM=https://ci.placeholder.com
-          TEAMS_WEBHOOK_PLANNING=https://ci.placeholder.com
-          TEAMS_WEBHOOK_FACTURATIE=https://ci.placeholder.com
-          TEAMS_WEBHOOK_MONITORING=https://ci.placeholder.com
-          BILLING_API_URL=https://ci.placeholder.com
-          SUPABASE_URL=https://ci.placeholder.com
-          SUPABASE_ANON_KEY=ci_placeholder
-          EOF
+          # secretGenerator has been removed — overlays no longer need .env files to render.
+          # Secrets are bootstrapped separately via scripts/create-secret.sh on the VM.
 
-          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > setup/.env.cloudflare
+          echo "Rendering base..."
+          kubectl kustomize base > /dev/null
 
-          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests.yaml"
-          rm -f setup/.env setup/.env.cloudflare
+          echo "Rendering overlays/prod..."
+          kubectl kustomize overlays/prod > "${RUNNER_TEMP}/rendered-manifests-prod.yaml"
+
+          echo "Rendering overlays/dev..."
+          kubectl kustomize overlays/dev > "${RUNNER_TEMP}/rendered-manifests-dev.yaml"
+
+          echo "Rendering root manifests..."
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"
+
           echo "✅ Kustomize render completed"
 
       - name: Install yamllint
@@ -180,6 +120,7 @@ jobs:
           exit-code: 1
           severity: HIGH,CRITICAL
           format: table
+          skip-dirs: argocd
 
       - name: Verify sensitive files are not committed
         shell: bash

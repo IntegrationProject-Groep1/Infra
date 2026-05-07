@@ -1,16 +1,24 @@
 # =============================================================
 # Environment & Secrets - CRITICAL: Contains passwords & API keys
 # =============================================================
+
+# Allow .env.example files as templates (must come before ignore patterns)
+!overlays/prod/.env.example
+!overlays/dev/.env.example
+!base/setup/.env.example
+
 .env
 .env.local
 .env.*.local
 .env.*
 *.env
-setup/.env
 **/.env
 
-# Ensure setup directory .env is never tracked
-setup/.env*
+# Overlay and base setup secrets — never commit the actual .env files
+overlays/prod/.env
+overlays/dev/.env
+base/setup/.env
+base/setup/.env*
 
 # Kubernetes secrets (contain credentials)
 **/secrets.yaml
