@@ -38,12 +38,9 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: FLEET_ENROLLMENT_TOKEN
-        # trivy:ignore:KSV-0118
-        # trivy:ignore:KSV-0014
         securityContext:
           runAsUser: 0
-          # trivy:ignore:KSV-0017
-          privileged: true
+          privileged:  true
           readOnlyRootFilesystem: false
         resources:
           requests:
