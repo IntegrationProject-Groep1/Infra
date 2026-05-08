@@ -22,5 +22,3 @@ images:
     newTag: prod
   - name: ghcr.io/integrationproject-groep1/kassa
     newTag: prod
-  - name: ghcr.io/integrationproject-groep1/monitoring
-    newTag: prod

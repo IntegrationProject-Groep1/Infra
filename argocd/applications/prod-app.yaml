@@ -11,8 +11,7 @@ metadata:
       crm=ghcr.io/integrationproject-groep1/crm:prod,
       planning=ghcr.io/integrationproject-groep1/planning:prod,
       identity=ghcr.io/integrationproject-groep1/identity-service:prod,
-      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod,
-      monitoring=ghcr.io/integrationproject-groep1/monitoring:prod
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:

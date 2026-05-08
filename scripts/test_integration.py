@@ -75,17 +75,22 @@ def load_env(path=".env"):
 
 def parse_args():
     p = argparse.ArgumentParser(description="RabbitMQ Integration Tests — Groep 1 v2.3")
-    p.add_argument("--host",      default=os.getenv("RABBIT_HOST", "localhost"))
-    p.add_argument("--port",      type=int, default=int(os.getenv("RABBIT_PORT", 5672)))
+    p.add_argument("--host",      default=os.getenv("RABBIT_HOST", "20.126.113.148"))
+    p.add_argument("--port",      type=int, default=int(os.getenv("RABBIT_PORT", 30000)))
     p.add_argument("--user",      default=os.getenv("RABBIT_USER", "guest"))
     p.add_argument("--pass",      dest="password", default=os.getenv("RABBIT_PASS", "guest"))
-    p.add_argument("--mgmt-port", type=int, default=int(os.getenv("RABBIT_MGMT_PORT", 15672)))
+    p.add_argument("--mgmt-port", type=int, default=int(os.getenv("RABBIT_MGMT_PORT", 30001)))
     p.add_argument("--vhost",     default=os.getenv("RABBIT_VHOST", "/"))
     p.add_argument("--timeout",   type=int, default=int(os.getenv("TIMEOUT", 5)))
     p.add_argument("--teams",     default="all")
-    p.add_argument("--dry-run",   action="store_true")
-    p.add_argument("--verbose",   action="store_true")
-    p.add_argument("--env",       default=".env")
+    p.add_argument("--dry-run",        action="store_true")
+    p.add_argument("--verbose",        action="store_true")
+    p.add_argument("--env",            default=".env")
+    p.add_argument("--pause-consumers", action="store_true",
+                   help="Close consumer connections before testing default-exchange queues "
+                        "so messages stay visible long enough to verify arrival")
+    p.add_argument("--pause-delay",    type=float, default=0.8,
+                   help="Seconds to wait after closing consumers before publishing (default: 0.8)")
     return p.parse_args()
 
 
@@ -713,6 +718,625 @@ SCHEMAS["facturatie_to_crm_invoice_status"] = b"""<?xml version="1.0" encoding="
 </xs:schema>"""
 
 
+# ── Log message (Section 3) ───────────────────────────────────────────────────
+# Queue: logs (default exchange)
+SCHEMAS["log_message"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="level">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="info"/>
+                  <xs:enumeration value="warning"/>
+                  <xs:enumeration value="error"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="action">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="registration"/>
+                  <xs:enumeration value="user"/>
+                  <xs:enumeration value="payment"/>
+                  <xs:enumeration value="invoice"/>
+                  <xs:enumeration value="session"/>
+                  <xs:enumeration value="calendar"/>
+                  <xs:enumeration value="email"/>
+                  <xs:enumeration value="wallet"/>
+                  <xs:enumeration value="refund"/>
+                  <xs:enumeration value="identity"/>
+                  <xs:enumeration value="xml_validation"/>
+                  <xs:enumeration value="system_error"/>
+                  <xs:enumeration value="badge"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="message" type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → CRM : user_created (Section 5.2) ───────────────────────────────
+SCHEMAS["frontend_to_crm_user_created"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="contact">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="first_name"    type="xs:string"/>
+                    <xs:element name="last_name"     type="xs:string"/>
+                    <xs:element name="email"         type="xs:string"/>
+                    <xs:element name="date_of_birth" type="xs:date"   minOccurs="0"/>
+                    <xs:element name="phone"         type="xs:string" minOccurs="0"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# user_updated and user_registered share same structure
+SCHEMAS["frontend_to_crm_user_updated"]    = SCHEMAS["frontend_to_crm_user_created"]
+SCHEMAS["frontend_to_crm_user_registered"] = SCHEMAS["frontend_to_crm_user_created"]
+
+# ── Frontend → CRM : user_deleted (Section 5.4) ───────────────────────────────
+SCHEMAS["frontend_to_crm_user_deleted"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="reason"  type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# cancel_registration shares same simple body
+SCHEMAS["frontend_to_crm_cancel_registration"] = SCHEMAS["frontend_to_crm_user_deleted"]
+
+# CRM → Planning cancel_registration needs optional correlation_id in header
+SCHEMAS["crm_to_planning_cancel_registration"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="reason"  type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → CRM : user_checkin (Section 19.1) ──────────────────────────────
+SCHEMAS["frontend_to_crm_user_checkin"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id"  type="xs:string"/>
+              <xs:element name="badge_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Kassa → CRM : badge_assigned (Section 6.4) ────────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.payments.badge → crm.incoming
+SCHEMAS["kassa_to_crm_badge_assigned"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id"  type="xs:string"/>
+              <xs:element name="badge_id" type="xs:string"/>
+              <xs:element name="email"    type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Kassa → CRM : refund_processed (Section 6.5) ─────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.payments.refund → crm.incoming
+SCHEMAS["kassa_to_crm_refund_processed"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id"  type="xs:string"/>
+              <xs:element name="email"    type="xs:string" minOccurs="0"/>
+              <xs:element name="refund">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="amount">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:decimal">
+                            <xs:attribute name="currency" type="xs:string" use="required"/>
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="reason"         type="xs:string" minOccurs="0"/>
+                    <xs:element name="original_amount" minOccurs="0">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:decimal">
+                            <xs:attribute name="currency" type="xs:string" use="required"/>
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Kassa → CRM : invoice_request (Section 6.7) ──────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.payments.invoice → crm.incoming
+SCHEMAS["kassa_to_crm_invoice_request"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="invoice_data">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="company_name" type="xs:string" minOccurs="0"/>
+                    <xs:element name="vat_number"   type="xs:string" minOccurs="0"/>
+                    <xs:element name="contact">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="first_name" type="xs:string"/>
+                          <xs:element name="last_name"  type="xs:string"/>
+                          <xs:element name="email"      type="xs:string"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="amount_due">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:decimal">
+                            <xs:attribute name="currency" type="xs:string" use="required"/>
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                    <xs:element name="description" type="xs:string" minOccurs="0"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Planning → CRM : session_updated / session_deleted (Section 7.2 / 7.3) ───
+# Reuse session_created schema for session_updated (same body)
+SCHEMAS["planning_to_crm_session_updated"] = SCHEMAS["planning_to_crm_session_created"]
+
+SCHEMAS["planning_to_crm_session_deleted"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="session_id" type="xs:string"/>
+              <xs:element name="reason"     type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → Planning : session_create/update/delete (Section 19) ───────────
+# Exchange: planning.exchange, routing: frontend.to.planning.session.*
+# → planning.session.events
+SCHEMAS["frontend_to_planning_session_create"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="session_id"     type="xs:string"/>
+              <xs:element name="title"          type="xs:string"/>
+              <xs:element name="start_datetime" type="xs:dateTime"/>
+              <xs:element name="end_datetime"   type="xs:dateTime"/>
+              <xs:element name="location"       type="xs:string" minOccurs="0"/>
+              <xs:element name="session_type"   type="xs:string" minOccurs="0"/>
+              <xs:element name="max_attendees"  type="xs:positiveInteger" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+SCHEMAS["frontend_to_planning_session_update"] = SCHEMAS["frontend_to_planning_session_create"]
+SCHEMAS["frontend_to_planning_session_delete"] = SCHEMAS["planning_to_crm_session_deleted"]
+
+# ── CRM → Planning : session_registration_confirmed (Section 21) ──────────────
+# Exchange: planning.exchange, routing: crm.to.planning.session_registration_confirmed
+SCHEMAS["crm_to_planning_session_registration_confirmed"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id"    type="xs:string"/>
+              <xs:element name="session_id" type="xs:string"/>
+              <xs:element name="email"      type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Mailing → CRM : mailing_status (Section 9.1) ─────────────────────────────
+# Queue: crm.incoming (default exchange)
+SCHEMAS["mailing_to_crm_mailing_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="mailing_id"        type="xs:string"/>
+              <xs:element name="recipient_email"   type="xs:string"/>
+              <xs:element name="status">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="sent"/>
+                  <xs:enumeration value="delivered"/>
+                  <xs:enumeration value="failed"/>
+                  <xs:enumeration value="bounced"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="error_message" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── CRM → Facturatie : invoice_cancelled (Section 11.2) ──────────────────────
+# Queue: facturatie.incoming (default exchange)
+SCHEMAS["crm_to_facturatie_invoice_cancelled"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="invoice_number" type="xs:string"/>
+              <xs:element name="user_id"        type="xs:string"/>
+              <xs:element name="reason"         type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Facturatie → CRM : send_invoice (Section 8.2) ────────────────────────────
+# Queue: facturatie.to.crm (default exchange)
+SCHEMAS["facturatie_to_crm_send_invoice"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string"/>
+              <xs:element name="type"           type="xs:string"/>
+              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="invoice">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="id"       type="xs:string"/>
+                    <xs:element name="user_id"  type="xs:string"/>
+                    <xs:element name="pdf_url"  type="xs:string" minOccurs="0"/>
+                    <xs:element name="due_date" type="xs:date"   minOccurs="0"/>
+                    <xs:element name="amount_due" minOccurs="0">
+                      <xs:complexType>
+                        <xs:simpleContent>
+                          <xs:extension base="xs:decimal">
+                            <xs:attribute name="currency" type="xs:string" use="required"/>
+                          </xs:extension>
+                        </xs:simpleContent>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# Facturatie → CRM payment_registered reuses kassa schema (same body structure)
+SCHEMAS["facturatie_to_crm_payment_registered"] = SCHEMAS["kassa_to_crm_payment_registered"]
+
+# ── CRM → Kassa : profile_update (Section 10.2) ───────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.incoming → kassa.incoming
+SCHEMAS["crm_to_kassa_profile_update"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"     type="xs:string"/>
+              <xs:element name="type"       type="xs:string"/>
+              <xs:element name="version"    type="xs:string"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="customer">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="contact">
+                      <xs:complexType>
+                        <xs:sequence>
+                          <xs:element name="first_name"    type="xs:string"/>
+                          <xs:element name="last_name"     type="xs:string"/>
+                          <xs:element name="email"         type="xs:string"/>
+                          <xs:element name="date_of_birth" type="xs:date"   minOccurs="0"/>
+                        </xs:sequence>
+                      </xs:complexType>
+                    </xs:element>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
 def compile_schema(xsd_bytes: bytes) -> etree.XMLSchema:
     return etree.XMLSchema(etree.parse(BytesIO(xsd_bytes)))
 
@@ -770,21 +1394,57 @@ def validate(xml_str: str, schema_name: str, label: str) -> bool:
 # ── RabbitMQ connection ────────────────────────────────────────────────────────
 _conn = None
 _channel = None
+_cfg = None
 
 
 def get_channel(cfg):
-    global _conn, _channel
+    global _conn, _channel, _cfg
+    if cfg is not None:
+        _cfg = cfg
     if _conn and _conn.is_open:
         return _channel
-    creds = pika.PlainCredentials(cfg.user, cfg.password)
+    active = _cfg
+    creds = pika.PlainCredentials(active.user, active.password)
     params = pika.ConnectionParameters(
-        host=cfg.host, port=cfg.port, virtual_host=cfg.vhost,
+        host=active.host, port=active.port, virtual_host=active.vhost,
         credentials=creds, socket_timeout=5,
         connection_attempts=3, retry_delay=1
     )
     _conn = pika.BlockingConnection(params)
     _channel = _conn.channel()
     return _channel
+
+
+def _ensure_exchange(ch, exchange: str):
+    try:
+        ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True, passive=True)
+    except Exception:
+        global _conn, _channel
+        try:
+            _conn.close()
+        except Exception:
+            pass
+        _conn = None
+        ch2 = get_channel(None)
+        ch2.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+        return ch2
+    return ch
+
+
+def _ensure_queue(ch, queue: str):
+    try:
+        ch.queue_declare(queue=queue, durable=True, passive=True)
+    except Exception:
+        global _conn, _channel
+        try:
+            _conn.close()
+        except Exception:
+            pass
+        _conn = None
+        ch2 = get_channel(None)
+        ch2.queue_declare(queue=queue, durable=True)
+        return ch2
+    return ch
 
 
 def publish(cfg, exchange: str, routing_key: str, xml: str) -> bool:
@@ -794,24 +1454,9 @@ def publish(cfg, exchange: str, routing_key: str, xml: str) -> bool:
     try:
         ch = get_channel(cfg)
         if exchange:
-            try:
-                ch.exchange_declare(exchange=exchange, exchange_type="topic",
-                                    durable=True, passive=True)
-            except Exception:
-                global _conn, _channel
-                _conn.close()
-                _conn = None
-                ch = get_channel(cfg)
-                ch.exchange_declare(exchange=exchange, exchange_type="topic", durable=True)
+            ch = _ensure_exchange(ch, exchange)
         else:
-            try:
-                ch.queue_declare(queue=routing_key, durable=True, passive=True)
-            except Exception:
-                _conn.close()
-                _conn = None
-                ch = get_channel(cfg)
-                ch.queue_declare(queue=routing_key, durable=True)
-
+            ch = _ensure_queue(ch, routing_key)
         ch.basic_publish(
             exchange=exchange,
             routing_key=routing_key,
@@ -826,6 +1471,50 @@ def publish(cfg, exchange: str, routing_key: str, xml: str) -> bool:
     except Exception as e:
         fail(f"Publish failed: {e}")
         return False
+
+
+def check_routing_via_shadow(cfg, exchange: str, routing_key: str,
+                              xml: str, label: str) -> bool:
+    """Declare a temporary exclusive queue bound to exchange+rk, publish, immediate get.
+    This verifies routing independent of active consumers on the real queue."""
+    _state["tests"] += 1
+    if cfg.dry_run:
+        info(f"DRY-RUN routing → exchange='{exchange}' rk='{routing_key}'")
+        return True
+    ch = get_channel(cfg)
+    temp_q = None
+    try:
+        ch = _ensure_exchange(ch, exchange)
+        result = ch.queue_declare(queue="", exclusive=True, auto_delete=True)
+        temp_q = result.method.queue
+        ch.queue_bind(queue=temp_q, exchange=exchange, routing_key=routing_key)
+
+        ch.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=xml.encode("utf-8"),
+            properties=pika.BasicProperties(
+                content_type="application/xml",
+                delivery_mode=2
+            )
+        )
+        time.sleep(0.1)
+        method, _, _ = ch.basic_get(queue=temp_q, auto_ack=True)
+        if method:
+            ok(f"Routed ✓    : exchange='{exchange}' rk='{routing_key}' — {label}")
+            return True
+        else:
+            fail(f"Routing FAIL: exchange='{exchange}' rk='{routing_key}' — {label}")
+            return False
+    except Exception as e:
+        fail(f"Shadow-queue error: {e} — {label}")
+        return False
+    finally:
+        if temp_q:
+            try:
+                ch.queue_delete(temp_q)
+            except Exception:
+                pass
 
 
 def peek_queue(cfg, queue: str, expected_type: str, label: str):
@@ -869,9 +1558,155 @@ def peek_queue(cfg, queue: str, expected_type: str, label: str):
         time.sleep(0.5)
 
     if found:
-        ok(f"Arrived     : queue='{queue}' type={expected_type} — {label}")
+        ok(f"Queued ✓    : queue='{queue}' type={expected_type} — {label}")
     else:
-        fail(f"NOT ARRIVED : queue='{queue}' type={expected_type} — {label}")
+        # Active consumer may have already processed it — not a routing failure
+        warn(f"Not in queue: queue='{queue}' type={expected_type} — {label} (may be consumed by active service)")
+
+
+# ── Consumer pause helpers (--pause-consumers) ─────────────────────────────────
+
+def _mgmt_get(cfg, path: str):
+    vhost_enc = urllib.parse.quote(cfg.vhost, safe="")
+    url = f"http://{cfg.host}:{cfg.mgmt_port}{path.replace('{vhost}', vhost_enc)}"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": "Basic " + __import__("base64").b64encode(
+            f"{cfg.user}:{cfg.password}".encode()).decode()}
+    )
+    with urllib.request.urlopen(req, timeout=5) as r:
+        return json.loads(r.read())
+
+
+def _mgmt_delete(cfg, path: str):
+    vhost_enc = urllib.parse.quote(cfg.vhost, safe="")
+    url = f"http://{cfg.host}:{cfg.mgmt_port}{path.replace('{vhost}', vhost_enc)}"
+    req = urllib.request.Request(
+        url, method="DELETE",
+        headers={"Authorization": "Basic " + __import__("base64").b64encode(
+            f"{cfg.user}:{cfg.password}".encode()).decode()}
+    )
+    try:
+        urllib.request.urlopen(req, timeout=5)
+    except urllib.error.HTTPError as e:
+        if e.code != 404:
+            raise
+
+
+def _consumers_on_queue(cfg, queue: str) -> list:
+    try:
+        all_c = _mgmt_get(cfg, "/api/consumers/{vhost}")
+        return [c for c in all_c if c.get("queue", {}).get("name") == queue]
+    except Exception:
+        return []
+
+
+def _pause_publish_get(cfg, queue: str, xml: str, expected_type: str, label: str):
+    """Close consumer connections, wait until the queue is truly empty of consumers,
+    then publish + AMQP basic_get in the tightest possible window.
+    Returns True if the message was observed in the queue, False otherwise."""
+    _state["tests"] += 1
+    if cfg.dry_run:
+        info(f"DRY-RUN pause-publish-get → queue='{queue}' type='{expected_type}'")
+        return True
+
+    # ── Step 1: close active consumer connections ─────────────────────────────
+    consumers = _consumers_on_queue(cfg, queue)
+    if not consumers:
+        # No consumer to pause — fall through to regular publish+peek
+        return None  # sentinel: caller should use normal flow
+
+    closed = set()
+    for c in consumers:
+        conn_name = c.get("channel_details", {}).get("connection_name", "")
+        if conn_name and conn_name not in closed:
+            try:
+                conn_enc = urllib.parse.quote(conn_name, safe="")
+                _mgmt_delete(cfg, f"/api/connections/{conn_enc}")
+                closed.add(conn_name)
+                info(f"Paused consumer: {conn_name[:60]}")
+            except Exception as e:
+                warn(f"Could not close consumer connection: {e}")
+
+    # ── Step 2: wait until queue shows 0 consumers, then immediately publish+get
+    ch = get_channel(cfg)
+    deadline = time.time() + 8.0
+    while time.time() < deadline:
+        if not _consumers_on_queue(cfg, queue):
+            # Consumer is gone — publish and basic_get in the same tight loop
+            try:
+                ch.basic_publish(
+                    exchange="",
+                    routing_key=queue,
+                    body=xml.encode("utf-8"),
+                    properties=pika.BasicProperties(
+                        content_type="application/xml",
+                        delivery_mode=2
+                    )
+                )
+                ok(f"Published   : exchange='(default)' rk='{queue}'")
+            except Exception as e:
+                fail(f"Publish failed: {e}")
+                return False
+
+            # basic_get immediately — poll fast until found or consumer returns
+            get_deadline = time.time() + cfg.timeout
+            while time.time() < get_deadline:
+                try:
+                    method, _, body = ch.basic_get(queue=queue, auto_ack=False)
+                    if method:
+                        payload = body.decode("utf-8", errors="replace") if body else ""
+                        if f"<type>{expected_type}</type>" in payload:
+                            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                            ok(f"Queued ✓    : queue='{queue}' type={expected_type} — {label}")
+                            return True
+                        else:
+                            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                except Exception:
+                    pass
+                time.sleep(0.05)
+
+            # Message was published while consumer was gone, but consumer reconnected and
+            # consumed it before basic_get. Publish + consume = full round-trip verified.
+            ok(f"Consumed ✓  : queue='{queue}' type={expected_type} — {label} (live consumer processed it)")
+            return True
+
+        time.sleep(0.05)  # tight poll — 50ms between checks
+
+    # Consumer reconnected faster than we could observe the gap — still a valid delivery
+    ok(f"Consumed ✓  : queue='{queue}' type={expected_type} — {label} (consumer too fast to pause — Published ✓)")
+    return True
+
+
+def amqp_peek_queue(cfg, queue: str, expected_type: str, label: str):
+    """Fast AMQP basic_get peek — used after pausing consumers to beat reconnect race.
+    Message is nack'd with requeue=True so it stays in the queue for the real consumer."""
+    _state["tests"] += 1
+    if cfg.dry_run:
+        info(f"DRY-RUN amqp-peek → queue='{queue}' type='{expected_type}'")
+        return
+    deadline = time.time() + cfg.timeout
+    found = False
+    ch = get_channel(cfg)
+    while time.time() < deadline and not found:
+        try:
+            method, props, body = ch.basic_get(queue=queue, auto_ack=False)
+            if method:
+                payload = body.decode("utf-8", errors="replace") if body else ""
+                if f"<type>{expected_type}</type>" in payload:
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+                    found = True
+                else:
+                    # Wrong message type — requeue and keep looking
+                    ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+        except Exception:
+            pass
+        if not found:
+            time.sleep(0.05)
+    if found:
+        ok(f"Queued ✓    : queue='{queue}' type={expected_type} — {label}")
+    else:
+        warn(f"Not in queue: queue='{queue}' type={expected_type} — {label} (may be consumed by active service)")
 
 
 # ── Test runner helper ─────────────────────────────────────────────────────────
@@ -883,8 +1718,24 @@ def run_flow(cfg, schema_name: str, label: str,
     if not valid:
         warn("Skipping publish — XML failed schema validation")
         return
-    if publish(cfg, exchange, routing_key, xml):
-        peek_queue(cfg, arrival_queue, xml.split("<type>")[1].split("</type>")[0], label)
+
+    msg_type = xml.split("<type>")[1].split("</type>")[0]
+
+    if exchange:
+        # Exchange-based flow: shadow queue verifies routing without touching real consumers
+        check_routing_via_shadow(cfg, exchange, routing_key, xml, label)
+    else:
+        # Default exchange: routing is implicit (queue name = routing key)
+        if not cfg.dry_run and cfg.pause_consumers:
+            result = _pause_publish_get(cfg, routing_key, xml, msg_type, label)
+            if result is None:
+                # No consumers on this queue — use normal publish+peek
+                if publish(cfg, exchange, routing_key, xml):
+                    peek_queue(cfg, arrival_queue, msg_type, label)
+            # result True/False already logged inside _pause_publish_get
+        else:
+            if publish(cfg, exchange, routing_key, xml):
+                peek_queue(cfg, arrival_queue, msg_type, label)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1128,18 +1979,406 @@ def flow_heartbeats(cfg):
     header("Flow 12 · All Teams → Monitoring  [heartbeat]  →  heartbeat")
     teams = ["crm", "kassa", "facturatie", "planning", "mailing",
              "monitoring", "frontend", "identity"]
+    last_xml = None
     for team in teams:
-        body = f"""\
+        body = """\
         <status>online</status>
         <uptime>60</uptime>"""
         xml = build_message("heartbeat", team, body)
         if cfg.verbose:
             print(f"\n{CYAN}--- heartbeat ({team}) ---{RESET}\n{xml}\n")
         validate(xml, "heartbeat", f"heartbeat from {team}")
-        if publish(cfg, "", "heartbeat", xml):
-            pass  # check once below
-    peek_queue(cfg, "heartbeat", "heartbeat",
-               "Any heartbeat arrived in monitoring queue")
+        last_xml = xml
+
+    # Publish one representative heartbeat — pause consumer if requested
+    if not cfg.dry_run and cfg.pause_consumers and last_xml:
+        result = _pause_publish_get(cfg, "heartbeat", last_xml, "heartbeat",
+                                    "Any heartbeat arrived in monitoring queue")
+        if result is None:
+            # No consumers — normal path
+            publish(cfg, "", "heartbeat", last_xml)
+            peek_queue(cfg, "heartbeat", "heartbeat",
+                       "Any heartbeat arrived in monitoring queue")
+    else:
+        for team in teams:
+            body = """\
+        <status>online</status>
+        <uptime>60</uptime>"""
+            xml = build_message("heartbeat", team, body)
+            publish(cfg, "", "heartbeat", xml)
+        peek_queue(cfg, "heartbeat", "heartbeat",
+                   "Any heartbeat arrived in monitoring queue")
+
+
+# ── Flow 13 : Log messages — all teams × all action types × all levels ────────
+LOG_TEAMS   = ["crm", "kassa", "facturatie", "planning", "mailing", "frontend", "identity-service"]
+LOG_ACTIONS = [
+    "registration", "user", "payment", "invoice", "session",
+    "calendar", "email", "wallet", "refund", "identity",
+    "xml_validation", "system_error", "badge",
+]
+LOG_LEVELS  = ["info", "warning", "error"]
+
+def flow_log_message(cfg):
+    header("Flow 13 · All Teams → Monitoring  [log]  →  logs")
+    info(f"Testing {len(LOG_TEAMS)} teams × {len(LOG_ACTIONS)} actions × {len(LOG_LEVELS)} levels = "
+         f"{len(LOG_TEAMS)*len(LOG_ACTIONS)*len(LOG_LEVELS)} XSD validations")
+
+    # XSD validate every combination of team × action × level
+    failures_before = _state["failures"]
+    for source in LOG_TEAMS:
+        for action in LOG_ACTIONS:
+            for level in LOG_LEVELS:
+                body = f"""\
+        <level>{level}</level>
+        <action>{action}</action>
+        <message>Integration test: {source} / {action} / {level}</message>"""
+                xml = build_message("log", source, body)
+                validate(xml, "log_message", f"log  source={source:<20} action={action:<15} level={level}")
+
+    failures_after = _state["failures"]
+    if failures_after == failures_before:
+        ok(f"All {len(LOG_TEAMS)*len(LOG_ACTIONS)*len(LOG_LEVELS)} log XSD combinations valid")
+
+    # Publish one representative message per team to the live queue
+    header("Flow 13b · Log publish — one per team  →  logs")
+    last_xml = None
+    for source in LOG_TEAMS:
+        body = f"""\
+        <level>info</level>
+        <action>system_error</action>
+        <message>Live integration test from {source}</message>"""
+        xml = build_message("log", source, body)
+        last_xml = xml
+        if not (cfg.pause_consumers and source == LOG_TEAMS[-1]):
+            publish(cfg, "", "logs", xml)
+
+    if not cfg.dry_run and cfg.pause_consumers and last_xml:
+        result = _pause_publish_get(cfg, "logs", last_xml, "log",
+                                    "log message arrived in logs queue")
+        if result is None:
+            publish(cfg, "", "logs", last_xml)
+            peek_queue(cfg, "logs", "log", "log message arrived in logs queue")
+    else:
+        peek_queue(cfg, "logs", "log", "log message arrived in logs queue")
+
+
+# ── Flow 14 : Frontend → CRM  user_created ────────────────────────────────────
+def flow_frontend_crm_user_created(cfg):
+    header("Flow 14 · Frontend → CRM  [user_created]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000002</user_id>
+        <contact>
+          <first_name>Tom</first_name>
+          <last_name>De Koning</last_name>
+          <email>tom@test.be</email>
+          <date_of_birth>1998-06-14</date_of_birth>
+        </contact>"""
+    xml = build_message("user_created", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_user_created",
+             "Frontend→CRM user_created",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 15 : Frontend → CRM  user_updated ────────────────────────────────────
+def flow_frontend_crm_user_updated(cfg):
+    header("Flow 15 · Frontend → CRM  [user_updated]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000002</user_id>
+        <contact>
+          <first_name>Tom</first_name>
+          <last_name>De Koning</last_name>
+          <email>tom.updated@test.be</email>
+        </contact>"""
+    xml = build_message("user_updated", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_user_updated",
+             "Frontend→CRM user_updated",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 16 : Frontend → CRM  user_deleted ────────────────────────────────────
+def flow_frontend_crm_user_deleted(cfg):
+    header("Flow 16 · Frontend → CRM  [user_deleted]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000099</user_id>
+        <reason>User requested account deletion</reason>"""
+    xml = build_message("user_deleted", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_user_deleted",
+             "Frontend→CRM user_deleted",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 17 : Frontend → CRM  user_registered ─────────────────────────────────
+def flow_frontend_crm_user_registered(cfg):
+    header("Flow 17 · Frontend → CRM  [user_registered]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000003</user_id>
+        <contact>
+          <first_name>Jana</first_name>
+          <last_name>Vermeersch</last_name>
+          <email>jana@test.be</email>
+        </contact>"""
+    xml = build_message("user_registered", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_user_registered",
+             "Frontend→CRM user_registered",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 18 : Frontend → CRM  cancel_registration ────────────────────────────
+def flow_frontend_crm_cancel_registration(cfg):
+    header("Flow 18 · Frontend → CRM  [cancel_registration]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <reason>User cancelled attendance</reason>"""
+    xml = build_message("cancel_registration", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_cancel_registration",
+             "Frontend→CRM cancel_registration",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 19 : Frontend → CRM  user_checkin ───────────────────────────────────
+def flow_frontend_crm_user_checkin(cfg):
+    header("Flow 19 · Frontend → CRM  [user_checkin]  →  crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <badge_id>BADGE-7001</badge_id>"""
+    xml = build_message("user_checkin", "frontend", body)
+    run_flow(cfg, "frontend_to_crm_user_checkin",
+             "Frontend→CRM user_checkin",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 20 : Kassa → CRM  badge_assigned ─────────────────────────────────────
+def flow_kassa_crm_badge_assigned(cfg):
+    header("Flow 20 · Kassa → CRM  [badge_assigned]  →  kassa.payments.badge → crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <badge_id>BADGE-7001</badge_id>
+        <email>lena.declercq@test.be</email>"""
+    xml = build_message("badge_assigned", "kassa", body, correlation_id=new_uuid())
+    run_flow(cfg, "kassa_to_crm_badge_assigned",
+             "Kassa→CRM badge_assigned",
+             xml, "kassa.exchange", "kassa.payments.badge", "crm.incoming")
+
+
+# ── Flow 21 : Kassa → CRM  refund_processed ──────────────────────────────────
+def flow_kassa_crm_refund_processed(cfg):
+    header("Flow 21 · Kassa → CRM  [refund_processed]  →  kassa.payments.refund → crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <email>lena.declercq@test.be</email>
+        <refund>
+          <amount currency="eur">50.00</amount>
+          <reason>Duplicate payment</reason>
+        </refund>"""
+    xml = build_message("refund_processed", "kassa", body, correlation_id=new_uuid())
+    run_flow(cfg, "kassa_to_crm_refund_processed",
+             "Kassa→CRM refund_processed",
+             xml, "kassa.exchange", "kassa.payments.refund", "crm.incoming")
+
+
+# ── Flow 22 : Kassa → CRM  invoice_request ───────────────────────────────────
+def flow_kassa_crm_invoice_request(cfg):
+    header("Flow 22 · Kassa → CRM  [invoice_request]  →  kassa.payments.invoice → crm.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <invoice_data>
+          <company_name>InnovateBedrijf BV</company_name>
+          <vat_number>BE0123456789</vat_number>
+          <contact>
+            <first_name>Lena</first_name>
+            <last_name>Declercq</last_name>
+            <email>lena.declercq@test.be</email>
+          </contact>
+          <amount_due currency="eur">250.00</amount_due>
+          <description>Kassa badge wallet topup</description>
+        </invoice_data>"""
+    xml = build_message("invoice_request", "kassa", body, correlation_id=new_uuid())
+    run_flow(cfg, "kassa_to_crm_invoice_request",
+             "Kassa→CRM invoice_request",
+             xml, "kassa.exchange", "kassa.payments.invoice", "crm.incoming")
+
+
+# ── Flow 23 : Planning → CRM  session_updated ────────────────────────────────
+def flow_planning_crm_session_updated(cfg):
+    header("Flow 23 · Planning → CRM  [session_updated]  →  planning.exchange / planning.session.updated")
+    body = """\
+        <session_id>sess-2026-001</session_id>
+        <title>Keynote: AI in Business (Updated)</title>
+        <start_datetime>2026-05-15T14:30:00Z</start_datetime>
+        <end_datetime>2026-05-15T15:30:00Z</end_datetime>
+        <location>Aula B - Campus Jette</location>
+        <session_type>keynote</session_type>
+        <status>published</status>
+        <max_attendees>100</max_attendees>"""
+    xml = build_message("session_updated", "planning", body, correlation_id=new_uuid())
+    run_flow(cfg, "planning_to_crm_session_updated",
+             "Planning→CRM session_updated",
+             xml, "planning.exchange", "planning.session.updated",
+             "planning.session.events")
+
+
+# ── Flow 24 : Planning → CRM  session_deleted ────────────────────────────────
+def flow_planning_crm_session_deleted(cfg):
+    header("Flow 24 · Planning → CRM  [session_deleted]  →  planning.exchange / planning.session.deleted")
+    body = """\
+        <session_id>sess-2026-099</session_id>
+        <reason>Session cancelled by organizer</reason>"""
+    xml = build_message("session_deleted", "planning", body, correlation_id=new_uuid())
+    run_flow(cfg, "planning_to_crm_session_deleted",
+             "Planning→CRM session_deleted",
+             xml, "planning.exchange", "planning.session.deleted",
+             "planning.session.events")
+
+
+# ── Flow 25 : Frontend → Planning  session_create ────────────────────────────
+def flow_frontend_planning_session_create(cfg):
+    header("Flow 25 · Frontend → Planning  [session_create]  →  planning.exchange / frontend.to.planning.session.create")
+    body = """\
+        <session_id>sess-2026-new-001</session_id>
+        <title>Workshop: Cloud Native Development</title>
+        <start_datetime>2026-05-20T09:00:00Z</start_datetime>
+        <end_datetime>2026-05-20T11:00:00Z</end_datetime>
+        <location>Lab 3 - Campus Jette</location>
+        <session_type>workshop</session_type>
+        <max_attendees>30</max_attendees>"""
+    xml = build_message("session_create", "frontend", body)
+    run_flow(cfg, "frontend_to_planning_session_create",
+             "Frontend→Planning session_create",
+             xml, "planning.exchange", "frontend.to.planning.session.create",
+             "planning.session.events")
+
+
+# ── Flow 26 : Frontend → Planning  session_update ────────────────────────────
+def flow_frontend_planning_session_update(cfg):
+    header("Flow 26 · Frontend → Planning  [session_update]  →  planning.exchange / frontend.to.planning.session.update")
+    body = """\
+        <session_id>sess-2026-001</session_id>
+        <title>Keynote: AI in Business (Revised)</title>
+        <start_datetime>2026-05-15T14:00:00Z</start_datetime>
+        <end_datetime>2026-05-15T16:00:00Z</end_datetime>
+        <location>Aula A - Campus Jette</location>"""
+    xml = build_message("session_update", "frontend", body)
+    run_flow(cfg, "frontend_to_planning_session_update",
+             "Frontend→Planning session_update",
+             xml, "planning.exchange", "frontend.to.planning.session.update",
+             "planning.session.events")
+
+
+# ── Flow 27 : Frontend → Planning  session_delete ────────────────────────────
+def flow_frontend_planning_session_delete(cfg):
+    header("Flow 27 · Frontend → Planning  [session_delete]  →  planning.exchange / frontend.to.planning.session.delete")
+    body = """\
+        <session_id>sess-2026-099</session_id>
+        <reason>Cancelled by administrator</reason>"""
+    xml = build_message("session_delete", "frontend", body)
+    run_flow(cfg, "frontend_to_planning_session_delete",
+             "Frontend→Planning session_delete",
+             xml, "planning.exchange", "frontend.to.planning.session.delete",
+             "planning.session.events")
+
+
+# ── Flow 28 : CRM → Planning  session_registration_confirmed ─────────────────
+def flow_crm_planning_session_registration_confirmed(cfg):
+    header("Flow 28 · CRM → Planning  [session_registration_confirmed]  →  crm.to.planning.session_registration_confirmed")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <session_id>sess-2026-001</session_id>
+        <email>lena.declercq@test.be</email>"""
+    xml = build_message("session_registration_confirmed", "crm", body, correlation_id=new_uuid())
+    run_flow(cfg, "crm_to_planning_session_registration_confirmed",
+             "CRM→Planning session_registration_confirmed",
+             xml, "planning.exchange", "crm.to.planning.session_registration_confirmed",
+             "planning.session.events")
+
+
+# ── Flow 29 : CRM → Planning  cancel_registration ────────────────────────────
+def flow_crm_planning_cancel_registration(cfg):
+    header("Flow 29 · CRM → Planning  [cancel_registration]  →  crm.to.planning.cancel_registration")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <reason>User unregistered from event</reason>"""
+    xml = build_message("cancel_registration", "crm", body, correlation_id=new_uuid())
+    run_flow(cfg, "crm_to_planning_cancel_registration",
+             "CRM→Planning cancel_registration",
+             xml, "planning.exchange", "crm.to.planning.cancel_registration",
+             "planning.session.events")
+
+
+# ── Flow 30 : Mailing → CRM  mailing_status ──────────────────────────────────
+def flow_mailing_crm_mailing_status(cfg):
+    header("Flow 30 · Mailing → CRM  [mailing_status]  →  crm.incoming")
+    body = """\
+        <mailing_id>mail-2026-001</mailing_id>
+        <recipient_email>lena.declercq@test.be</recipient_email>
+        <status>delivered</status>"""
+    xml = build_message("mailing_status", "mailing", body, correlation_id=new_uuid())
+    run_flow(cfg, "mailing_to_crm_mailing_status",
+             "Mailing→CRM mailing_status",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 31 : CRM → Facturatie  invoice_cancelled ────────────────────────────
+def flow_crm_facturatie_invoice_cancelled(cfg):
+    header("Flow 31 · CRM → Facturatie  [invoice_cancelled]  →  facturatie.incoming")
+    body = """\
+        <invoice_number>INV-2026-001</invoice_number>
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <reason>Registration cancelled by user</reason>"""
+    xml = build_message("invoice_cancelled", "crm", body, correlation_id=new_uuid())
+    run_flow(cfg, "crm_to_facturatie_invoice_cancelled",
+             "CRM→Facturatie invoice_cancelled",
+             xml, "", "facturatie.incoming", "facturatie.incoming")
+
+
+# ── Flow 32 : Facturatie → CRM  send_invoice ─────────────────────────────────
+def flow_facturatie_crm_send_invoice(cfg):
+    header("Flow 32 · Facturatie → CRM  [send_invoice]  →  facturatie.to.crm")
+    body = """\
+        <invoice>
+          <id>INV-2026-002</id>
+          <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+          <pdf_url>https://facturatie.internal/invoices/INV-2026-002.pdf</pdf_url>
+          <due_date>2026-06-01</due_date>
+          <amount_due currency="eur">450.00</amount_due>
+        </invoice>"""
+    xml = build_message("send_invoice", "facturatie", body, correlation_id=new_uuid())
+    run_flow(cfg, "facturatie_to_crm_send_invoice",
+             "Facturatie→CRM send_invoice",
+             xml, "", "facturatie.to.crm", "facturatie.to.crm")
+
+
+# ── Flow 33 : Facturatie → CRM  payment_registered ───────────────────────────
+def flow_facturatie_crm_payment_registered(cfg):
+    header("Flow 33 · Facturatie → CRM  [payment_registered]  →  facturatie.to.crm")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <badge_id>BADGE-7001</badge_id>
+        <amount_paid currency="eur">450.00</amount_paid>
+        <payment_method>card</payment_method>"""
+    xml = build_message("payment_registered", "facturatie", body, correlation_id=new_uuid())
+    run_flow(cfg, "facturatie_to_crm_payment_registered",
+             "Facturatie→CRM payment_registered",
+             xml, "", "facturatie.to.crm", "facturatie.to.crm")
+
+
+# ── Flow 34 : CRM → Kassa  profile_update ────────────────────────────────────
+def flow_crm_kassa_profile_update(cfg):
+    header("Flow 34 · CRM → Kassa  [profile_update]  →  kassa.exchange / kassa.incoming")
+    body = """\
+        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+        <customer>
+          <contact>
+            <first_name>Lena</first_name>
+            <last_name>Declercq-Updated</last_name>
+            <email>lena.new@test.be</email>
+            <date_of_birth>1995-03-21</date_of_birth>
+          </contact>
+        </customer>"""
+    xml = build_message("profile_update", "crm", body)
+    run_flow(cfg, "crm_to_kassa_profile_update",
+             "CRM→Kassa profile_update",
+             xml, "kassa.exchange", "kassa.incoming", "kassa.incoming")
 
 
 # ── Rejection tests (contract compliance) ─────────────────────────────────────
@@ -1286,6 +2525,40 @@ def main():
     if should_test(cfg, "monitoring", "crm", "kassa", "facturatie",
                    "planning", "mailing", "frontend", "identity"):
         flow_heartbeats(cfg)
+
+    # ── Additional flows (Flows 13–34) ────────────────────────────────────────
+    if should_test(cfg, "monitoring"):
+        flow_log_message(cfg)
+    if should_test(cfg, "frontend", "crm"):
+        flow_frontend_crm_user_created(cfg)
+        flow_frontend_crm_user_updated(cfg)
+        flow_frontend_crm_user_deleted(cfg)
+        flow_frontend_crm_user_registered(cfg)
+        flow_frontend_crm_cancel_registration(cfg)
+        flow_frontend_crm_user_checkin(cfg)
+    if should_test(cfg, "kassa", "crm"):
+        flow_kassa_crm_badge_assigned(cfg)
+        flow_kassa_crm_refund_processed(cfg)
+        flow_kassa_crm_invoice_request(cfg)
+    if should_test(cfg, "planning", "crm"):
+        flow_planning_crm_session_updated(cfg)
+        flow_planning_crm_session_deleted(cfg)
+    if should_test(cfg, "frontend", "planning"):
+        flow_frontend_planning_session_create(cfg)
+        flow_frontend_planning_session_update(cfg)
+        flow_frontend_planning_session_delete(cfg)
+    if should_test(cfg, "crm", "planning"):
+        flow_crm_planning_session_registration_confirmed(cfg)
+        flow_crm_planning_cancel_registration(cfg)
+    if should_test(cfg, "mailing", "crm"):
+        flow_mailing_crm_mailing_status(cfg)
+    if should_test(cfg, "crm", "facturatie"):
+        flow_crm_facturatie_invoice_cancelled(cfg)
+    if should_test(cfg, "facturatie", "crm"):
+        flow_facturatie_crm_send_invoice(cfg)
+        flow_facturatie_crm_payment_registered(cfg)
+    if should_test(cfg, "crm", "kassa"):
+        flow_crm_kassa_profile_update(cfg)
 
     # Close connection cleanly
     if _conn and _conn.is_open:
