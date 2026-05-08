@@ -1375,6 +1375,39 @@ def _pause_publish_get(cfg, queue: str, xml: str, expected_type: str, label: str
     return True
 
 
+def _shadow_queue_test(cfg, exchange: str, routing_key: str,
+                       xml: str, msg_type: str, label: str) -> bool:
+    """Bind a temp exclusive queue to exchange+rk, publish, then basic_get to prove routing."""
+    _state["tests"] += 1
+    if cfg.dry_run:
+        info(f"DRY-RUN shadow → exchange='{exchange}' rk='{routing_key}'")
+        return True
+    try:
+        ch = get_channel(cfg)
+        result = ch.queue_declare(queue="", exclusive=True, auto_delete=True)
+        tmp_queue = result.method.queue
+        ch.queue_bind(queue=tmp_queue, exchange=exchange, routing_key=routing_key)
+        ch.basic_publish(
+            exchange=exchange,
+            routing_key=routing_key,
+            body=xml.encode("utf-8"),
+            properties=pika.BasicProperties(content_type="application/xml", delivery_mode=2)
+        )
+        ok(f"Published   : exchange='{exchange}' rk='{routing_key}'")
+        for _ in range(20):
+            method, _props, body = ch.basic_get(queue=tmp_queue, auto_ack=True)
+            if method:
+                if f"<type>{msg_type}</type>" in body.decode("utf-8", errors="replace"):
+                    ok(f"Routed ✓    : exchange='{exchange}' rk='{routing_key}' — {label}")
+                    return True
+            time.sleep(0.05)
+        fail(f"Routing FAIL: exchange='{exchange}' rk='{routing_key}' — {label}")
+        return False
+    except Exception as e:
+        fail(f"Shadow queue error: {e}")
+        return False
+
+
 def publish(cfg, exchange: str, routing_key: str, xml: str) -> bool:
     if cfg.dry_run:
         info(f"DRY-RUN publish → exchange='{exchange}' rk='{routing_key}'")
@@ -1519,10 +1552,8 @@ def run_flow(cfg, schema_name: str, label: str,
         return
     msg_type = xml.split("<type>")[1].split("</type>")[0]
     if exchange:
-        # Exchange flow: shadow queue verifies routing without touching real consumers
-        before_stats = _queue_marker(_queue_stats(cfg, arrival_queue))
-        if publish(cfg, exchange, routing_key, xml):
-            peek_queue(cfg, arrival_queue, msg_type, label, before_stats)
+        # True shadow queue: bind a temp exclusive queue to the exchange+rk and basic_get
+        _shadow_queue_test(cfg, exchange, routing_key, xml, msg_type, label)
     elif cfg.pause_consumers and not cfg.dry_run:
         # Direct-queue flow with pause: disconnect consumers, publish, immediate basic_get
         _state["tests"] += 1
@@ -1916,10 +1947,13 @@ def flow_heartbeats(cfg):
         if cfg.verbose:
             print(f"\n{CYAN}--- heartbeat ({team}) ---{RESET}\n{xml}\n")
         validate(xml, "heartbeat", f"heartbeat from {team}")
-        if publish(cfg, "", "heartbeat", xml):
-            pass
-    peek_queue(cfg, "heartbeat", "heartbeat",
-               "Any heartbeat arrived in monitoring queue")
+        if team != teams[-1]:
+            publish(cfg, "", "heartbeat", xml)
+    # Final message goes through run_flow so pause_consumers is respected
+    body = f"        <status>online</status>\n        <uptime>{int(time.time()) % 10000}</uptime>"
+    xml = build_message("heartbeat", teams[-1], body)
+    run_flow(cfg, "heartbeat", "Any heartbeat arrived in monitoring queue",
+             xml, "", "heartbeat", "heartbeat")
 
 
 # ── Flow 17 : Frontend → CRM  event_ended (§5.7) ─────────────────────────────
@@ -1969,8 +2003,8 @@ def flow_logs(cfg):
                     print(f"\n{CYAN}--- log ({team}/{action}/{level}) ---{RESET}\n{xml}\n")
                 validate(xml, "logs", f"log {team}/{action}/{level}")
 
-    # Publish one message per team (live routing check)
-    for team in teams:
+    # Publish one message per team (live routing check); last one uses run_flow for pause support
+    for team in teams[:-1]:
         body = """\
         <level>info</level>
         <action>registration</action>
@@ -1978,7 +2012,13 @@ def flow_logs(cfg):
         xml = build_message("log", team, body)
         publish(cfg, "", "logs", xml)
 
-    peek_queue(cfg, "logs", "log", "Any log arrived in monitoring queue")
+    body = """\
+        <level>info</level>
+        <action>registration</action>
+        <message>Integration test log message</message>"""
+    xml = build_message("log", teams[-1], body)
+    run_flow(cfg, "logs", "Any log arrived in monitoring queue",
+             xml, "", "logs", "logs")
 
 
 # ── Flow 20 : IoT/Kassa → Kassa  badge_scanned (§6.3) ────────────────────────
