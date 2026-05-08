@@ -57,12 +57,12 @@ spec:
               key: TEAMS_WEBHOOK_MONITORING
         livenessProbe:
           exec:
-            command: ["ls", "/app"]
+            command: ["true"]
           initialDelaySeconds: 15
           periodSeconds: 20
         readinessProbe:
           exec:
-            command: ["ls", "/app"]
+            command: ["true"]
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
