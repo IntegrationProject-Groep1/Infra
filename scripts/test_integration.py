@@ -91,61 +91,20 @@ def parse_args():
 
 # ── XSD Schemas (v2.3 contract) ────────────────────────────────────────────────
 # All schemas derived verbatim from XML_XSD_Contract_v2.3_Centralized 1.md
+# and the XSD files present in each team repo.
 # Key rules from the contract:
 #   - No xmlns, no <receiver> in header
 #   - version MUST be "2.0"
+#   - identity_uuid (UUID format) replaces all legacy user_id / customer_id fields
 #   - Names wrapped in <contact> block
-#   - currency="eur" attribute on all monetary amounts
+#   - currency="eur" (fixed) on all monetary amounts
 #   - date_of_birth instead of age
-#   - source is enum (frontend|crm|kassa|planning|facturatie|mailing|monitoring|iot_gateway)
+#   - Header order: message_id, timestamp, source, type, version, [correlation_id]
 
 SCHEMAS = {}
 
-# ── Shared header (used by all standard messages) ──────────────────────────────
-SCHEMAS["header"] = b"""<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-
-  <xs:complexType name="HeaderType">
-    <xs:sequence>
-      <xs:element name="message_id" type="UUIDType"/>
-      <xs:element name="timestamp"  type="xs:dateTime"/>
-      <xs:element name="source"     type="SourceType"/>
-      <xs:element name="type"       type="xs:string"/>
-      <xs:element name="version">
-        <xs:simpleType>
-          <xs:restriction base="xs:string">
-            <xs:enumeration value="2.0"/>
-          </xs:restriction>
-        </xs:simpleType>
-      </xs:element>
-      <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
-    </xs:sequence>
-  </xs:complexType>
-
-  <xs:simpleType name="UUIDType">
-    <xs:restriction base="xs:string">
-      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-  <xs:simpleType name="SourceType">
-    <xs:restriction base="xs:string">
-      <xs:enumeration value="frontend"/>
-      <xs:enumeration value="crm"/>
-      <xs:enumeration value="kassa"/>
-      <xs:enumeration value="planning"/>
-      <xs:enumeration value="facturatie"/>
-      <xs:enumeration value="mailing"/>
-      <xs:enumeration value="monitoring"/>
-      <xs:enumeration value="identity"/>
-      <xs:enumeration value="iot_gateway"/>
-    </xs:restriction>
-  </xs:simpleType>
-
-</xs:schema>"""
-
-# ── Heartbeat (Section 3) ──────────────────────────────────────────────────────
-# Queue: heartbeat (direct, default exchange)
+# ── Heartbeat (§3) ─────────────────────────────────────────────────────────────
+# Queue: heartbeat
 SCHEMAS["heartbeat"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:element name="message">
@@ -193,55 +152,232 @@ SCHEMAS["heartbeat"] = b"""<?xml version="1.0" encoding="UTF-8"?>
   </xs:element>
 </xs:schema>"""
 
-# ── Frontend → CRM : new_registration (Section 5.1) ───────────────────────────
-# Queue: crm.incoming
-SCHEMAS["frontend_to_crm_new_registration"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+# ── system_alert (§4) ──────────────────────────────────────────────────────────
+# Flat <alert> root — NOT the standard <message> envelope.
+# Queue: monitoring.alerts
+SCHEMAS["monitoring_system_alert"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="message">
+  <xs:element name="alert">
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id" type="xs:string"/>
-              <xs:element name="timestamp"  type="xs:dateTime"/>
-              <xs:element name="source"     type="xs:string"/>
-              <xs:element name="type"       type="xs:string"/>
-              <xs:element name="version"    type="xs:string"/>
-              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="user_id"       type="xs:string"/>
+        <xs:element name="type"      type="xs:string" fixed="HEARTBEAT_CRITICAL"/>
+        <xs:element name="system"    type="xs:string"/>
+        <xs:element name="message"   type="xs:string"/>
+        <xs:element name="timestamp" type="xs:dateTime"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → CRM : new_registration (§5.1) ──────────────────────────────────
+# Queue: crm.incoming
+SCHEMAS["frontend_new_registration"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"     type="UUIDType"/>
+          <xs:element name="timestamp"      type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="frontend"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="new_registration"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="correlation_id" type="UUIDType"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="customer">
+            <xs:complexType><xs:sequence>
+              <xs:element name="identity_uuid"     type="UUIDType"/>
+              <xs:element name="email"             type="xs:string"/>
+              <xs:element name="type"              type="xs:string"/>
+              <xs:element name="is_company_linked" type="xs:boolean"/>
+              <xs:element name="vat_number"        type="xs:string" minOccurs="0"/>
+              <xs:element name="date_of_birth"     type="xs:date"/>
+              <xs:element name="contact">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="first_name" type="xs:string"/>
+                  <xs:element name="last_name"  type="xs:string"/>
+                </xs:sequence></xs:complexType>
+              </xs:element>
+              <xs:element name="address"    type="xs:string"/>
+              <xs:element name="company_id" type="xs:string" minOccurs="0"/>
+              <xs:element name="session_id" type="xs:string"/>
+              <xs:element name="payment_due">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="amount">
+                    <xs:complexType><xs:simpleContent><xs:extension base="xs:decimal">
+                      <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+                    </xs:extension></xs:simpleContent></xs:complexType>
+                  </xs:element>
+                  <xs:element name="status" type="xs:string" fixed="unpaid"/>
+                </xs:sequence></xs:complexType>
+              </xs:element>
+            </xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── CRM → Kassa : new_registration (§10.1) ────────────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.incoming
+SCHEMAS["crm_to_kassa_new_registration"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"     type="UUIDType"/>
+          <xs:element name="timestamp"      type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="crm"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="new_registration"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="correlation_id" type="UUIDType"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="customer">
+            <xs:complexType><xs:sequence>
+              <xs:element name="identity_uuid"  type="UUIDType"/>
+              <xs:element name="email"          type="xs:string"/>
+              <xs:element name="date_of_birth"  type="xs:date"/>
+              <xs:element name="contact">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="first_name" type="xs:string"/>
+                  <xs:element name="last_name"  type="xs:string"/>
+                </xs:sequence></xs:complexType>
+              </xs:element>
               <xs:element name="type">
                 <xs:simpleType><xs:restriction base="xs:string">
                   <xs:enumeration value="private"/>
                   <xs:enumeration value="company"/>
                 </xs:restriction></xs:simpleType>
               </xs:element>
-              <xs:element name="contact">
+              <xs:element name="company_name"   type="xs:string" minOccurs="0"/>
+              <xs:element name="vat_number"     type="xs:string" minOccurs="0"/>
+              <xs:element name="company_id"     type="xs:string" minOccurs="0"/>
+              <xs:element name="badge_id"       type="xs:string" minOccurs="0"/>
+              <xs:element name="session_id"     type="xs:string"/>
+              <xs:element name="session_title"  type="xs:string" minOccurs="0"/>
+              <xs:element name="payment_due">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="amount">
+                    <xs:complexType><xs:simpleContent><xs:extension base="xs:decimal">
+                      <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+                    </xs:extension></xs:simpleContent></xs:complexType>
+                  </xs:element>
+                  <xs:element name="status">
+                    <xs:simpleType><xs:restriction base="xs:string">
+                      <xs:enumeration value="unpaid"/>
+                      <xs:enumeration value="paid"/>
+                    </xs:restriction></xs:simpleType>
+                  </xs:element>
+                </xs:sequence></xs:complexType>
+              </xs:element>
+            </xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Kassa → CRM/Facturatie : consumption_order (§6.1, v2.3) ───────────────────
+# Exchange: kassa.exchange, routing: kassa.payments.consumption
+SCHEMAS["kassa_consumption_order"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="CustomerType">
+    <xs:sequence>
+      <xs:element name="id"            type="xs:string"  minOccurs="0"/>
+      <xs:element name="identity_uuid" type="UUIDType"   minOccurs="0"/>
+      <xs:element name="type">
+        <xs:simpleType><xs:restriction base="xs:string">
+          <xs:enumeration value="private"/>
+          <xs:enumeration value="company"/>
+        </xs:restriction></xs:simpleType>
+      </xs:element>
+      <xs:element name="email"   type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ItemType">
+    <xs:sequence>
+      <xs:element name="id"          type="xs:string"/>
+      <xs:element name="sku"         type="xs:string"/>
+      <xs:element name="description" type="xs:string"/>
+      <xs:element name="quantity"    type="xs:integer"/>
+      <xs:element name="unit_price">
+        <xs:complexType><xs:simpleContent><xs:extension base="xs:decimal">
+          <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+        </xs:extension></xs:simpleContent>
+      </xs:complexType>
+      </xs:element>
+      <xs:element name="vat_rate">
+        <xs:simpleType><xs:restriction base="xs:integer">
+          <xs:enumeration value="0"/>
+          <xs:enumeration value="6"/>
+          <xs:enumeration value="12"/>
+          <xs:enumeration value="21"/>
+        </xs:restriction></xs:simpleType>
+      </xs:element>
+      <xs:element name="total_amount">
+        <xs:complexType><xs:simpleContent><xs:extension base="xs:decimal">
+          <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+        </xs:extension></xs:simpleContent>
+      </xs:complexType>
+      </xs:element>
+      <xs:element name="item_type" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="UUIDType"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string" fixed="kassa"/>
+              <xs:element name="type"           type="xs:string" fixed="consumption_order"/>
+              <xs:element name="version"        type="xs:string" fixed="2.0"/>
+              <xs:element name="correlation_id" type="UUIDType"  minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="is_anonymous" type="xs:boolean"    minOccurs="0"/>
+              <xs:element name="customer"     type="CustomerType"  minOccurs="0"/>
+              <xs:element name="items">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="first_name"     type="xs:string"/>
-                    <xs:element name="last_name"      type="xs:string"/>
-                    <xs:element name="email"          type="xs:string"/>
-                    <xs:element name="date_of_birth"  type="xs:date"   minOccurs="0"/>
-                    <xs:element name="phone"          type="xs:string" minOccurs="0"/>
+                    <xs:element name="item" type="ItemType" maxOccurs="unbounded"/>
                   </xs:sequence>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="company_name"  type="xs:string"  minOccurs="0"/>
-              <xs:element name="vat_number"    type="xs:string"  minOccurs="0"/>
-              <xs:element name="payment_due" minOccurs="0">
-                <xs:complexType>
-                  <xs:simpleContent>
-                    <xs:extension base="xs:decimal">
-                      <xs:attribute name="currency" type="xs:string" use="required"/>
-                    </xs:extension>
-                  </xs:simpleContent>
                 </xs:complexType>
               </xs:element>
             </xs:sequence>
@@ -252,61 +388,82 @@ SCHEMAS["frontend_to_crm_new_registration"] = b"""<?xml version="1.0" encoding="
   </xs:element>
 </xs:schema>"""
 
-# ── CRM → Kassa : new_registration (Section 10.1) ─────────────────────────────
-# Queue: kassa.incoming (exchange: kassa.exchange)
-SCHEMAS["crm_to_kassa_new_registration"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+# ── Kassa → CRM/Facturatie : payment_registered (§6.5 / §6.6) ─────────────────
+# Exchange: kassa.exchange, routing: kassa.payments.registration
+SCHEMAS["kassa_payment_registered"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:complexType name="CurrencyAmountType">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
   <xs:element name="message">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="header">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="message_id" type="xs:string"/>
-              <xs:element name="timestamp"  type="xs:dateTime"/>
-              <xs:element name="source"     type="xs:string"/>
-              <xs:element name="type"       type="xs:string"/>
-              <xs:element name="version"    type="xs:string"/>
+              <xs:element name="message_id"     type="UUIDType"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="kassa"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="payment_registered"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
         <xs:element name="body">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="user_id"      type="xs:string"/>
-              <xs:element name="customer">
+              <xs:element name="identity_uuid" type="UUIDType" minOccurs="0"/>
+              <xs:element name="invoice">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="contact">
-                      <xs:complexType>
-                        <xs:sequence>
-                          <xs:element name="first_name"    type="xs:string"/>
-                          <xs:element name="last_name"     type="xs:string"/>
-                          <xs:element name="email"         type="xs:string"/>
-                          <xs:element name="date_of_birth" type="xs:date"   minOccurs="0"/>
-                        </xs:sequence>
-                      </xs:complexType>
-                    </xs:element>
-                    <xs:element name="company_name" type="xs:string" minOccurs="0"/>
-                    <xs:element name="vat_number"   type="xs:string" minOccurs="0"/>
-                    <xs:element name="type">
+                    <xs:element name="id"          type="xs:string" minOccurs="0"/>
+                    <xs:element name="amount_paid" type="CurrencyAmountType"/>
+                    <xs:element name="status">
                       <xs:simpleType><xs:restriction base="xs:string">
-                        <xs:enumeration value="private"/>
-                        <xs:enumeration value="company"/>
+                        <xs:enumeration value="paid"/>
+                        <xs:enumeration value="pending"/>
+                        <xs:enumeration value="cancelled"/>
+                      </xs:restriction></xs:simpleType>
+                    </xs:element>
+                    <xs:element name="due_date" type="xs:date" minOccurs="0"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="payment_context">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="registration"/>
+                  <xs:enumeration value="consumption"/>
+                  <xs:enumeration value="online_invoice"/>
+                  <xs:enumeration value="session_registration"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="transaction">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="id" type="xs:string"/>
+                    <xs:element name="payment_method">
+                      <xs:simpleType><xs:restriction base="xs:string">
+                        <xs:enumeration value="company_link"/>
+                        <xs:enumeration value="on_site"/>
+                        <xs:enumeration value="online"/>
                       </xs:restriction></xs:simpleType>
                     </xs:element>
                   </xs:sequence>
                 </xs:complexType>
               </xs:element>
-              <xs:element name="payment_due" minOccurs="0">
-                <xs:complexType>
-                  <xs:simpleContent>
-                    <xs:extension base="xs:decimal">
-                      <xs:attribute name="currency" type="xs:string" use="required"/>
-                    </xs:extension>
-                  </xs:simpleContent>
-                </xs:complexType>
-              </xs:element>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
@@ -315,174 +472,61 @@ SCHEMAS["crm_to_kassa_new_registration"] = b"""<?xml version="1.0" encoding="UTF
   </xs:element>
 </xs:schema>"""
 
-# ── Kassa → CRM : consumption_order (Section 6.1) ─────────────────────────────
-# Queue: kassa.payments.consumption (exchange: kassa.exchange)
-SCHEMAS["kassa_to_crm_consumption_order"] = b"""<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="message">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id"     type="xs:string"/>
-              <xs:element name="timestamp"      type="xs:dateTime"/>
-              <xs:element name="source"         type="xs:string"/>
-              <xs:element name="type"           type="xs:string"/>
-              <xs:element name="version"        type="xs:string"/>
-              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="user_id"   type="xs:string"/>
-              <xs:element name="badge_id"  type="xs:string"/>
-              <xs:element name="items">
-                <xs:complexType>
-                  <xs:sequence>
-                    <xs:element name="item" maxOccurs="unbounded">
-                      <xs:complexType>
-                        <xs:sequence>
-                          <xs:element name="name"     type="xs:string"/>
-                          <xs:element name="quantity" type="xs:positiveInteger"/>
-                          <xs:element name="unit_price">
-                            <xs:complexType>
-                              <xs:simpleContent>
-                                <xs:extension base="xs:decimal">
-                                  <xs:attribute name="currency" type="xs:string" use="required"/>
-                                </xs:extension>
-                              </xs:simpleContent>
-                            </xs:complexType>
-                          </xs:element>
-                          <xs:element name="total_amount">
-                            <xs:complexType>
-                              <xs:simpleContent>
-                                <xs:extension base="xs:decimal">
-                                  <xs:attribute name="currency" type="xs:string" use="required"/>
-                                </xs:extension>
-                              </xs:simpleContent>
-                            </xs:complexType>
-                          </xs:element>
-                        </xs:sequence>
-                      </xs:complexType>
-                    </xs:element>
-                  </xs:sequence>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="total_order_amount">
-                <xs:complexType>
-                  <xs:simpleContent>
-                    <xs:extension base="xs:decimal">
-                      <xs:attribute name="currency" type="xs:string" use="required"/>
-                    </xs:extension>
-                  </xs:simpleContent>
-                </xs:complexType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>"""
-
-# ── Kassa → CRM : payment_registered (Section 6.6) ───────────────────────────
-# Routing key: kassa.payments.registration
-SCHEMAS["kassa_to_crm_payment_registered"] = b"""<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="message">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id"     type="xs:string"/>
-              <xs:element name="timestamp"      type="xs:dateTime"/>
-              <xs:element name="source"         type="xs:string"/>
-              <xs:element name="type"           type="xs:string"/>
-              <xs:element name="version"        type="xs:string"/>
-              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="user_id"       type="xs:string"/>
-              <xs:element name="badge_id"      type="xs:string"/>
-              <xs:element name="amount_paid">
-                <xs:complexType>
-                  <xs:simpleContent>
-                    <xs:extension base="xs:decimal">
-                      <xs:attribute name="currency" type="xs:string" use="required"/>
-                    </xs:extension>
-                  </xs:simpleContent>
-                </xs:complexType>
-              </xs:element>
-              <xs:element name="payment_method">
-                <xs:simpleType><xs:restriction base="xs:string">
-                  <xs:enumeration value="cash"/>
-                  <xs:enumeration value="card"/>
-                  <xs:enumeration value="badge_wallet"/>
-                </xs:restriction></xs:simpleType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>"""
-
-# ── CRM → Facturatie : invoice_request (Section 11.1) ─────────────────────────
-# Queue: facturatie.incoming  (NOT crm.to.facturatie — that's a known CRM bug)
+# ── CRM → Facturatie : invoice_request (§11.1) ────────────────────────────────
+# Queue: facturatie.incoming
 SCHEMAS["crm_to_facturatie_invoice_request"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="AddressType">
+    <xs:sequence>
+      <xs:element name="street"      type="xs:string"/>
+      <xs:element name="number"      type="xs:string"/>
+      <xs:element name="postal_code" type="xs:string"/>
+      <xs:element name="city"        type="xs:string"/>
+      <xs:element name="country"     type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:element name="message">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="header">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="message_id"     type="UUIDType"/>
               <xs:element name="timestamp"      type="xs:dateTime"/>
-              <xs:element name="source"         type="xs:string"/>
-              <xs:element name="type"           type="xs:string"/>
-              <xs:element name="version"        type="xs:string"/>
-              <xs:element name="correlation_id" type="xs:string"/>
+              <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="crm"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="invoice_request"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="correlation_id" type="UUIDType"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
         <xs:element name="body">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="user_id" type="xs:string"/>
+              <xs:element name="identity_uuid" type="UUIDType"/>
               <xs:element name="invoice_data">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="company_name"  type="xs:string"/>
-                    <xs:element name="vat_number"    type="xs:string" minOccurs="0"/>
                     <xs:element name="contact">
                       <xs:complexType>
                         <xs:sequence>
                           <xs:element name="first_name" type="xs:string"/>
                           <xs:element name="last_name"  type="xs:string"/>
-                          <xs:element name="email"      type="xs:string"/>
                         </xs:sequence>
                       </xs:complexType>
                     </xs:element>
-                    <xs:element name="amount_due">
-                      <xs:complexType>
-                        <xs:simpleContent>
-                          <xs:extension base="xs:decimal">
-                            <xs:attribute name="currency" type="xs:string" use="required"/>
-                          </xs:extension>
-                        </xs:simpleContent>
-                      </xs:complexType>
-                    </xs:element>
-                    <xs:element name="description" type="xs:string" minOccurs="0"/>
+                    <xs:element name="email"        type="xs:string"/>
+                    <xs:element name="address"      type="AddressType"/>
+                    <xs:element name="company_name" type="xs:string" minOccurs="0"/>
+                    <xs:element name="vat_number"   type="xs:string" minOccurs="0"/>
                   </xs:sequence>
                 </xs:complexType>
               </xs:element>
@@ -494,87 +538,253 @@ SCHEMAS["crm_to_facturatie_invoice_request"] = b"""<?xml version="1.0" encoding=
   </xs:element>
 </xs:schema>"""
 
-# ── CRM → Mailing : send_mailing (Section 12.1) ───────────────────────────────
-# Queue: crm.to.mailing  (type MUST be send_mailing, NOT mailing_status)
-SCHEMAS["crm_to_mailing_send_mailing"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+# ── CRM/Facturatie → Mailing : send_mailing (§12.1 / §13.1) ───────────────────
+# Queue: crm.to.mailing  or  facturatie.to.mailing
+SCHEMAS["send_mailing"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="ContactType">
+    <xs:sequence>
+      <xs:element name="first_name" type="xs:string"/>
+      <xs:element name="last_name"  type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RecipientType">
+    <xs:sequence>
+      <xs:element name="email"         type="xs:string"/>
+      <xs:element name="identity_uuid" type="UUIDType"/>
+      <xs:element name="contact"       type="ContactType"/>
+    </xs:sequence>
+  </xs:complexType>
   <xs:element name="message">
     <xs:complexType>
       <xs:sequence>
         <xs:element name="header">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="message_id" type="xs:string"/>
-              <xs:element name="timestamp"  type="xs:dateTime"/>
-              <xs:element name="source"     type="xs:string"/>
-              <xs:element name="type"       type="xs:string"/>
-              <xs:element name="version"    type="xs:string"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="recipient_email" type="xs:string"/>
-              <xs:element name="recipient_name"  type="xs:string" minOccurs="0"/>
-              <xs:element name="subject"         type="xs:string"/>
-              <xs:element name="template_id"     type="xs:string" minOccurs="0"/>
-              <xs:element name="context"         minOccurs="0">
-                <xs:complexType>
-                  <xs:sequence minOccurs="0" maxOccurs="unbounded">
-                    <xs:any processContents="lax"/>
-                  </xs:sequence>
-                </xs:complexType>
-              </xs:element>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>"""
-
-# ── Planning → CRM : session_created (Section 7.1) ────────────────────────────
-# Exchange: planning.exchange, routing: planning.session.created
-# Queue bound: planning.session.events
-SCHEMAS["planning_to_crm_session_created"] = b"""<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="message">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id"     type="xs:string"/>
+              <xs:element name="message_id"     type="UUIDType"/>
               <xs:element name="timestamp"      type="xs:dateTime"/>
-              <xs:element name="source"         type="xs:string"/>
-              <xs:element name="type"           type="xs:string"/>
-              <xs:element name="version"        type="xs:string"/>
-              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+              <xs:element name="source">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="crm"/>
+                  <xs:enumeration value="facturatie"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="send_mailing"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="correlation_id" type="UUIDType"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
         <xs:element name="body">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="session_id"      type="xs:string"/>
-              <xs:element name="title"           type="xs:string"/>
-              <xs:element name="start_datetime"  type="xs:dateTime"/>
-              <xs:element name="end_datetime"    type="xs:dateTime"/>
-              <xs:element name="location"        type="xs:string" minOccurs="0"/>
-              <xs:element name="session_type"    type="xs:string" minOccurs="0"/>
-              <xs:element name="status"          type="xs:string" minOccurs="0"/>
-              <xs:element name="max_attendees"   type="xs:positiveInteger" minOccurs="0"/>
-              <xs:element name="speaker" minOccurs="0">
+              <xs:element name="campaign_id" type="xs:string"/>
+              <xs:element name="subject"     type="xs:string"/>
+              <xs:element name="mail_type">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="registration_confirmation"/>
+                  <xs:enumeration value="payment_confirmation"/>
+                  <xs:enumeration value="invoice_ready"/>
+                  <xs:enumeration value="session_update"/>
+                  <xs:enumeration value="general_announcement"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="recipients">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="contact">
-                      <xs:complexType>
-                        <xs:sequence>
-                          <xs:element name="first_name" type="xs:string"/>
-                          <xs:element name="last_name"  type="xs:string"/>
-                        </xs:sequence>
-                      </xs:complexType>
+                    <xs:element name="recipient" type="RecipientType" maxOccurs="unbounded"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="template_data" type="xs:string" minOccurs="0"/>
+              <xs:element name="body_html"     type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Mailing → CRM : mailing_status (§9.1) ─────────────────────────────────────
+# Queue: mailing.to.crm
+SCHEMAS["mailing_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id" type="xs:string"/>
+              <xs:element name="timestamp"  type="xs:dateTime"/>
+              <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="mailing"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="mailing_status"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="campaign_id" type="xs:string"/>
+              <xs:element name="subject"     type="xs:string"/>
+              <xs:element name="sent"        type="xs:integer"/>
+              <xs:element name="delivered"   type="xs:integer"/>
+              <xs:element name="bounced"     type="xs:integer"/>
+              <xs:element name="bounced_emails" minOccurs="0">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="email" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="opened" type="xs:integer"/>
+              <xs:element name="status">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="completed"/>
+                  <xs:enumeration value="partial_failure"/>
+                  <xs:enumeration value="failed"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Facturatie → CRM : invoice_status (§8.1) ──────────────────────────────────
+# Queue: facturatie.to.crm
+SCHEMAS["facturatie_invoice_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"     type="UUIDType"/>
+          <xs:element name="timestamp"      type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="facturatie"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="invoice_status"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="invoice_id"    type="xs:string"/>
+          <xs:element name="identity_uuid" type="UUIDType"/>
+          <xs:element name="status">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="draft"/>
+              <xs:enumeration value="sent"/>
+              <xs:enumeration value="paid"/>
+              <xs:enumeration value="overdue"/>
+              <xs:enumeration value="cancelled"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="amount">
+            <xs:complexType><xs:simpleContent><xs:extension base="xs:decimal">
+              <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+            </xs:extension></xs:simpleContent></xs:complexType>
+          </xs:element>
+          <xs:element name="due_date" type="xs:date" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Facturatie → CRM : payment_registered (§8.2) ──────────────────────────────
+# Outbound from Facturatie after online payment confirmation.
+# Queue: facturatie.to.crm
+SCHEMAS["facturatie_payment_registered"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:complexType name="CurrencyAmountType">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="currency" type="xs:string" fixed="eur" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="header">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="message_id"     type="UUIDType"/>
+              <xs:element name="timestamp"      type="xs:dateTime"/>
+              <xs:element name="source"         type="xs:string" fixed="facturatie"/>
+              <xs:element name="type"           type="xs:string" fixed="payment_registered"/>
+              <xs:element name="version"        type="xs:string" fixed="2.0"/>
+              <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+        <xs:element name="body">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element name="identity_uuid" type="UUIDType"/>
+              <xs:element name="invoice">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="id"          type="xs:string"/>
+                    <xs:element name="amount_paid" type="CurrencyAmountType"/>
+                    <xs:element name="status">
+                      <xs:simpleType><xs:restriction base="xs:string">
+                        <xs:enumeration value="paid"/>
+                        <xs:enumeration value="pending"/>
+                        <xs:enumeration value="cancelled"/>
+                      </xs:restriction></xs:simpleType>
+                    </xs:element>
+                    <xs:element name="due_date" type="xs:date" minOccurs="0"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+              <xs:element name="payment_context">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="registration"/>
+                  <xs:enumeration value="consumption"/>
+                  <xs:enumeration value="online_invoice"/>
+                  <xs:enumeration value="session_registration"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="transaction" minOccurs="0">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="id" type="xs:string"/>
+                    <xs:element name="payment_method">
+                      <xs:simpleType><xs:restriction base="xs:string">
+                        <xs:enumeration value="company_link"/>
+                        <xs:enumeration value="on_site"/>
+                        <xs:enumeration value="online"/>
+                      </xs:restriction></xs:simpleType>
                     </xs:element>
                   </xs:sequence>
                 </xs:complexType>
@@ -587,85 +797,181 @@ SCHEMAS["planning_to_crm_session_created"] = b"""<?xml version="1.0" encoding="U
   </xs:element>
 </xs:schema>"""
 
-# ── Frontend → Planning : calendar_invite (Section 17.2) ──────────────────────
-# Exchange: calendar.exchange, routing: frontend.to.planning.calendar.invite
-# attendee_email is required per v2.3 audit fix
-SCHEMAS["frontend_to_planning_calendar_invite"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+# ── Planning → CRM : session_created (§7.1) ───────────────────────────────────
+# Exchange: planning.exchange, routing: planning.session.created
+SCHEMAS["planning_session_created"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
   <xs:element name="message">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id" type="xs:string"/>
-              <xs:element name="timestamp"  type="xs:dateTime"/>
-              <xs:element name="source"     type="xs:string"/>
-              <xs:element name="type"       type="xs:string"/>
-              <xs:element name="version"    type="xs:string"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="session_id"      type="xs:string"/>
-              <xs:element name="title"           type="xs:string"/>
-              <xs:element name="start_datetime"  type="xs:dateTime"/>
-              <xs:element name="end_datetime"    type="xs:dateTime"/>
-              <xs:element name="attendee_email"  type="xs:string"/>
-              <xs:element name="location"        type="xs:string" minOccurs="0"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-</xs:schema>"""
-
-# ── Monitoring → Mailing : system_alert (Section 4) ───────────────────────────
-# Queue: monitoring.alerts
-SCHEMAS["monitoring_to_mailing_system_alert"] = b"""<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
-  <xs:element name="message">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element name="header">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="message_id" type="xs:string"/>
-              <xs:element name="timestamp"  type="xs:dateTime"/>
-              <xs:element name="source"     type="xs:string"/>
-              <xs:element name="type"       type="xs:string"/>
-              <xs:element name="version"    type="xs:string"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-        <xs:element name="body">
-          <xs:complexType>
-            <xs:sequence>
-              <xs:element name="alert_level">
-                <xs:simpleType><xs:restriction base="xs:string">
-                  <xs:enumeration value="warning"/>
-                  <xs:enumeration value="critical"/>
-                  <xs:enumeration value="info"/>
-                </xs:restriction></xs:simpleType>
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"    type="UUIDType"/>
+          <xs:element name="timestamp"     type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="planning"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="session_created"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="session_id"        type="xs:string"/>
+          <xs:element name="title"             type="xs:string"/>
+          <xs:element name="start_datetime"    type="xs:dateTime"/>
+          <xs:element name="end_datetime"      type="xs:dateTime"/>
+          <xs:element name="location"          type="xs:string"/>
+          <xs:element name="session_type">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="keynote"/>
+              <xs:enumeration value="workshop"/>
+              <xs:enumeration value="reception"/>
+              <xs:enumeration value="other"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="status">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="draft"/>
+              <xs:enumeration value="published"/>
+              <xs:enumeration value="cancelled"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="max_attendees"     type="xs:positiveInteger"/>
+          <xs:element name="current_attendees" type="xs:nonNegativeInteger"/>
+          <xs:element name="speaker" minOccurs="0">
+            <xs:complexType><xs:sequence>
+              <xs:element name="identity_uuid" type="UUIDType" minOccurs="0"/>
+              <xs:element name="contact">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="first_name" type="xs:string"/>
+                  <xs:element name="last_name"  type="xs:string"/>
+                </xs:sequence></xs:complexType>
               </xs:element>
-              <xs:element name="affected_team" type="xs:string"/>
-              <xs:element name="message"       type="xs:string"/>
-              <xs:element name="timestamp"     type="xs:dateTime" minOccurs="0"/>
-            </xs:sequence>
-          </xs:complexType>
-        </xs:element>
-      </xs:sequence>
-    </xs:complexType>
+              <xs:element name="organisation" type="xs:string" minOccurs="0"/>
+              <xs:element name="email"        type="xs:string" minOccurs="0"/>
+            </xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
   </xs:element>
 </xs:schema>"""
 
-# ── Facturatie → CRM : invoice_status (Section 8.1) ───────────────────────────
-# Queue: facturatie.to.crm  (type MUST be invoice_status, NOT send_invoice)
-SCHEMAS["facturatie_to_crm_invoice_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+# ── Planning → CRM : session_updated (§7.2) ───────────────────────────────────
+# Exchange: planning.exchange, routing: planning.session.updated
+SCHEMAS["planning_session_updated"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"    type="UUIDType"/>
+          <xs:element name="timestamp"     type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="planning"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="session_updated"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="session_id"        type="xs:string"/>
+          <xs:element name="title"             type="xs:string"/>
+          <xs:element name="start_datetime"    type="xs:dateTime"/>
+          <xs:element name="end_datetime"      type="xs:dateTime"/>
+          <xs:element name="location"          type="xs:string"/>
+          <xs:element name="session_type">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="keynote"/>
+              <xs:enumeration value="workshop"/>
+              <xs:enumeration value="reception"/>
+              <xs:enumeration value="other"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="status">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="draft"/>
+              <xs:enumeration value="published"/>
+              <xs:enumeration value="cancelled"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="max_attendees"     type="xs:positiveInteger"/>
+          <xs:element name="current_attendees" type="xs:nonNegativeInteger"/>
+          <xs:element name="change_reason"     type="xs:string" minOccurs="0"/>
+          <xs:element name="speaker" minOccurs="0">
+            <xs:complexType><xs:sequence>
+              <xs:element name="identity_uuid" type="UUIDType" minOccurs="0"/>
+              <xs:element name="contact">
+                <xs:complexType><xs:sequence>
+                  <xs:element name="first_name" type="xs:string"/>
+                  <xs:element name="last_name"  type="xs:string"/>
+                </xs:sequence></xs:complexType>
+              </xs:element>
+              <xs:element name="organisation" type="xs:string" minOccurs="0"/>
+              <xs:element name="email"        type="xs:string" minOccurs="0"/>
+            </xs:sequence></xs:complexType>
+          </xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → Planning : session_create_request (§19.1) ──────────────────────
+# Exchange: planning.exchange, routing: frontend.to.planning.session.create
+SCHEMAS["frontend_session_create_request"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id" type="xs:string"/>
+          <xs:element name="timestamp"  type="xs:dateTime"/>
+          <xs:element name="source"     type="xs:string" fixed="frontend"/>
+          <xs:element name="type"       type="xs:string" fixed="session_create_request"/>
+          <xs:element name="version"    type="xs:string" fixed="2.0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="session_id"     type="xs:string"/>
+          <xs:element name="title"          type="xs:string"/>
+          <xs:element name="start_datetime" type="xs:dateTime"/>
+          <xs:element name="end_datetime"   type="xs:dateTime"/>
+          <xs:element name="location"       type="xs:string" minOccurs="0"/>
+          <xs:element name="session_type"   type="xs:string" minOccurs="0"/>
+          <xs:element name="status"         type="xs:string" minOccurs="0"/>
+          <xs:element name="max_attendees"  type="xs:integer" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → Planning : calendar_invite (§19.3) ─────────────────────────────
+# Exchange: calendar.exchange, routing: frontend.to.planning.calendar.invite
+SCHEMAS["frontend_calendar_invite"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
   <xs:element name="message">
     <xs:complexType>
       <xs:sequence>
@@ -674,9 +980,16 @@ SCHEMAS["facturatie_to_crm_invoice_status"] = b"""<?xml version="1.0" encoding="
             <xs:sequence>
               <xs:element name="message_id"     type="xs:string"/>
               <xs:element name="timestamp"      type="xs:dateTime"/>
-              <xs:element name="source"         type="xs:string"/>
-              <xs:element name="type"           type="xs:string"/>
-              <xs:element name="version"        type="xs:string"/>
+              <xs:element name="source">
+                <xs:simpleType><xs:restriction base="xs:string">
+                  <xs:enumeration value="frontend"/>
+                  <xs:enumeration value="crm"/>
+                </xs:restriction></xs:simpleType>
+              </xs:element>
+              <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="calendar_invite"/></xs:restriction></xs:simpleType></xs:element>
+              <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+                <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
               <xs:element name="correlation_id" type="xs:string" minOccurs="0"/>
             </xs:sequence>
           </xs:complexType>
@@ -684,26 +997,13 @@ SCHEMAS["facturatie_to_crm_invoice_status"] = b"""<?xml version="1.0" encoding="
         <xs:element name="body">
           <xs:complexType>
             <xs:sequence>
-              <xs:element name="invoice_id"  type="xs:string"/>
-              <xs:element name="user_id"     type="xs:string"/>
-              <xs:element name="status">
-                <xs:simpleType><xs:restriction base="xs:string">
-                  <xs:enumeration value="created"/>
-                  <xs:enumeration value="sent"/>
-                  <xs:enumeration value="paid"/>
-                  <xs:enumeration value="overdue"/>
-                  <xs:enumeration value="cancelled"/>
-                </xs:restriction></xs:simpleType>
-              </xs:element>
-              <xs:element name="amount_due" minOccurs="0">
-                <xs:complexType>
-                  <xs:simpleContent>
-                    <xs:extension base="xs:decimal">
-                      <xs:attribute name="currency" type="xs:string" use="required"/>
-                    </xs:extension>
-                  </xs:simpleContent>
-                </xs:complexType>
-              </xs:element>
+              <xs:element name="identity_uuid"  type="UUIDType"/>
+              <xs:element name="session_id"     type="xs:string"/>
+              <xs:element name="title"          type="xs:string"/>
+              <xs:element name="start_datetime" type="xs:dateTime"/>
+              <xs:element name="end_datetime"   type="xs:dateTime"/>
+              <xs:element name="location"       type="xs:string" minOccurs="0"/>
+              <xs:element name="attendee_email" type="xs:string"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
@@ -720,7 +1020,7 @@ def compile_schema(xsd_bytes: bytes) -> etree.XMLSchema:
 COMPILED = {name: compile_schema(xsd) for name, xsd in SCHEMAS.items()}
 
 
-# ── XML Builder ────────────────────────────────────────────────────────────────
+# ── XML Builders ────────────────────────────────────────────────────────────────
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -730,8 +1030,8 @@ def new_uuid() -> str:
 
 
 def build_message(msg_type: str, source: str, body: str, correlation_id: str = None) -> str:
-    """Build a standard v2.0 XML envelope per contract Section 2."""
-    corr = f"    <correlation_id>{correlation_id}</correlation_id>" if correlation_id else ""
+    """Standard v2.0 envelope per contract §2."""
+    corr = f"    <correlation_id>{correlation_id}</correlation_id>\n" if correlation_id else ""
     return textwrap.dedent(f"""\
         <?xml version="1.0" encoding="UTF-8"?>
         <message>
@@ -746,6 +1046,18 @@ def build_message(msg_type: str, source: str, body: str, correlation_id: str = N
         {body}
           </body>
         </message>""")
+
+
+def build_alert(system: str, message: str) -> str:
+    """Flat <alert> root per contract §4 — NOT the standard envelope."""
+    return textwrap.dedent(f"""\
+        <?xml version="1.0" encoding="UTF-8"?>
+        <alert>
+          <type>HEARTBEAT_CRITICAL</type>
+          <system>{system}</system>
+          <message>{message}</message>
+          <timestamp>{now_iso()}</timestamp>
+        </alert>""")
 
 
 # ── XSD Validator ──────────────────────────────────────────────────────────────
@@ -884,11 +1196,13 @@ def run_flow(cfg, schema_name: str, label: str,
         warn("Skipping publish — XML failed schema validation")
         return
     if publish(cfg, exchange, routing_key, xml):
-        peek_queue(cfg, arrival_queue, xml.split("<type>")[1].split("</type>")[0], label)
+        # For flat <alert>, extract from <type>…</type>; for <message>, same works.
+        msg_type = xml.split("<type>")[1].split("</type>")[0]
+        peek_queue(cfg, arrival_queue, msg_type, label)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# FLOW DEFINITIONS (one function per flow)
+# FLOW DEFINITIONS
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_connectivity(cfg):
@@ -915,107 +1229,136 @@ def test_connectivity(cfg):
         return False
 
 
-# ── Flow 01 : Frontend → CRM  new_registration ────────────────────────────────
+# ── Flow 01 : Frontend → CRM  new_registration (§5.1) ─────────────────────────
 def flow_frontend_crm_new_registration(cfg):
     header("Flow 01 · Frontend → CRM  [new_registration]  →  crm.incoming")
+    corr = new_uuid()
     body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <type>private</type>
-        <contact>
-          <first_name>Lena</first_name>
-          <last_name>Declercq</last_name>
+        <customer>
+          <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
           <email>lena.declercq@test.be</email>
+          <type>private</type>
+          <is_company_linked>false</is_company_linked>
           <date_of_birth>1995-03-21</date_of_birth>
-        </contact>
-        <payment_due currency="eur">0.00</payment_due>"""
-    xml = build_message("new_registration", "frontend", body)
-    run_flow(cfg, "frontend_to_crm_new_registration",
+          <contact>
+            <first_name>Lena</first_name>
+            <last_name>Declercq</last_name>
+          </contact>
+          <address>Tervurenlaan 1, 1040 Brussel</address>
+          <session_id>sess-2026-001</session_id>
+          <payment_due>
+            <amount currency="eur">0.00</amount>
+            <status>unpaid</status>
+          </payment_due>
+        </customer>"""
+    xml = build_message("new_registration", "frontend", body, correlation_id=corr)
+    run_flow(cfg, "frontend_new_registration",
              "Frontend→CRM new_registration",
              xml, "", "crm.incoming", "crm.incoming")
 
 
-# ── Flow 02 : CRM → Kassa  new_registration ───────────────────────────────────
+# ── Flow 02 : CRM → Kassa  new_registration (§10.1) ──────────────────────────
 def flow_crm_kassa_new_registration(cfg):
     header("Flow 02 · CRM → Kassa  [new_registration]  →  kassa.incoming")
+    corr = new_uuid()
     body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
         <customer>
+          <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+          <email>lena.declercq@test.be</email>
+          <date_of_birth>1995-03-21</date_of_birth>
           <contact>
             <first_name>Lena</first_name>
             <last_name>Declercq</last_name>
-            <email>lena.declercq@test.be</email>
-            <date_of_birth>1995-03-21</date_of_birth>
           </contact>
-          <company_name>InnovateBedrijf BV</company_name>
-          <vat_number>BE0123456789</vat_number>
-          <type>company</type>
-        </customer>
-        <payment_due currency="eur">250.00</payment_due>"""
-    xml = build_message("new_registration", "crm", body)
+          <type>private</type>
+          <session_id>sess-2026-001</session_id>
+          <session_title>Keynote: AI in Business</session_title>
+          <payment_due>
+            <amount currency="eur">25.00</amount>
+            <status>unpaid</status>
+          </payment_due>
+        </customer>"""
+    xml = build_message("new_registration", "crm", body, correlation_id=corr)
     run_flow(cfg, "crm_to_kassa_new_registration",
              "CRM→Kassa new_registration",
              xml, "kassa.exchange", "kassa.incoming", "kassa.incoming")
 
 
-# ── Flow 03 : Kassa → CRM  consumption_order ──────────────────────────────────
-def flow_kassa_crm_consumption_order(cfg):
+# ── Flow 03 : Kassa → CRM  consumption_order (§6.1 v2.3) ─────────────────────
+def flow_kassa_consumption_order(cfg):
     header("Flow 03 · Kassa → CRM  [consumption_order]  →  kassa.payments.consumption")
     body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <badge_id>BADGE-7001</badge_id>
+        <customer>
+          <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+          <type>private</type>
+          <email>lena.declercq@test.be</email>
+        </customer>
         <items>
           <item>
-            <name>Koffie</name>
+            <id>item-001</id>
+            <sku>KOFFIE</sku>
+            <description>Koffie</description>
             <quantity>2</quantity>
             <unit_price currency="eur">3.00</unit_price>
+            <vat_rate>21</vat_rate>
             <total_amount currency="eur">6.00</total_amount>
           </item>
           <item>
-            <name>Lunch sandwich</name>
+            <id>item-002</id>
+            <sku>LUNCH</sku>
+            <description>Lunch sandwich</description>
             <quantity>1</quantity>
             <unit_price currency="eur">7.50</unit_price>
+            <vat_rate>6</vat_rate>
             <total_amount currency="eur">7.50</total_amount>
           </item>
-        </items>
-        <total_order_amount currency="eur">13.50</total_order_amount>"""
-    xml = build_message("consumption_order", "kassa", body,
-                        correlation_id=new_uuid())
-    run_flow(cfg, "kassa_to_crm_consumption_order",
+        </items>"""
+    xml = build_message("consumption_order", "kassa", body, correlation_id=new_uuid())
+    run_flow(cfg, "kassa_consumption_order",
              "Kassa→CRM consumption_order",
              xml, "kassa.exchange", "kassa.payments.consumption", "crm.incoming")
 
 
-# ── Flow 04 : Kassa → CRM  payment_registered ─────────────────────────────────
-def flow_kassa_crm_payment_registered(cfg):
-    header("Flow 04 · Kassa → CRM  [payment_registered]  →  kassa.payments.registration")
+# ── Flow 04 : Kassa → CRM/Facturatie  payment_registered (§6.5 / §6.6) ────────
+def flow_kassa_payment_registered(cfg):
+    header("Flow 04 · Kassa → CRM/Facturatie  [payment_registered]  →  kassa.payments.registration")
     body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <badge_id>BADGE-7001</badge_id>
-        <amount_paid currency="eur">250.00</amount_paid>
-        <payment_method>badge_wallet</payment_method>"""
-    xml = build_message("payment_registered", "kassa", body,
-                        correlation_id=new_uuid())
-    run_flow(cfg, "kassa_to_crm_payment_registered",
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+        <invoice>
+          <id>INV-KASSA-2026-001</id>
+          <amount_paid currency="eur">25.00</amount_paid>
+          <status>paid</status>
+        </invoice>
+        <payment_context>session_registration</payment_context>
+        <transaction>
+          <id>TXN-2026-001</id>
+          <payment_method>on_site</payment_method>
+        </transaction>"""
+    xml = build_message("payment_registered", "kassa", body, correlation_id=new_uuid())
+    run_flow(cfg, "kassa_payment_registered",
              "Kassa→CRM payment_registered",
              xml, "kassa.exchange", "kassa.payments.registration", "crm.incoming")
 
 
-# ── Flow 05 : CRM → Facturatie  invoice_request ───────────────────────────────
+# ── Flow 05 : CRM → Facturatie  invoice_request (§11.1) ──────────────────────
 def flow_crm_facturatie_invoice_request(cfg):
     header("Flow 05 · CRM → Facturatie  [invoice_request]  →  facturatie.incoming")
     corr = new_uuid()
-    body = f"""\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
+    body = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
         <invoice_data>
-          <company_name>InnovateBedrijf BV</company_name>
-          <vat_number>BE0123456789</vat_number>
           <contact>
             <first_name>Lena</first_name>
             <last_name>Declercq</last_name>
-            <email>lena.declercq@test.be</email>
           </contact>
-          <amount_due currency="eur">450.00</amount_due>
-          <description>Inschrijving evenement 2026</description>
+          <email>lena.declercq@test.be</email>
+          <address>
+            <street>Tervurenlaan</street>
+            <number>1</number>
+            <postal_code>1040</postal_code>
+            <city>Brussel</city>
+            <country>BE</country>
+          </address>
         </invoice_data>"""
     xml = build_message("invoice_request", "crm", body, correlation_id=corr)
     run_flow(cfg, "crm_to_facturatie_invoice_request",
@@ -1023,52 +1366,112 @@ def flow_crm_facturatie_invoice_request(cfg):
              xml, "", "facturatie.incoming", "facturatie.incoming")
 
 
-# ── Flow 06 : CRM → Mailing  send_mailing ─────────────────────────────────────
+# ── Flow 06 : CRM → Mailing  send_mailing (§12.1) ────────────────────────────
 def flow_crm_mailing_send_mailing(cfg):
     header("Flow 06 · CRM → Mailing  [send_mailing]  →  crm.to.mailing")
+    corr = new_uuid()
     body = """\
-        <recipient_email>lena.declercq@test.be</recipient_email>
-        <recipient_name>Lena Declercq</recipient_name>
-        <subject>Bevestiging inschrijving evenement 2026</subject>
-        <template_id>registration_confirmation</template_id>"""
-    xml = build_message("send_mailing", "crm", body)
-    run_flow(cfg, "crm_to_mailing_send_mailing",
+        <campaign_id>sg-campaign-reg-001</campaign_id>
+        <subject>Bevestiging inschrijving Shiftfestival 2026</subject>
+        <mail_type>registration_confirmation</mail_type>
+        <recipients>
+          <recipient>
+            <email>lena.declercq@test.be</email>
+            <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+            <contact>
+              <first_name>Lena</first_name>
+              <last_name>Declercq</last_name>
+            </contact>
+          </recipient>
+        </recipients>
+        <template_data>{"session_title":"Keynote: AI in Business","session_date":"15 mei 2026 14:00"}</template_data>"""
+    xml = build_message("send_mailing", "crm", body, correlation_id=corr)
+    run_flow(cfg, "send_mailing",
              "CRM→Mailing send_mailing",
              xml, "", "crm.to.mailing", "crm.to.mailing")
 
 
-# ── Flow 07 : Facturatie → Mailing  send_mailing ──────────────────────────────
+# ── Flow 07 : Facturatie → Mailing  send_mailing (§13.1) ─────────────────────
 def flow_facturatie_mailing_send_mailing(cfg):
     header("Flow 07 · Facturatie → Mailing  [send_mailing]  →  facturatie.to.mailing")
+    corr = new_uuid()
     body = """\
-        <recipient_email>lena.declercq@test.be</recipient_email>
-        <recipient_name>Lena Declercq</recipient_name>
-        <subject>Uw factuur voor evenement 2026</subject>
-        <template_id>invoice_notification</template_id>"""
-    xml = build_message("send_mailing", "facturatie", body)
-    run_flow(cfg, "crm_to_mailing_send_mailing",
+        <campaign_id>sg-invoice-00142</campaign_id>
+        <subject>Uw factuur voor Shiftfestival 2026</subject>
+        <mail_type>invoice_ready</mail_type>
+        <recipients>
+          <recipient>
+            <email>lena.declercq@test.be</email>
+            <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+            <contact>
+              <first_name>Lena</first_name>
+              <last_name>Declercq</last_name>
+            </contact>
+          </recipient>
+        </recipients>
+        <template_data>{"invoice_id":"foss-inv-00142","amount":"31.50","due_date":"2026-06-15"}</template_data>"""
+    xml = build_message("send_mailing", "facturatie", body, correlation_id=corr)
+    run_flow(cfg, "send_mailing",
              "Facturatie→Mailing send_mailing",
              xml, "", "facturatie.to.mailing", "facturatie.to.mailing")
 
 
-# ── Flow 08 : Facturatie → CRM  invoice_status ────────────────────────────────
+# ── Flow 08 : Facturatie → CRM  invoice_status (§8.1) ────────────────────────
 def flow_facturatie_crm_invoice_status(cfg):
     header("Flow 08 · Facturatie → CRM  [invoice_status]  →  facturatie.to.crm")
     body = """\
-        <invoice_id>INV-2026-001</invoice_id>
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <status>created</status>
-        <amount_due currency="eur">450.00</amount_due>"""
-    xml = build_message("invoice_status", "facturatie", body,
-                        correlation_id=new_uuid())
-    run_flow(cfg, "facturatie_to_crm_invoice_status",
+        <invoice_id>foss-inv-00142</invoice_id>
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+        <status>sent</status>
+        <amount currency="eur">31.50</amount>
+        <due_date>2026-06-15</due_date>"""
+    xml = build_message("invoice_status", "facturatie", body, correlation_id=new_uuid())
+    run_flow(cfg, "facturatie_invoice_status",
              "Facturatie→CRM invoice_status",
              xml, "", "facturatie.to.crm", "facturatie.to.crm")
 
 
-# ── Flow 09 : Planning → CRM  session_created ─────────────────────────────────
+# ── Flow 09 : Facturatie → CRM  payment_registered (§8.2) ────────────────────
+def flow_facturatie_crm_payment_registered(cfg):
+    header("Flow 09 · Facturatie → CRM  [payment_registered]  →  facturatie.to.crm")
+    body = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+        <invoice>
+          <id>foss-inv-00142</id>
+          <amount_paid currency="eur">31.50</amount_paid>
+          <status>paid</status>
+        </invoice>
+        <payment_context>online_invoice</payment_context>
+        <transaction>
+          <id>TXN-ONLINE-2026-001</id>
+          <payment_method>online</payment_method>
+        </transaction>"""
+    xml = build_message("payment_registered", "facturatie", body, correlation_id=new_uuid())
+    run_flow(cfg, "facturatie_payment_registered",
+             "Facturatie→CRM payment_registered",
+             xml, "", "facturatie.to.crm", "facturatie.to.crm")
+
+
+# ── Flow 10 : Mailing → CRM  mailing_status (§9.1) ───────────────────────────
+def flow_mailing_crm_mailing_status(cfg):
+    header("Flow 10 · Mailing → CRM  [mailing_status]  →  mailing.to.crm")
+    body = """\
+        <campaign_id>sg-campaign-reg-001</campaign_id>
+        <subject>Bevestiging inschrijving Shiftfestival 2026</subject>
+        <sent>1</sent>
+        <delivered>1</delivered>
+        <bounced>0</bounced>
+        <opened>1</opened>
+        <status>completed</status>"""
+    xml = build_message("mailing_status", "mailing", body, correlation_id=new_uuid())
+    run_flow(cfg, "mailing_status",
+             "Mailing→CRM mailing_status",
+             xml, "", "mailing.to.crm", "mailing.to.crm")
+
+
+# ── Flow 11 : Planning → CRM  session_created (§7.1) ─────────────────────────
 def flow_planning_crm_session_created(cfg):
-    header("Flow 09 · Planning → CRM  [session_created]  →  planning.exchange / planning.session.created")
+    header("Flow 11 · Planning → CRM  [session_created]  →  planning.exchange / planning.session.created")
     body = """\
         <session_id>sess-2026-001</session_id>
         <title>Keynote: AI in Business</title>
@@ -1078,100 +1481,154 @@ def flow_planning_crm_session_created(cfg):
         <session_type>keynote</session_type>
         <status>published</status>
         <max_attendees>120</max_attendees>
+        <current_attendees>0</current_attendees>
         <speaker>
           <contact>
             <first_name>Prof. Ahmed</first_name>
             <last_name>El-Rashidi</last_name>
           </contact>
+          <organisation>KU Leuven</organisation>
         </speaker>"""
-    xml = build_message("session_created", "planning", body,
-                        correlation_id=new_uuid())
-    run_flow(cfg, "planning_to_crm_session_created",
+    xml = build_message("session_created", "planning", body, correlation_id=new_uuid())
+    run_flow(cfg, "planning_session_created",
              "Planning→CRM session_created",
              xml, "planning.exchange", "planning.session.created",
              "planning.session.events")
 
 
-# ── Flow 10 : Frontend → Planning  calendar_invite ────────────────────────────
-def flow_frontend_planning_calendar_invite(cfg):
-    header("Flow 10 · Frontend → Planning  [calendar_invite]  →  calendar.exchange / frontend.to.planning.calendar.invite")
+# ── Flow 12 : Planning → CRM  session_updated (§7.2) ─────────────────────────
+def flow_planning_crm_session_updated(cfg):
+    header("Flow 12 · Planning → CRM  [session_updated]  →  planning.exchange / planning.session.updated")
     body = """\
+        <session_id>sess-2026-001</session_id>
+        <title>Keynote: AI in Business (Updated)</title>
+        <start_datetime>2026-05-15T14:30:00Z</start_datetime>
+        <end_datetime>2026-05-15T15:30:00Z</end_datetime>
+        <location>Aula B - Campus Jette</location>
+        <session_type>keynote</session_type>
+        <status>published</status>
+        <max_attendees>150</max_attendees>
+        <current_attendees>42</current_attendees>
+        <change_reason>Room change due to higher attendance</change_reason>"""
+    xml = build_message("session_updated", "planning", body, correlation_id=new_uuid())
+    run_flow(cfg, "planning_session_updated",
+             "Planning→CRM session_updated",
+             xml, "planning.exchange", "planning.session.updated",
+             "planning.session.events")
+
+
+# ── Flow 13 : Frontend → Planning  session_create_request (§19.1) ────────────
+def flow_frontend_planning_session_create_request(cfg):
+    header("Flow 13 · Frontend → Planning  [session_create_request]  →  frontend.to.planning.session.create")
+    body = """\
+        <session_id>sess-2026-new-001</session_id>
+        <title>Workshop: Cloud Native Development</title>
+        <start_datetime>2026-05-16T09:00:00Z</start_datetime>
+        <end_datetime>2026-05-16T11:00:00Z</end_datetime>
+        <location>Lab 3 - Campus Jette</location>
+        <session_type>workshop</session_type>
+        <status>draft</status>
+        <max_attendees>30</max_attendees>"""
+    xml = build_message("session_create_request", "frontend", body)
+    run_flow(cfg, "frontend_session_create_request",
+             "Frontend→Planning session_create_request",
+             xml, "planning.exchange", "frontend.to.planning.session.create",
+             "planning.session.requests")
+
+
+# ── Flow 14 : Frontend → Planning  calendar_invite (§19.3) ───────────────────
+def flow_frontend_planning_calendar_invite(cfg):
+    header("Flow 14 · Frontend → Planning  [calendar_invite]  →  calendar.exchange / frontend.to.planning.calendar.invite")
+    body = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
         <session_id>sess-2026-001</session_id>
         <title>Keynote: AI in Business</title>
         <start_datetime>2026-05-15T14:00:00Z</start_datetime>
         <end_datetime>2026-05-15T15:00:00Z</end_datetime>
-        <attendee_email>lena.declercq@test.be</attendee_email>
-        <location>Aula A - Campus Jette</location>"""
+        <location>Aula A - Campus Jette</location>
+        <attendee_email>lena.declercq@test.be</attendee_email>"""
     xml = build_message("calendar_invite", "frontend", body)
-    run_flow(cfg, "frontend_to_planning_calendar_invite",
+    run_flow(cfg, "frontend_calendar_invite",
              "Frontend→Planning calendar_invite",
              xml, "calendar.exchange", "frontend.to.planning.calendar.invite",
              "planning.calendar.invite")
 
 
-# ── Flow 11 : Monitoring → Mailing  system_alert ──────────────────────────────
+# ── Flow 15 : Monitoring → Mailing  system_alert (§4) ────────────────────────
 def flow_monitoring_mailing_system_alert(cfg):
-    header("Flow 11 · Monitoring → Mailing  [system_alert]  →  monitoring.alerts")
-    body = """\
-        <alert_level>critical</alert_level>
-        <affected_team>crm</affected_team>
-        <message>Service crm has been offline for more than 60 seconds</message>
-        <timestamp>2026-05-06T10:00:00Z</timestamp>"""
-    xml = build_message("system_alert", "monitoring", body)
-    run_flow(cfg, "monitoring_to_mailing_system_alert",
-             "Monitoring→Mailing system_alert",
-             xml, "", "monitoring.alerts", "monitoring.alerts")
+    header("Flow 15 · Monitoring → Mailing  [system_alert]  →  monitoring.alerts")
+    xml = build_alert("crm", "Heartbeat timeout: crm has not responded and is considered offline")
+    if cfg.verbose:
+        print(f"\n{CYAN}--- XML ---{RESET}\n{xml}\n")
+    valid = validate(xml, "monitoring_system_alert", "Monitoring→Mailing system_alert")
+    if not valid:
+        warn("Skipping publish — XML failed schema validation")
+        return
+    if publish(cfg, "", "monitoring.alerts", xml):
+        peek_queue(cfg, "monitoring.alerts", "HEARTBEAT_CRITICAL",
+                   "Monitoring→Mailing system_alert")
 
 
-# ── Flow 12 : Heartbeats — all 8 teams ────────────────────────────────────────
+# ── Flow 16 : All Teams → Monitoring  heartbeat (§3) ─────────────────────────
 def flow_heartbeats(cfg):
-    header("Flow 12 · All Teams → Monitoring  [heartbeat]  →  heartbeat")
+    header("Flow 16 · All Teams → Monitoring  [heartbeat]  →  heartbeat")
     teams = ["crm", "kassa", "facturatie", "planning", "mailing",
              "monitoring", "frontend", "identity"]
     for team in teams:
-        body = f"""\
-        <status>online</status>
-        <uptime>60</uptime>"""
+        body = "        <status>online</status>\n        <uptime>60</uptime>"
         xml = build_message("heartbeat", team, body)
         if cfg.verbose:
             print(f"\n{CYAN}--- heartbeat ({team}) ---{RESET}\n{xml}\n")
         validate(xml, "heartbeat", f"heartbeat from {team}")
         if publish(cfg, "", "heartbeat", xml):
-            pass  # check once below
+            pass
     peek_queue(cfg, "heartbeat", "heartbeat",
                "Any heartbeat arrived in monitoring queue")
 
 
 # ── Rejection tests (contract compliance) ─────────────────────────────────────
 def test_schema_rejections():
-    header("Flow DLQ · Contract Violation Rejection Tests")
+    header("Contract Violation Rejection Tests")
 
-    # Contract check: known CRM bug — type should be 'send_mailing', NOT 'mailing_status'
-    # The XSD allows any xs:string for <type> (receiver-side check), so we verify
-    # the CORRECT message validates and document the known violation explicitly.
+    # Correct: valid send_mailing with full recipients structure
     _state["tests"] += 1
-    correct_msg = build_message("send_mailing", "crm",
-                                "<recipient_email>x@x.be</recipient_email>"
-                                "<subject>Test</subject>")
-    schema = COMPILED["crm_to_mailing_send_mailing"]
+    corr = new_uuid()
+    valid_mailing_body = f"""\
+        <campaign_id>sg-test-001</campaign_id>
+        <subject>Test</subject>
+        <mail_type>registration_confirmation</mail_type>
+        <recipients>
+          <recipient>
+            <email>x@test.be</email>
+            <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+            <contact>
+              <first_name>Test</first_name>
+              <last_name>User</last_name>
+            </contact>
+          </recipient>
+        </recipients>"""
+    valid_mailing = build_message("send_mailing", "crm", valid_mailing_body,
+                                  correlation_id=corr)
+    schema_mailing = COMPILED["send_mailing"]
     try:
-        schema.assertValid(etree.parse(BytesIO(correct_msg.encode())))
-        ok("Contract: type='send_mailing' is correct for CRM→Mailing (not 'mailing_status')")
+        schema_mailing.assertValid(etree.parse(BytesIO(valid_mailing.encode())))
+        ok("Contract: correct send_mailing (campaign_id + recipients) validates OK")
     except etree.DocumentInvalid as e:
-        fail(f"Correct send_mailing message failed schema: {e}")
+        fail(f"Valid send_mailing failed schema: {e}")
 
     # Forbidden: xmlns namespace in header (v1.0 leftover)
     _state["tests"] += 1
     xmlns_xml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
         '<message xmlns="urn:integration:planning:v1">'
-        '<header><message_id>x</message_id><timestamp>2026-01-01T00:00:00Z</timestamp>'
+        '<header><message_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</message_id>'
+        '<timestamp>2026-01-01T00:00:00Z</timestamp>'
         '<source>crm</source><type>heartbeat</type><version>2.0</version></header>'
         '<body><status>online</status></body></message>'
     )
-    schema = COMPILED["heartbeat"]
+    schema_hb = COMPILED["heartbeat"]
     try:
-        schema.assertValid(etree.parse(BytesIO(xmlns_xml.encode())))
+        schema_hb.assertValid(etree.parse(BytesIO(xmlns_xml.encode())))
         fail("Should have rejected: xmlns namespace (v1.0 leftover) in header")
     except (etree.DocumentInvalid, etree.XMLSyntaxError):
         ok("Rejected: xmlns namespace in header (Regel 1 violation)")
@@ -1179,52 +1636,104 @@ def test_schema_rejections():
     # Forbidden: version=1.0 instead of 2.0
     _state["tests"] += 1
     v1_xml = build_message("heartbeat", "crm",
-                           "<status>online</status>").replace(
+                           "        <status>online</status>").replace(
         "<version>2.0</version>", "<version>1.0</version>")
     try:
-        schema.assertValid(etree.parse(BytesIO(v1_xml.encode())))
+        schema_hb.assertValid(etree.parse(BytesIO(v1_xml.encode())))
         fail("Should have rejected: version=1.0")
     except etree.DocumentInvalid:
         ok("Rejected: version=1.0 (contract requires 2.0)")
 
-    # Forbidden: <age> instead of <date_of_birth> (known CRM/Frontend bug)
+    # Forbidden: date_of_birth missing, <age> used instead (Regel 4)
     _state["tests"] += 1
-    age_body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <type>private</type>
-        <contact>
-          <first_name>Jan</first_name><last_name>Peeters</last_name>
+    corr2 = new_uuid()
+    age_body = f"""\
+        <customer>
+          <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
           <email>j@j.be</email>
+          <type>private</type>
+          <is_company_linked>false</is_company_linked>
           <age>29</age>
-        </contact>"""
-    age_xml = build_message("new_registration", "frontend", age_body)
-    schema_reg = COMPILED["frontend_to_crm_new_registration"]
+          <contact>
+            <first_name>Jan</first_name><last_name>Peeters</last_name>
+          </contact>
+          <address>Straat 1</address>
+          <session_id>sess-001</session_id>
+          <payment_due>
+            <amount currency="eur">0.00</amount>
+            <status>unpaid</status>
+          </payment_due>
+        </customer>"""
+    age_xml = build_message("new_registration", "frontend", age_body, correlation_id=corr2)
+    schema_reg = COMPILED["frontend_new_registration"]
     try:
         schema_reg.assertValid(etree.parse(BytesIO(age_xml.encode())))
         fail("Should have rejected: <age> field (Regel 4 violation — use date_of_birth)")
     except etree.DocumentInvalid:
         ok("Rejected: <age> field (contract requires <date_of_birth>)")
 
-    # Forbidden: currency attribute missing on monetary amount (Regel 3)
+    # Forbidden: currency attribute missing on monetary item amount (Regel 3)
     _state["tests"] += 1
     no_currency_body = """\
-        <user_id>e8b27c1d-4f2a-4b3e-9c5f-000000000001</user_id>
-        <badge_id>BADGE-001</badge_id>
+        <customer>
+          <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+          <type>private</type>
+        </customer>
         <items>
           <item>
-            <name>Koffie</name><quantity>1</quantity>
+            <id>item-001</id>
+            <sku>KOFFIE</sku>
+            <description>Koffie</description>
+            <quantity>1</quantity>
             <unit_price>3.00</unit_price>
-            <total_amount>3.00</total_amount>
+            <vat_rate>21</vat_rate>
+            <total_amount currency="eur">3.00</total_amount>
           </item>
-        </items>
-        <total_order_amount>3.00</total_order_amount>"""
+        </items>"""
     no_curr_xml = build_message("consumption_order", "kassa", no_currency_body)
-    schema_cons = COMPILED["kassa_to_crm_consumption_order"]
+    schema_cons = COMPILED["kassa_consumption_order"]
     try:
         schema_cons.assertValid(etree.parse(BytesIO(no_curr_xml.encode())))
         fail("Should have rejected: missing currency attribute (Regel 3 violation)")
     except etree.DocumentInvalid:
         ok("Rejected: missing currency attribute on monetary field (Regel 3)")
+
+    # Forbidden: invalid mail_type enum in send_mailing
+    _state["tests"] += 1
+    bad_mailtype_body = f"""\
+        <campaign_id>sg-test-001</campaign_id>
+        <subject>Test</subject>
+        <mail_type>unknown_type</mail_type>
+        <recipients>
+          <recipient>
+            <email>x@test.be</email>
+            <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
+            <contact>
+              <first_name>Test</first_name>
+              <last_name>User</last_name>
+            </contact>
+          </recipient>
+        </recipients>"""
+    bad_type_xml = build_message("send_mailing", "crm", bad_mailtype_body,
+                                  correlation_id=new_uuid())
+    try:
+        schema_mailing.assertValid(etree.parse(BytesIO(bad_type_xml.encode())))
+        fail("Should have rejected: invalid mail_type enum")
+    except etree.DocumentInvalid:
+        ok("Rejected: invalid mail_type enum (must be registration_confirmation etc.)")
+
+    # Forbidden: system_alert as <message> envelope (must be flat <alert> root)
+    _state["tests"] += 1
+    envelope_alert = build_message("system_alert", "monitoring",
+                                   "        <alert_level>critical</alert_level>\n"
+                                   "        <affected_team>crm</affected_team>\n"
+                                   "        <message>offline</message>")
+    schema_alert = COMPILED["monitoring_system_alert"]
+    try:
+        schema_alert.assertValid(etree.parse(BytesIO(envelope_alert.encode())))
+        fail("Should have rejected: system_alert in <message> envelope (must be flat <alert>)")
+    except etree.DocumentInvalid:
+        ok("Rejected: system_alert in <message> envelope (§4 requires flat <alert> root)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1267,8 +1776,8 @@ def main():
     if should_test(cfg, "crm", "kassa"):
         flow_crm_kassa_new_registration(cfg)
     if should_test(cfg, "kassa", "crm"):
-        flow_kassa_crm_consumption_order(cfg)
-        flow_kassa_crm_payment_registered(cfg)
+        flow_kassa_consumption_order(cfg)
+        flow_kassa_payment_registered(cfg)
     if should_test(cfg, "crm", "facturatie"):
         flow_crm_facturatie_invoice_request(cfg)
     if should_test(cfg, "crm", "mailing"):
@@ -1277,9 +1786,14 @@ def main():
         flow_facturatie_mailing_send_mailing(cfg)
     if should_test(cfg, "facturatie", "crm"):
         flow_facturatie_crm_invoice_status(cfg)
+        flow_facturatie_crm_payment_registered(cfg)
+    if should_test(cfg, "mailing", "crm"):
+        flow_mailing_crm_mailing_status(cfg)
     if should_test(cfg, "planning", "crm"):
         flow_planning_crm_session_created(cfg)
+        flow_planning_crm_session_updated(cfg)
     if should_test(cfg, "frontend", "planning"):
+        flow_frontend_planning_session_create_request(cfg)
         flow_frontend_planning_calendar_invite(cfg)
     if should_test(cfg, "monitoring", "mailing"):
         flow_monitoring_mailing_system_alert(cfg)
@@ -1287,7 +1801,6 @@ def main():
                    "planning", "mailing", "frontend", "identity"):
         flow_heartbeats(cfg)
 
-    # Close connection cleanly
     if _conn and _conn.is_open:
         try:
             _conn.close()
