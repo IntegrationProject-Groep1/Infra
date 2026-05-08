@@ -550,6 +550,83 @@ SCHEMAS["kassa_payment_registered"] = b"""<?xml version="1.0" encoding="UTF-8"?>
   </xs:element>
 </xs:schema>"""
 
+# ── IoT/Kassa → Kassa : badge_scanned (§6.3, v2.3) ───────────────────────────
+# Queue: kassa.incoming  (no exchange — direct queue publish)
+# Body: xs:choice — badge_id (badge-scan) OR identity_uuid (QR-scan)
+SCHEMAS["kassa_badge_scanned"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id" type="UUIDType"/>
+          <xs:element name="timestamp"  type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="iot_gateway"/>
+            <xs:enumeration value="kassa"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="badge_scanned"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:choice>
+            <xs:element name="badge_id"      type="xs:string"/>
+            <xs:element name="identity_uuid" type="UUIDType"/>
+          </xs:choice>
+          <xs:element name="location">
+            <xs:simpleType><xs:restriction base="xs:string">
+              <xs:enumeration value="entrance"/>
+              <xs:enumeration value="bar"/>
+              <xs:enumeration value="main_bar"/>
+              <xs:enumeration value="session"/>
+            </xs:restriction></xs:simpleType>
+          </xs:element>
+          <xs:element name="scanned_at" type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Kassa → CRM : wallet_lease_request (§26.1) ────────────────────────────────
+# Exchange: kassa.exchange, routing: kassa.to.crm.wallet_lease_request
+# badge_id is optional (minOccurs="0") — absent on QR-scan, present on badge-scan
+SCHEMAS["kassa_wallet_lease_request"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id" type="UUIDType"/>
+          <xs:element name="timestamp"  type="xs:dateTime"/>
+          <xs:element name="source"     type="xs:string" fixed="kassa"/>
+          <xs:element name="type"       type="xs:string" fixed="wallet_lease_request"/>
+          <xs:element name="version"    type="xs:string" fixed="2.0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="identity_uuid" type="UUIDType"/>
+          <xs:element name="badge_id"      type="xs:string" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
 # ── CRM → Facturatie : invoice_request (§11.1) ────────────────────────────────
 # Queue: facturatie.incoming
 SCHEMAS["crm_to_facturatie_invoice_request"] = b"""<?xml version="1.0" encoding="UTF-8"?>
@@ -1772,6 +1849,55 @@ def flow_logs(cfg):
                "Any log arrived in monitoring queue")
 
 
+# ── Flow 20 : IoT/Kassa → Kassa  badge_scanned (§6.3) ────────────────────────
+def flow_kassa_badge_scanned(cfg):
+    header("Flow 20 · IoT/Kassa → Kassa  [badge_scanned]  →  kassa.incoming")
+
+    # Variant A: badge-scan (iot_gateway source, badge_id in body)
+    body_badge = """\
+        <badge_id>BADGE-0042</badge_id>
+        <location>entrance</location>
+        <scanned_at>2026-05-15T18:06:30Z</scanned_at>"""
+    xml_badge = build_message("badge_scanned", "iot_gateway", body_badge)
+    run_flow(cfg, "kassa_badge_scanned",
+             "IoT→Kassa badge_scanned (badge-scan)",
+             xml_badge, "", "kassa.incoming", "kassa.incoming")
+
+    # Variant B: QR-scan (kassa source, identity_uuid in body)
+    body_qr = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-123456789abc</identity_uuid>
+        <location>entrance</location>
+        <scanned_at>2026-05-15T18:06:35Z</scanned_at>"""
+    xml_qr = build_message("badge_scanned", "kassa", body_qr)
+    run_flow(cfg, "kassa_badge_scanned",
+             "Kassa→Kassa badge_scanned (QR-scan)",
+             xml_qr, "", "kassa.incoming", "kassa.incoming")
+
+
+# ── Flow 21 : Kassa → CRM  wallet_lease_request (§26.1) ──────────────────────
+def flow_kassa_wallet_lease_request(cfg):
+    header("Flow 21 · Kassa → CRM  [wallet_lease_request]  →  kassa.to.crm.wallet_lease_request")
+
+    # Variant A: via badge-scan (identity_uuid + badge_id)
+    body_badge = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-123456789abc</identity_uuid>
+        <badge_id>BADGE-0042</badge_id>"""
+    xml_badge = build_message("wallet_lease_request", "kassa", body_badge)
+    run_flow(cfg, "kassa_wallet_lease_request",
+             "Kassa→CRM wallet_lease_request (via badge)",
+             xml_badge, "kassa.exchange", "kassa.to.crm.wallet_lease_request",
+             "crm.incoming")
+
+    # Variant B: via QR-scan (identity_uuid only, badge_id absent)
+    body_qr = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-123456789abc</identity_uuid>"""
+    xml_qr = build_message("wallet_lease_request", "kassa", body_qr)
+    run_flow(cfg, "kassa_wallet_lease_request",
+             "Kassa→CRM wallet_lease_request (via QR, no badge_id)",
+             xml_qr, "kassa.exchange", "kassa.to.crm.wallet_lease_request",
+             "crm.incoming")
+
+
 # ── Rejection tests (contract compliance) ─────────────────────────────────────
 def test_schema_rejections():
     header("Contract Violation Rejection Tests")
@@ -1921,6 +2047,45 @@ def test_schema_rejections():
     except etree.DocumentInvalid:
         ok("Rejected: system_alert in <message> envelope (§4 requires flat <alert> root)")
 
+    # Forbidden: badge_scanned with both badge_id AND identity_uuid (xs:choice = exactly one)
+    _state["tests"] += 1
+    both_body = """\
+        <badge_id>BADGE-0042</badge_id>
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-123456789abc</identity_uuid>
+        <location>entrance</location>
+        <scanned_at>2026-05-15T18:06:30Z</scanned_at>"""
+    both_xml = build_message("badge_scanned", "iot_gateway", both_body)
+    schema_bs = COMPILED["kassa_badge_scanned"]
+    try:
+        schema_bs.assertValid(parse_xml(both_xml))
+        fail("Should have rejected: badge_scanned with both badge_id and identity_uuid (xs:choice)")
+    except etree.DocumentInvalid:
+        ok("Rejected: badge_scanned with both badge_id+identity_uuid (§6.3 xs:choice enforces exactly one)")
+
+    # Forbidden: badge_scanned with neither badge_id nor identity_uuid
+    _state["tests"] += 1
+    neither_body = """\
+        <location>entrance</location>
+        <scanned_at>2026-05-15T18:06:30Z</scanned_at>"""
+    neither_xml = build_message("badge_scanned", "iot_gateway", neither_body)
+    try:
+        schema_bs.assertValid(parse_xml(neither_xml))
+        fail("Should have rejected: badge_scanned with no identifier")
+    except etree.DocumentInvalid:
+        ok("Rejected: badge_scanned with no identifier (§6.3 xs:choice requires exactly one)")
+
+    # Correct: wallet_lease_request without badge_id (QR-scan path) must be valid
+    _state["tests"] += 1
+    qr_lease_body = """\
+        <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-123456789abc</identity_uuid>"""
+    qr_lease_xml = build_message("wallet_lease_request", "kassa", qr_lease_body)
+    schema_wlr = COMPILED["kassa_wallet_lease_request"]
+    try:
+        schema_wlr.assertValid(parse_xml(qr_lease_xml))
+        ok("Contract: wallet_lease_request without badge_id (QR-scan) validates OK")
+    except etree.DocumentInvalid as e:
+        fail(f"Valid wallet_lease_request (QR-scan, no badge_id) failed schema: {e}")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN
@@ -1965,6 +2130,8 @@ def main():
     if should_test(cfg, "kassa", "crm"):
         flow_kassa_consumption_order(cfg)
         flow_kassa_payment_registered(cfg)
+        flow_kassa_badge_scanned(cfg)
+        flow_kassa_wallet_lease_request(cfg)
     if should_test(cfg, "crm", "facturatie"):
         flow_crm_facturatie_invoice_request(cfg)
     if should_test(cfg, "crm", "mailing"):
