@@ -69,9 +69,6 @@ spec:
           requests:
             memory: "768Mi"
             cpu: "100m"
-          limits:
-            memory: "1536Mi"
-            cpu: "500m"
         volumeMounts:
         - name: pipeline
           mountPath: /usr/share/logstash/pipeline

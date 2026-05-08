@@ -56,34 +56,31 @@ spec:
               name: shift-secrets
               key: ELASTIC_PASSWORD
         - name: ES_JAVA_OPTS
-          value: "-Xms1g -Xmx1g"
+          value: "-Xms512m -Xmx512m"
         livenessProbe:
           exec:
             command:
               - sh
               - -c
               - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
-          initialDelaySeconds: 120
-          periodSeconds: 20
-          timeoutSeconds: 10
-          failureThreshold: 5
+          initialDelaySeconds: 180
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 10
         readinessProbe:
           exec:
             command:
               - sh
               - -c
               - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
-          initialDelaySeconds: 60
-          periodSeconds: 10
-          timeoutSeconds: 10
-          failureThreshold: 5
+          initialDelaySeconds: 90
+          periodSeconds: 20
+          timeoutSeconds: 30
+          failureThreshold: 10
         resources:
           requests:
             memory: "512Mi"
             cpu: "100m"
-          limits:
-            memory: "2Gi"
-            cpu: "1000m"
         volumeMounts:
         - name: es-data
           mountPath: /usr/share/elasticsearch/data
