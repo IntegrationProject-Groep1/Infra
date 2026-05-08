@@ -92,6 +92,22 @@ spec:
               fieldPath: metadata.name
         - name: ELASTIC_NETINFO
           value: "false"
+        - name: HOSTFS
+          value: "/hostfs"
+        livenessProbe:
+          exec:
+            command:
+              - elastic-agent
+              - status
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command:
+              - elastic-agent
+              - status
+          initialDelaySeconds: 10
+          periodSeconds: 10
         resources:
           requests:
             memory: "512Mi"
@@ -117,7 +133,7 @@ spec:
           mountPath: /var/log
           readOnly: true
         - name: state
-          mountPath: /var/lib/elastic-agent-standalone/shift-festival/state
+          mountPath: /usr/share/elastic-agent/state
       volumes:
       - name: agent-node-datastreams
         configMap:
