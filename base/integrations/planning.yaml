@@ -19,6 +19,7 @@ spec:
       containers:
       - name: planning
         image: ghcr.io/integrationproject-groep1/planning:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
