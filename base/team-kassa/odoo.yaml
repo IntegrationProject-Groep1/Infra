@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: kassa-web
 spec:
-  replicas: 0
+  replicas: 1
   selector:
     matchLabels:
       app: kassa-web

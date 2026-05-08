@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: kassa-db
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
