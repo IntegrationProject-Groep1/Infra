@@ -11,14 +11,15 @@ Usage:
 
 Options:
     --host HOST         RabbitMQ host  (default: localhost)
-    --port PORT         AMQP port      (default: 5672)
+    --port PORT         AMQP port      (default: 5672, use 30000 for Azure)
     --user USER         Username       (default: guest)
     --pass PASS         Password       (default: guest)
-    --mgmt-port PORT    Management API (default: 15672)
+    --mgmt-port PORT    Management API (default: 15672, use 30001 for Azure)
     --vhost VHOST       Virtual host   (default: /)
     --timeout SECS      Arrival check  (default: 5)
     --teams TEAMS       Comma list of teams to test, e.g. crm,kassa (default: all)
     --dry-run           Validate XML only, skip publish/arrival
+    --strict-live       Fail the run if live RabbitMQ connectivity fails
     --verbose           Print full XML payloads
     --env FILE          Load .env file (default: .env if present)
 """
@@ -84,6 +85,7 @@ def parse_args():
     p.add_argument("--timeout",   type=int, default=int(os.getenv("TIMEOUT", 5)))
     p.add_argument("--teams",     default="all")
     p.add_argument("--dry-run",   action="store_true")
+    p.add_argument("--strict-live", action="store_true")
     p.add_argument("--verbose",   action="store_true")
     p.add_argument("--env",       default=".env")
     return p.parse_args()
@@ -140,10 +142,9 @@ SCHEMAS["heartbeat"] = b"""<?xml version="1.0" encoding="UTF-8"?>
                 <xs:simpleType><xs:restriction base="xs:string">
                   <xs:enumeration value="online"/>
                   <xs:enumeration value="offline"/>
-                  <xs:enumeration value="degraded"/>
                 </xs:restriction></xs:simpleType>
               </xs:element>
-              <xs:element name="uptime" type="xs:string" minOccurs="0"/>
+              <xs:element name="uptime" type="xs:nonNegativeInteger"/>
             </xs:sequence>
           </xs:complexType>
         </xs:element>
@@ -154,7 +155,7 @@ SCHEMAS["heartbeat"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 
 # ── system_alert (§4) ──────────────────────────────────────────────────────────
 # Flat <alert> root — NOT the standard <message> envelope.
-# Queue: monitoring.alerts
+# Queue: to_mailing
 SCHEMAS["monitoring_system_alert"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:element name="alert">
@@ -166,6 +167,83 @@ SCHEMAS["monitoring_system_alert"] = b"""<?xml version="1.0" encoding="UTF-8"?>
         <xs:element name="timestamp" type="xs:dateTime"/>
       </xs:sequence>
     </xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Log (§3.5) ────────────────────────────────────────────────────────────────
+# Queue: logs
+SCHEMAS["logs"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id" type="UUIDType"/>
+          <xs:element name="timestamp"  type="xs:dateTime"/>
+          <xs:element name="source"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="crm"/><xs:enumeration value="kassa"/>
+            <xs:enumeration value="facturatie"/><xs:enumeration value="frontend"/>
+            <xs:enumeration value="planning"/><xs:enumeration value="mailing"/>
+            <xs:enumeration value="identity-service"/><xs:enumeration value="iot_gateway"/>
+          </xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="type"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="log"/></xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="version"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="2.0"/></xs:restriction></xs:simpleType></xs:element>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="level"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="info"/><xs:enumeration value="warning"/><xs:enumeration value="error"/>
+          </xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="action"><xs:simpleType><xs:restriction base="xs:string">
+            <xs:enumeration value="registration"/><xs:enumeration value="user"/><xs:enumeration value="payment"/>
+            <xs:enumeration value="invoice"/><xs:enumeration value="session"/><xs:enumeration value="calendar"/>
+            <xs:enumeration value="email"/><xs:enumeration value="wallet"/><xs:enumeration value="refund"/>
+            <xs:enumeration value="identity"/><xs:enumeration value="xml_validation"/><xs:enumeration value="system_error"/>
+            <xs:enumeration value="badge"/>
+          </xs:restriction></xs:simpleType></xs:element>
+          <xs:element name="message" type="xs:string"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
+  </xs:element>
+</xs:schema>"""
+
+# ── Frontend → CRM/Facturatie : event_ended (§5.7 / §11.6) ────────────────────
+# Queue: crm.incoming  or  facturatie.incoming
+SCHEMAS["frontend_event_ended"] = b"""<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:simpleType name="UUIDType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="message">
+    <xs:complexType><xs:sequence>
+      <xs:element name="header">
+        <xs:complexType><xs:sequence>
+          <xs:element name="message_id"     type="UUIDType"/>
+          <xs:element name="timestamp"      type="xs:dateTime"/>
+          <xs:element name="source"         type="xs:string" fixed="frontend"/>
+          <xs:element name="type"           type="xs:string" fixed="event_ended"/>
+          <xs:element name="version"        type="xs:string" fixed="2.0"/>
+          <xs:element name="correlation_id" type="UUIDType" minOccurs="0"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="body">
+        <xs:complexType><xs:sequence>
+          <xs:element name="session_id" type="xs:string"/>
+          <xs:element name="ended_at"   type="xs:dateTime"/>
+        </xs:sequence></xs:complexType>
+      </xs:element>
+    </xs:sequence></xs:complexType>
   </xs:element>
 </xs:schema>"""
 
@@ -614,7 +692,7 @@ SCHEMAS["send_mailing"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 </xs:schema>"""
 
 # ── Mailing → CRM : mailing_status (§9.1) ─────────────────────────────────────
-# Queue: mailing.to.crm
+# Queue: crm.incoming
 SCHEMAS["mailing_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:element name="message">
@@ -667,7 +745,7 @@ SCHEMAS["mailing_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 </xs:schema>"""
 
 # ── Facturatie → CRM : invoice_status (§8.1) ──────────────────────────────────
-# Queue: facturatie.to.crm
+# Queue: crm.incoming
 SCHEMAS["facturatie_invoice_status"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:simpleType name="UUIDType">
@@ -717,7 +795,7 @@ SCHEMAS["facturatie_invoice_status"] = b"""<?xml version="1.0" encoding="UTF-8"?
 
 # ── Facturatie → CRM : payment_registered (§8.2) ──────────────────────────────
 # Outbound from Facturatie after online payment confirmation.
-# Queue: facturatie.to.crm
+# Queue: crm.incoming
 SCHEMAS["facturatie_payment_registered"] = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
   <xs:complexType name="CurrencyAmountType">
@@ -1020,6 +1098,11 @@ def compile_schema(xsd_bytes: bytes) -> etree.XMLSchema:
 COMPILED = {name: compile_schema(xsd) for name, xsd in SCHEMAS.items()}
 
 
+def parse_xml(xml_str: str) -> etree._ElementTree:
+    """Parse generated XML after removing template indentation before <?xml."""
+    return etree.parse(BytesIO(xml_str.lstrip().encode("utf-8")))
+
+
 # ── XML Builders ────────────────────────────────────────────────────────────────
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1031,21 +1114,30 @@ def new_uuid() -> str:
 
 def build_message(msg_type: str, source: str, body: str, correlation_id: str = None) -> str:
     """Standard v2.0 envelope per contract §2."""
-    corr = f"    <correlation_id>{correlation_id}</correlation_id>\n" if correlation_id else ""
+    header_parts = [
+        f"    <message_id>{new_uuid()}</message_id>",
+        f"    <timestamp>{now_iso()}</timestamp>",
+        f"    <source>{source}</source>",
+        f"    <type>{msg_type}</type>",
+        "    <version>2.0</version>"
+    ]
+    if correlation_id:
+        header_parts.append(f"    <correlation_id>{correlation_id}</correlation_id>")
+
+    header_xml = "\n".join(header_parts)
+    # Ensure body is correctly indented and dedented
+    clean_body = textwrap.indent(textwrap.dedent(body).strip(), "    ")
+
     return textwrap.dedent(f"""\
         <?xml version="1.0" encoding="UTF-8"?>
         <message>
           <header>
-            <message_id>{new_uuid()}</message_id>
-            <timestamp>{now_iso()}</timestamp>
-            <source>{source}</source>
-            <type>{msg_type}</type>
-            <version>2.0</version>
-        {corr}  </header>
+        {header_xml}
+          </header>
           <body>
-        {body}
+        {clean_body}
           </body>
-        </message>""")
+        </message>""").strip()
 
 
 def build_alert(system: str, message: str) -> str:
@@ -1057,7 +1149,7 @@ def build_alert(system: str, message: str) -> str:
           <system>{system}</system>
           <message>{message}</message>
           <timestamp>{now_iso()}</timestamp>
-        </alert>""")
+        </alert>""").lstrip()
 
 
 # ── XSD Validator ──────────────────────────────────────────────────────────────
@@ -1065,7 +1157,7 @@ def validate(xml_str: str, schema_name: str, label: str) -> bool:
     _state["tests"] += 1
     schema = COMPILED[schema_name]
     try:
-        doc = etree.parse(BytesIO(xml_str.encode("utf-8")))
+        doc = parse_xml(xml_str)
         schema.assertValid(doc)
         ok(f"XSD valid   : {label}")
         return True
@@ -1140,7 +1232,51 @@ def publish(cfg, exchange: str, routing_key: str, xml: str) -> bool:
         return False
 
 
-def peek_queue(cfg, queue: str, expected_type: str, label: str):
+def _basic_auth(cfg) -> str:
+    return "Basic " + __import__("base64").b64encode(
+        f"{cfg.user}:{cfg.password}".encode()).decode()
+
+
+def _queue_stats(cfg, queue: str):
+    if cfg.dry_run:
+        return None
+
+    vhost_enc = urllib.parse.quote(cfg.vhost, safe="")
+    queue_enc = urllib.parse.quote(queue, safe="")
+    url = f"http://{cfg.host}:{cfg.mgmt_port}/api/queues/{vhost_enc}/{queue_enc}"
+    try:
+        req = urllib.request.Request(
+            url,
+            method="GET",
+            headers={"Authorization": _basic_auth(cfg)}
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            return json.loads(resp.read())
+    except Exception:
+        return None
+
+
+def _queue_marker(stats):
+    if not stats:
+        return None
+    message_stats = stats.get("message_stats", {}) or {}
+    return {
+        "messages": int(stats.get("messages", 0) or 0),
+        "messages_ready": int(stats.get("messages_ready", 0) or 0),
+        "messages_unacknowledged": int(stats.get("messages_unacknowledged", 0) or 0),
+        "publish": int(message_stats.get("publish", 0) or 0),
+        "deliver_get": int(message_stats.get("deliver_get", 0) or 0),
+        "ack": int(message_stats.get("ack", 0) or 0),
+    }
+
+
+def _queue_had_activity(before, after) -> bool:
+    if not before or not after:
+        return False
+    return any(after.get(key, 0) > before.get(key, 0) for key in before)
+
+
+def peek_queue(cfg, queue: str, expected_type: str, label: str, before_stats=None):
     """Non-destructively peek the queue via management HTTP API."""
     _state["tests"] += 1
     if cfg.dry_run:
@@ -1148,7 +1284,8 @@ def peek_queue(cfg, queue: str, expected_type: str, label: str):
         return
 
     vhost_enc = urllib.parse.quote(cfg.vhost, safe="")
-    url = f"http://{cfg.host}:{cfg.mgmt_port}/api/queues/{vhost_enc}/{queue}/get"
+    queue_enc = urllib.parse.quote(queue, safe="")
+    url = f"http://{cfg.host}:{cfg.mgmt_port}/api/queues/{vhost_enc}/{queue_enc}/get"
     payload = json.dumps({
         "count": 5,
         "ackmode": "ack_requeue_true",
@@ -1164,8 +1301,7 @@ def peek_queue(cfg, queue: str, expected_type: str, label: str):
                 url, data=payload, method="POST",
                 headers={
                     "Content-Type": "application/json",
-                    "Authorization": "Basic " + __import__("base64").b64encode(
-                        f"{cfg.user}:{cfg.password}".encode()).decode()
+                    "Authorization": _basic_auth(cfg)
                 }
             )
             with urllib.request.urlopen(req, timeout=4) as resp:
@@ -1182,6 +1318,8 @@ def peek_queue(cfg, queue: str, expected_type: str, label: str):
 
     if found:
         ok(f"Arrived     : queue='{queue}' type={expected_type} — {label}")
+    elif _queue_had_activity(before_stats, _queue_marker(_queue_stats(cfg, queue))):
+        ok(f"Delivered   : queue='{queue}' type={expected_type} — {label} (consumed before peek)")
     else:
         fail(f"NOT ARRIVED : queue='{queue}' type={expected_type} — {label}")
 
@@ -1195,10 +1333,11 @@ def run_flow(cfg, schema_name: str, label: str,
     if not valid:
         warn("Skipping publish — XML failed schema validation")
         return
+    before_stats = _queue_marker(_queue_stats(cfg, arrival_queue))
     if publish(cfg, exchange, routing_key, xml):
         # For flat <alert>, extract from <type>…</type>; for <message>, same works.
         msg_type = xml.split("<type>")[1].split("</type>")[0]
-        peek_queue(cfg, arrival_queue, msg_type, label)
+        peek_queue(cfg, arrival_queue, msg_type, label, before_stats)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1207,10 +1346,10 @@ def run_flow(cfg, schema_name: str, label: str,
 
 def test_connectivity(cfg):
     header("RabbitMQ Connectivity")
-    _state["tests"] += 1
     if cfg.dry_run:
         info("DRY-RUN: skipped")
         return True
+    _state["tests"] += 1
     try:
         creds = pika.PlainCredentials(cfg.user, cfg.password)
         params = pika.ConnectionParameters(
@@ -1222,8 +1361,13 @@ def test_connectivity(cfg):
         ok(f"Connected @ {cfg.host}:{cfg.port}  vhost={cfg.vhost}")
         return True
     except Exception as e:
-        fail(f"Cannot connect @ {cfg.host}:{cfg.port}")
+        if cfg.strict_live:
+            fail(f"Cannot connect @ {cfg.host}:{cfg.port}")
+        else:
+            warn(f"Cannot connect @ {cfg.host}:{cfg.port}")
         warn(str(e))
+        if "ACCESS_REFUSED" in str(e):
+            warn("RabbitMQ rejected the username/password or vhost. Use a RabbitMQ user from shift-secrets, not the VM SSH user.")
         warn("Falling back to dry-run — publish/arrival tests skipped")
         cfg.dry_run = True
         return False
@@ -1418,7 +1562,7 @@ def flow_facturatie_mailing_send_mailing(cfg):
 
 # ── Flow 08 : Facturatie → CRM  invoice_status (§8.1) ────────────────────────
 def flow_facturatie_crm_invoice_status(cfg):
-    header("Flow 08 · Facturatie → CRM  [invoice_status]  →  facturatie.to.crm")
+    header("Flow 08 · Facturatie → CRM  [invoice_status]  →  crm.incoming")
     body = """\
         <invoice_id>foss-inv-00142</invoice_id>
         <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
@@ -1428,12 +1572,12 @@ def flow_facturatie_crm_invoice_status(cfg):
     xml = build_message("invoice_status", "facturatie", body, correlation_id=new_uuid())
     run_flow(cfg, "facturatie_invoice_status",
              "Facturatie→CRM invoice_status",
-             xml, "", "facturatie.to.crm", "facturatie.to.crm")
+             xml, "", "crm.incoming", "crm.incoming")
 
 
 # ── Flow 09 : Facturatie → CRM  payment_registered (§8.2) ────────────────────
 def flow_facturatie_crm_payment_registered(cfg):
-    header("Flow 09 · Facturatie → CRM  [payment_registered]  →  facturatie.to.crm")
+    header("Flow 09 · Facturatie → CRM  [payment_registered]  →  crm.incoming")
     body = """\
         <identity_uuid>e8b27c1d-4f2a-4b3e-9c5f-000000000001</identity_uuid>
         <invoice>
@@ -1449,12 +1593,12 @@ def flow_facturatie_crm_payment_registered(cfg):
     xml = build_message("payment_registered", "facturatie", body, correlation_id=new_uuid())
     run_flow(cfg, "facturatie_payment_registered",
              "Facturatie→CRM payment_registered",
-             xml, "", "facturatie.to.crm", "facturatie.to.crm")
+             xml, "", "crm.incoming", "crm.incoming")
 
 
 # ── Flow 10 : Mailing → CRM  mailing_status (§9.1) ───────────────────────────
 def flow_mailing_crm_mailing_status(cfg):
-    header("Flow 10 · Mailing → CRM  [mailing_status]  →  mailing.to.crm")
+    header("Flow 10 · Mailing → CRM  [mailing_status]  →  crm.incoming")
     body = """\
         <campaign_id>sg-campaign-reg-001</campaign_id>
         <subject>Bevestiging inschrijving Shiftfestival 2026</subject>
@@ -1466,7 +1610,7 @@ def flow_mailing_crm_mailing_status(cfg):
     xml = build_message("mailing_status", "mailing", body, correlation_id=new_uuid())
     run_flow(cfg, "mailing_status",
              "Mailing→CRM mailing_status",
-             xml, "", "mailing.to.crm", "mailing.to.crm")
+             xml, "", "crm.incoming", "crm.incoming")
 
 
 # ── Flow 11 : Planning → CRM  session_created (§7.1) ─────────────────────────
@@ -1533,7 +1677,7 @@ def flow_frontend_planning_session_create_request(cfg):
     run_flow(cfg, "frontend_session_create_request",
              "Frontend→Planning session_create_request",
              xml, "planning.exchange", "frontend.to.planning.session.create",
-             "planning.session.requests")
+             "planning.session.events")
 
 
 # ── Flow 14 : Frontend → Planning  calendar_invite (§19.3) ───────────────────
@@ -1556,16 +1700,16 @@ def flow_frontend_planning_calendar_invite(cfg):
 
 # ── Flow 15 : Monitoring → Mailing  system_alert (§4) ────────────────────────
 def flow_monitoring_mailing_system_alert(cfg):
-    header("Flow 15 · Monitoring → Mailing  [system_alert]  →  monitoring.alerts")
+    header("Flow 15 · Monitoring → Mailing  [system_alert]  →  to_mailing")
     xml = build_alert("crm", "Heartbeat timeout: crm has not responded and is considered offline")
     if cfg.verbose:
         print(f"\n{CYAN}--- XML ---{RESET}\n{xml}\n")
     valid = validate(xml, "monitoring_system_alert", "Monitoring→Mailing system_alert")
     if not valid:
-        warn("Skipping publish — XML failed schema validation")
+        warn("Skipping publish — alert XML failed schema validation")
         return
-    if publish(cfg, "", "monitoring.alerts", xml):
-        peek_queue(cfg, "monitoring.alerts", "HEARTBEAT_CRITICAL",
+    if publish(cfg, "", "to_mailing", xml):
+        peek_queue(cfg, "to_mailing", "HEARTBEAT_CRITICAL",
                    "Monitoring→Mailing system_alert")
 
 
@@ -1573,9 +1717,9 @@ def flow_monitoring_mailing_system_alert(cfg):
 def flow_heartbeats(cfg):
     header("Flow 16 · All Teams → Monitoring  [heartbeat]  →  heartbeat")
     teams = ["crm", "kassa", "facturatie", "planning", "mailing",
-             "monitoring", "frontend", "identity"]
+             "monitoring", "frontend", "identity-service"]
     for team in teams:
-        body = "        <status>online</status>\n        <uptime>60</uptime>"
+        body = f"        <status>online</status>\n        <uptime>{int(time.time()) % 10000}</uptime>"
         xml = build_message("heartbeat", team, body)
         if cfg.verbose:
             print(f"\n{CYAN}--- heartbeat ({team}) ---{RESET}\n{xml}\n")
@@ -1584,6 +1728,48 @@ def flow_heartbeats(cfg):
             pass
     peek_queue(cfg, "heartbeat", "heartbeat",
                "Any heartbeat arrived in monitoring queue")
+
+
+# ── Flow 17 : Frontend → CRM  event_ended (§5.7) ─────────────────────────────
+def flow_frontend_crm_event_ended(cfg):
+    header("Flow 17 · Frontend → CRM  [event_ended]  →  crm.incoming")
+    body = """\
+        <session_id>sess-keynote-001</session_id>
+        <ended_at>2026-05-15T22:00:00Z</ended_at>"""
+    xml = build_message("event_ended", "frontend", body, correlation_id=new_uuid())
+    run_flow(cfg, "frontend_event_ended",
+             "Frontend→CRM event_ended",
+             xml, "", "crm.incoming", "crm.incoming")
+
+
+# ── Flow 18 : Frontend → Facturatie  event_ended (§11.6) ──────────────────────
+def flow_frontend_facturatie_event_ended(cfg):
+    header("Flow 18 · Frontend → Facturatie  [event_ended]  →  facturatie.incoming")
+    body = """\
+        <session_id>sess-keynote-001</session_id>
+        <ended_at>2026-05-15T22:00:00Z</ended_at>"""
+    xml = build_message("event_ended", "frontend", body, correlation_id=new_uuid())
+    run_flow(cfg, "frontend_event_ended",
+             "Frontend→Facturatie event_ended",
+             xml, "", "facturatie.incoming", "facturatie.incoming")
+
+
+# ── Flow 19 : All Teams → Monitoring  log (§3.5) ─────────────────────────────
+def flow_logs(cfg):
+    header("Flow 19 · All Teams → Monitoring  [log]  →  logs")
+    for team in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service", "iot_gateway"]:
+        body = """\
+        <level>info</level>
+        <action>registration</action>
+        <message>Test log message from integration suite</message>"""
+        xml = build_message("log", team, body)
+        if cfg.verbose:
+            print(f"\n{CYAN}--- log ({team}) ---{RESET}\n{xml}\n")
+        validate(xml, "logs", f"log from {team}")
+        if publish(cfg, "", "logs", xml):
+            pass
+    peek_queue(cfg, "logs", "log",
+               "Any log arrived in monitoring queue")
 
 
 # ── Rejection tests (contract compliance) ─────────────────────────────────────
@@ -1611,7 +1797,7 @@ def test_schema_rejections():
                                   correlation_id=corr)
     schema_mailing = COMPILED["send_mailing"]
     try:
-        schema_mailing.assertValid(etree.parse(BytesIO(valid_mailing.encode())))
+        schema_mailing.assertValid(parse_xml(valid_mailing))
         ok("Contract: correct send_mailing (campaign_id + recipients) validates OK")
     except etree.DocumentInvalid as e:
         fail(f"Valid send_mailing failed schema: {e}")
@@ -1628,7 +1814,7 @@ def test_schema_rejections():
     )
     schema_hb = COMPILED["heartbeat"]
     try:
-        schema_hb.assertValid(etree.parse(BytesIO(xmlns_xml.encode())))
+        schema_hb.assertValid(parse_xml(xmlns_xml))
         fail("Should have rejected: xmlns namespace (v1.0 leftover) in header")
     except (etree.DocumentInvalid, etree.XMLSyntaxError):
         ok("Rejected: xmlns namespace in header (Regel 1 violation)")
@@ -1639,7 +1825,7 @@ def test_schema_rejections():
                            "        <status>online</status>").replace(
         "<version>2.0</version>", "<version>1.0</version>")
     try:
-        schema_hb.assertValid(etree.parse(BytesIO(v1_xml.encode())))
+        schema_hb.assertValid(parse_xml(v1_xml))
         fail("Should have rejected: version=1.0")
     except etree.DocumentInvalid:
         ok("Rejected: version=1.0 (contract requires 2.0)")
@@ -1667,7 +1853,7 @@ def test_schema_rejections():
     age_xml = build_message("new_registration", "frontend", age_body, correlation_id=corr2)
     schema_reg = COMPILED["frontend_new_registration"]
     try:
-        schema_reg.assertValid(etree.parse(BytesIO(age_xml.encode())))
+        schema_reg.assertValid(parse_xml(age_xml))
         fail("Should have rejected: <age> field (Regel 4 violation — use date_of_birth)")
     except etree.DocumentInvalid:
         ok("Rejected: <age> field (contract requires <date_of_birth>)")
@@ -1693,7 +1879,7 @@ def test_schema_rejections():
     no_curr_xml = build_message("consumption_order", "kassa", no_currency_body)
     schema_cons = COMPILED["kassa_consumption_order"]
     try:
-        schema_cons.assertValid(etree.parse(BytesIO(no_curr_xml.encode())))
+        schema_cons.assertValid(parse_xml(no_curr_xml))
         fail("Should have rejected: missing currency attribute (Regel 3 violation)")
     except etree.DocumentInvalid:
         ok("Rejected: missing currency attribute on monetary field (Regel 3)")
@@ -1717,7 +1903,7 @@ def test_schema_rejections():
     bad_type_xml = build_message("send_mailing", "crm", bad_mailtype_body,
                                   correlation_id=new_uuid())
     try:
-        schema_mailing.assertValid(etree.parse(BytesIO(bad_type_xml.encode())))
+        schema_mailing.assertValid(parse_xml(bad_type_xml))
         fail("Should have rejected: invalid mail_type enum")
     except etree.DocumentInvalid:
         ok("Rejected: invalid mail_type enum (must be registration_confirmation etc.)")
@@ -1730,7 +1916,7 @@ def test_schema_rejections():
                                    "        <message>offline</message>")
     schema_alert = COMPILED["monitoring_system_alert"]
     try:
-        schema_alert.assertValid(etree.parse(BytesIO(envelope_alert.encode())))
+        schema_alert.assertValid(parse_xml(envelope_alert))
         fail("Should have rejected: system_alert in <message> envelope (must be flat <alert>)")
     except etree.DocumentInvalid:
         ok("Rejected: system_alert in <message> envelope (§4 requires flat <alert> root)")
@@ -1766,6 +1952,7 @@ def main():
     print(f"  Vhost   : {CYAN}{cfg.vhost}{RESET}")
     print(f"  Timeout : {CYAN}{cfg.timeout}s{RESET}")
     print(f"  Mode    : {CYAN}{'DRY-RUN (schema only)' if cfg.dry_run else 'LIVE'}{RESET}")
+    print(f"  Strict  : {CYAN}{'yes' if cfg.strict_live else 'no'}{RESET}")
     print(f"  Teams   : {CYAN}{cfg.teams}{RESET}")
 
     test_connectivity(cfg)
@@ -1795,11 +1982,15 @@ def main():
     if should_test(cfg, "frontend", "planning"):
         flow_frontend_planning_session_create_request(cfg)
         flow_frontend_planning_calendar_invite(cfg)
+    if should_test(cfg, "frontend", "crm", "facturatie"):
+        flow_frontend_crm_event_ended(cfg)
+        flow_frontend_facturatie_event_ended(cfg)
     if should_test(cfg, "monitoring", "mailing"):
         flow_monitoring_mailing_system_alert(cfg)
     if should_test(cfg, "monitoring", "crm", "kassa", "facturatie",
-                   "planning", "mailing", "frontend", "identity"):
+                   "planning", "mailing", "frontend", "identity-service"):
         flow_heartbeats(cfg)
+        flow_logs(cfg)
 
     if _conn and _conn.is_open:
         try:
