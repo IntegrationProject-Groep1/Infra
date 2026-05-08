@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img alt="Tests" src="https://img.shields.io/badge/Tests-70%20checks-2f855a?style=for-the-badge&logo=checkmarx&logoColor=white&labelColor=0b1f2a">
+  <img alt="Tests" src="https://img.shields.io/badge/Tests-374%20checks-2f855a?style=for-the-badge&logo=checkmarx&logoColor=white&labelColor=0b1f2a">
   <img alt="Flows" src="https://img.shields.io/badge/Flows-21%20message%20flows-1e40af?style=for-the-badge&logo=rabbitmq&logoColor=white&labelColor=0b1f2a">
   <img alt="Contract" src="https://img.shields.io/badge/Contract-v2.3-0a7ea4?style=for-the-badge&logo=files&logoColor=white&labelColor=0b1f2a">
   <img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-f59e0b?style=for-the-badge&logo=python&logoColor=white&labelColor=0b1f2a">
@@ -170,7 +170,7 @@ Het script bewijst ook dat **ongeldige** berichten correct worden **afgewezen** 
 
 ---
 
-### Log-matrix (312 XSD-validaties)
+### Log-matrix (312 XSD-validaties — grootste blok)
 Alle combinaties van **8 teams × 13 acties × 3 niveaus** worden gevalideerd:
 
 | Teams | Acties | Niveaus |

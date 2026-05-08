@@ -1955,19 +1955,36 @@ def flow_frontend_facturatie_event_ended(cfg):
 # ── Flow 19 : All Teams → Monitoring  log (§3.5) ─────────────────────────────
 def flow_logs(cfg):
     header("Flow 19 · All Teams → Monitoring  [log]  →  logs")
-    for team in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service", "iot_gateway"]:
+    teams   = ["crm", "kassa", "facturatie", "frontend", "planning",
+               "mailing", "identity-service", "iot_gateway"]
+    actions = ["registration", "user", "payment", "invoice", "session",
+               "calendar", "email", "wallet", "refund", "identity",
+               "xml_validation", "system_error", "badge"]
+    levels  = ["info", "warning", "error"]
+
+    # Validate all 8 × 13 × 3 = 312 combinations against the log XSD
+    for team in teams:
+        for action in actions:
+            for level in levels:
+                body = f"""\
+        <level>{level}</level>
+        <action>{action}</action>
+        <message>Test log [{level}] [{action}] from {team}</message>"""
+                xml = build_message("log", team, body)
+                if cfg.verbose:
+                    print(f"\n{CYAN}--- log ({team}/{action}/{level}) ---{RESET}\n{xml}\n")
+                validate(xml, "logs", f"log {team}/{action}/{level}")
+
+    # Publish one message per team (live routing check)
+    for team in teams:
         body = """\
         <level>info</level>
         <action>registration</action>
-        <message>Test log message from integration suite</message>"""
+        <message>Integration test log message</message>"""
         xml = build_message("log", team, body)
-        if cfg.verbose:
-            print(f"\n{CYAN}--- log ({team}) ---{RESET}\n{xml}\n")
-        validate(xml, "logs", f"log from {team}")
-        if publish(cfg, "", "logs", xml):
-            pass
-    peek_queue(cfg, "logs", "log",
-               "Any log arrived in monitoring queue")
+        publish(cfg, "", "logs", xml)
+
+    peek_queue(cfg, "logs", "log", "Any log arrived in monitoring queue")
 
 
 # ── Flow 20 : IoT/Kassa → Kassa  badge_scanned (§6.3) ────────────────────────
