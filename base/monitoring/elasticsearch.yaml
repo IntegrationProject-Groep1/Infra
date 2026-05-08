@@ -63,8 +63,9 @@ spec:
               - sh
               - -c
               - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
-          initialDelaySeconds: 60
+          initialDelaySeconds: 120
           periodSeconds: 20
+          timeoutSeconds: 10
           failureThreshold: 5
         readinessProbe:
           exec:
@@ -72,13 +73,14 @@ spec:
               - sh
               - -c
               - curl -sf -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 10
+          timeoutSeconds: 10
           failureThreshold: 5
         resources:
           requests:
-            memory: "1Gi"
-            cpu: "200m"
+            memory: "512Mi"
+            cpu: "100m"
           limits:
             memory: "2Gi"
             cpu: "1000m"
