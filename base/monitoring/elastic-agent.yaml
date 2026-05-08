@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: elastic-agent
+  labels:
+    app: elastic-agent
+spec:
+  selector:
+    matchLabels:
+      app: elastic-agent
+  template:
+    metadata:
+      labels:
+        app: elastic-agent
+    spec:
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      containers:
+      - name: elastic-agent
+        image: docker.elastic.co/beats/elastic-agent:8.17.0
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: HOSTFS
+          value: /hostfs
+        - name: STATE_PATH
+          value: /usr/share/elastic-agent/state
+        - name: FLEET_ENROLL
+          value: "1"
+        - name: FLEET_URL
+          value: "https://fleet-server:8220" # Pas aan indien nodig
+        - name: FLEET_ENROLLMENT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FLEET_ENROLLMENT_TOKEN
+        securityContext:
+          runAsUser: 0
+          privileged: true
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 600m
+            memory: 1200Mi
+        livenessProbe:
+          exec:
+            command: ["elastic-agent", "status"]
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command: ["elastic-agent", "status"]
+          initialDelaySeconds: 15
+          periodSeconds: 10
+        volumeMounts:
+        - name: hostfs
+          mountPath: /hostfs
+          readOnly: true
+        - name: state
+          mountPath: /usr/share/elastic-agent/state
+      volumes:
+      - name: hostfs
+        hostPath:
+          path: /
+      - name: state
+        hostPath:
+          path: /var/lib/elastic-agent/state
+          type: DirectoryOrCreate
