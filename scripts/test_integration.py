@@ -1549,13 +1549,7 @@ def test_connectivity(cfg):
         return True
     _state["tests"] += 1
     try:
-        creds = pika.PlainCredentials(cfg.user, cfg.password)
-        params = pika.ConnectionParameters(
-            host=cfg.host, port=cfg.port, virtual_host=cfg.vhost,
-            credentials=creds, socket_timeout=5,
-            connection_attempts=2, retry_delay=1
-        )
-        pika.BlockingConnection(params).close()
+        get_channel(cfg)
         ok(f"Connected @ {cfg.host}:{cfg.port}  vhost={cfg.vhost}")
         return True
     except Exception as e:
@@ -1563,7 +1557,7 @@ def test_connectivity(cfg):
             fail(f"Cannot connect @ {cfg.host}:{cfg.port}")
         else:
             warn(f"Cannot connect @ {cfg.host}:{cfg.port}")
-        warn(str(e))
+        warn(f"{type(e).__name__}: {e}")
         if "ACCESS_REFUSED" in str(e):
             warn("RabbitMQ rejected the username/password or vhost. Use a RabbitMQ user from shift-secrets, not the VM SSH user.")
         warn("Falling back to dry-run — publish/arrival tests skipped")
