@@ -7,14 +7,6 @@ resources:
   - ../../base
   - namespace.yaml
 
-generatorOptions:
-  disableNameSuffixHash: true
-
-secretGenerator:
-  - name: cloudflare-tunnel-secret
-    envs:
-      - .env.cloudflare
-
 images:
   - name: ghcr.io/integrationproject-groep1/heartbeat
     newTag: prod
