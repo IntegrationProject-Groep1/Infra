@@ -7,5 +7,4 @@ resources:
   - logstash.yaml
   - kibana.yaml
   - monitoring-agent.yaml
-  - elastic-agent.yaml
   - heartbeat.yaml
