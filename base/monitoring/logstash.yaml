@@ -57,12 +57,12 @@ spec:
               key: ELASTIC_PASSWORD
         livenessProbe:
           tcpSocket:
-            port: 5044
+            port: 9600
           initialDelaySeconds: 60
           periodSeconds: 20
         readinessProbe:
           tcpSocket:
-            port: 5044
+            port: 9600
           initialDelaySeconds: 30
           periodSeconds: 10
         resources:
