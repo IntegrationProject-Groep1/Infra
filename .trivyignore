@@ -1,0 +1,10 @@
+# Ignore host network for monitoring agent
+KSV-0009
+# Ignore read-only root filesystem for monitoring agent
+KSV-0014
+# Ignore privileged container for monitoring agent
+KSV-0017
+# Ignore root privileges for monitoring agent
+KSV-0118
+# Ignore hostPath mounts for monitoring agent
+KSV-0121
