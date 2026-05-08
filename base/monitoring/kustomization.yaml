@@ -8,3 +8,4 @@ resources:
   - kibana.yaml
   - monitoring-agent.yaml
   - heartbeat.yaml
+  - elastic-agent.yaml
