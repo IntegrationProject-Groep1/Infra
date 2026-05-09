@@ -237,6 +237,7 @@ spec:
             - --configmap=$(POD_NAMESPACE)/ingress-nginx-controller
             - --ingress-class=nginx
             - --publish-service=$(POD_NAMESPACE)/ingress-nginx-controller-service
+            - --enable-ssl-passthrough
             - --http-port=8080
             - --https-port=8443
           securityContext:
