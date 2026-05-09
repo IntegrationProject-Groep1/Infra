@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ingress-nginx
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -11,6 +12,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: ingress-nginx
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -88,6 +90,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: ingress-nginx
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -107,6 +110,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ingress-nginx-controller
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -118,6 +122,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ingress-nginx-controller
+  namespace: shift-festival
   labels:
     app: ingress-nginx
     project: shift-festival
@@ -131,6 +136,7 @@ spec:
       app: ingress-nginx
   template:
     metadata:
+      namespace: shift-festival
       labels:
         app: ingress-nginx
     spec:
@@ -170,6 +176,8 @@ spec:
               containerPort: 8080
             - name: https
               containerPort: 8443
+            - name: health
+              containerPort: 10254
           livenessProbe:
             httpGet:
               path: /healthz
@@ -193,6 +201,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ingress-nginx-controller-service
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -216,6 +225,7 @@ metadata:
   name: nginx
   annotations:
     ingressclass.kubernetes.io/is-default-class: "true"
+  namespace: shift-festival
   labels:
     project: shift-festival
     managed-by: Team-Infra
