@@ -3,11 +3,20 @@ kind: Ingress
 metadata:
   name: frontend-ingress
   namespace: shift-festival
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx
   rules:
   - host: desiderius.me
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend-drupal-service
+            port:
+              number: 80
+  - host: frontend.desiderius.me
     http:
       paths:
       - path: /

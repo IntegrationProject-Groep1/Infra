@@ -3,9 +3,8 @@ kind: Ingress
 metadata:
   name: kibana-ingress
   namespace: shift-festival
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx
   rules:
   - host: kibana.desiderius.me
     http:

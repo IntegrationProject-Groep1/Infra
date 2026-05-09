@@ -4,10 +4,10 @@ metadata:
   name: kassa-ingress
   namespace: shift-festival
   annotations:
-    kubernetes.io/ingress.class: "nginx"
     # Optioneel: voeg hier specifieke Nginx instellingen toe
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 spec:
+  ingressClassName: nginx
   rules:
   - host: kassa.desiderius.me
     http:
