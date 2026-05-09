@@ -10,3 +10,5 @@ KSV-0118
 KSV-0121
 # Ignore ClusterRole secret access for ingress-nginx (standard requirement)
 KSV-0041
+# Ignore ExternalName services used for cross-namespace routing (ArgoCD/Dashboard)
+KSV-0108

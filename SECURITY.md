@@ -84,6 +84,11 @@ Selected services use NodePorts within assigned team ranges (30000–30100). Acc
   - **Findings:** ClusterRole 'ingress-nginx' has access to manage (list/watch) resource 'secrets'.
   - **Decision:** Accepted. The NGINX Ingress Controller requires `list` and `watch` permissions on secrets at the cluster scope to monitor TLS certificate changes across namespaces. This is a standard requirement for the component. Finding is suppressed via inline comment `# trivy:ignore:KSV-0041`.
 
+- [x] **A3 — Trivy: ExternalName services for cross-namespace routing (KSV-0108)**
+  - **Affected file:** `base/core/external-ingress.yaml`
+  - **Findings:** Services 'argocd-server-alias' and 'kubernetes-dashboard-alias' use `externalName`.
+  - **Decision:** Accepted. These aliases are used to allow the NGINX Ingress Controller (running in the `shift-festival` namespace) to route traffic to the ArgoCD and Kubernetes Dashboard services in their respective namespaces. Since these aliases point to internal `.svc.cluster.local` addresses and not external internet IPs, the risk associated with CVE-2020-8554 is mitigated. Finding is suppressed via `.trivyignore`.
+
 ### Open Bevindingen / Toekomstige Verbeteringen
 - [ ] **M1 — NetworkPolicies:** Implement Egress/Ingress policies to restrict inter-pod communication (e.g., only the frontend can talk to the frontend-db).
 - [ ] **M2 — Resource Quotas:** Enforce Namespace-level resource limits to prevent noisy neighbor issues.
