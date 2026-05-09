@@ -22,3 +22,5 @@ images:
     newTag: prod
   - name: ghcr.io/integrationproject-groep1/kassa
     newTag: prod
+  - name: ghcr.io/integrationproject-groep1/mailing
+    newTag: prod

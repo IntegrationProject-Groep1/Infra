@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailing-service
+  namespace: shift-festival
+  labels:
+    app: mailing
+    project: shift-festival
+    managed-by: Team-Infra
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailing
+  template:
+    metadata:
+      labels:
+        app: mailing
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: mailing
+        image: ghcr.io/integrationproject-groep1/mailing:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMAILING_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMAILING_PASS
+        - name: RABBITMQ_VHOST
+          value: "/"
+        - name: SENDGRID_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_API_KEY
+        - name: FROM_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FROM_EMAIL
+        - name: ADMIN_EMAILS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ADMIN_EMAILS
+        - name: SENDGRID_TEMPLATE_REGISTRATION_CONFIRMATION
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_REGISTRATION_CONFIRMATION
+        - name: SENDGRID_TEMPLATE_PAYMENT_CONFIRMATION
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_PAYMENT_CONFIRMATION
+        - name: SENDGRID_TEMPLATE_INVOICE_READY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_INVOICE_READY
+        - name: SENDGRID_TEMPLATE_SESSION_UPDATE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_SESSION_UPDATE
+        - name: SENDGRID_TEMPLATE_GENERAL_ANNOUNCEMENT
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_GENERAL_ANNOUNCEMENT
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - kill -0 1
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - kill -0 1
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
