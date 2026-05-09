@@ -16,13 +16,3 @@ spec:
             name: frontend-drupal-service
             port:
               number: 80
-  - host: frontend.desiderius.me
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: frontend-drupal-service
-            port:
-              number: 80

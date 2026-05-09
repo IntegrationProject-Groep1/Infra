@@ -124,6 +124,8 @@ metadata:
     managed-by: Team-Infra
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: ingress-nginx
