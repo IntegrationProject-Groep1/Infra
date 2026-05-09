@@ -2,7 +2,6 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ingress-nginx
-  namespace: ingress-nginx
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -108,7 +107,6 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ingress-nginx-controller
-  namespace: ingress-nginx
   labels:
     project: shift-festival
     managed-by: Team-Infra
@@ -120,7 +118,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ingress-nginx-controller
-  namespace: ingress-nginx
   labels:
     app: ingress-nginx
     project: shift-festival
@@ -192,7 +189,6 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ingress-nginx-controller-service
-  namespace: ingress-nginx
   labels:
     project: shift-festival
     managed-by: Team-Infra
