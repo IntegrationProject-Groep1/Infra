@@ -7,6 +7,5 @@ kind: Kustomization
 #   kubectl apply -k overlays/dev                             (push to dev)
 # After that update, this root file can be removed.
 resources:
-  - base/core/ingress/ingress-nginx.yaml
   - overlays/prod
   - keel/keel.yaml

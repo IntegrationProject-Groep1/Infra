@@ -4,4 +4,3 @@ kind: Kustomization
 resources:
   - prod-app.yaml
   - dev-app.yaml
-  - ingress-app.yaml

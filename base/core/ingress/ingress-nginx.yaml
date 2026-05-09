@@ -1,12 +1,4 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: ingress-nginx
-  labels:
-    project: shift-festival
-    managed-by: Team-Infra
----
-apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ingress-nginx
