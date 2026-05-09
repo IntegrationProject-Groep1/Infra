@@ -6,3 +6,4 @@ resources:
   - crm.yaml
   - planning.yaml
   - mailing.yaml
+  - planning-pgadmin-ingress.yaml

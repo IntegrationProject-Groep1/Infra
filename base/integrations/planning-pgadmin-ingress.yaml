@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: planning-pgadmin-ingress
+  namespace: shift-festival
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: planning.desiderius.me
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: planning-pgadmin-service
+            port:
+              number: 80
