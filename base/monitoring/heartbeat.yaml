@@ -28,7 +28,7 @@ spec:
         - name: SYSTEM_NAME
           value: "monitoring"
         - name: TARGETS
-          value: "monitoring-agent:3000" # Assuming monitoring agent has a port? Wait, let's check.
+          value: "elasticsearch-service:9200" # Assuming monitoring agent has a port? Wait, let's check.
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT

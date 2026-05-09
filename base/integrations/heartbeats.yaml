@@ -74,7 +74,7 @@ spec:
         - name: SYSTEM_NAME
           value: "identity-service"
         - name: TARGETS
-          value: "identity-service:3000"
+          value: "identity-service:8000"
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT
@@ -120,7 +120,7 @@ spec:
         - name: SYSTEM_NAME
           value: "planning"
         - name: TARGETS
-          value: "planning-service:3000"
+          value: "planning-service:30050"
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT
