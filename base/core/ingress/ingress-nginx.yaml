@@ -26,14 +26,9 @@ rules:
       - secrets
       - namespaces
     verbs:
+      - get
       - list
       - watch
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - get
   - apiGroups:
       - ""
     resources:
