@@ -88,6 +88,8 @@ jobs:
               -n ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
             kubectl apply -k ${{ env.OVERLAY }}
+            kubectl apply -k argocd/
+            kubectl apply -f base/core/kubernetes-dashboard-ingress.yaml
 
             # ArgoCD manages rollout health and self-healing from this point.
             # We only verify the critical shared infrastructure comes up cleanly.

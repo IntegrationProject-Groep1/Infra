@@ -7,4 +7,3 @@ resources:
   - cloudflared.yaml
   - ingress/ingress-nginx.yaml
   - pgadmin-ingress.yaml
-  - kubernetes-dashboard-ingress.yaml
