@@ -3,4 +3,6 @@ kind: Kustomization
 resources:
   - postgres.yaml
   - rabbitmq.yaml
+  - rabbitmq-ingress.yaml
   - cloudflared.yaml
+  - ingress/ingress-nginx.yaml

@@ -6,3 +6,4 @@ resources:
   - fossbilling.yaml
   - heartbeat.yaml
   - proxy.yaml
+  - ingress.yaml

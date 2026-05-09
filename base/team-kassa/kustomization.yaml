@@ -5,4 +5,5 @@ resources:
   - odoo.yaml
   - heartbeat.yaml
   - proxy.yaml
+  - ingress.yaml
   - integration.yaml

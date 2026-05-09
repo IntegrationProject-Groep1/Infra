@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kassa-ingress
+  namespace: shift-festival
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    # Optioneel: voeg hier specifieke Nginx instellingen toe
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  rules:
+  - host: kassa.shiftfestival.be # Vervang door het werkelijke domein
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: kassa-web-service
+            port:
+              number: 8069

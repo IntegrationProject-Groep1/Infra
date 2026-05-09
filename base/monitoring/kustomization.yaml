@@ -6,5 +6,6 @@ resources:
   - logstash-settings.yaml
   - logstash.yaml
   - kibana.yaml
+  - kibana-ingress.yaml
   - monitoring-agent.yaml
   - heartbeat.yaml

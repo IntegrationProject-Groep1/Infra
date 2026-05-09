@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: facturatie-ingress
+  namespace: shift-festival
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  rules:
+  - host: facturatie.shiftfestival.be # Vervang door het werkelijke domein
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: facturatie-app-service
+            port:
+              number: 80
