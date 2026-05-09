@@ -7,7 +7,7 @@ metadata:
     kubernetes.io/ingress.class: "nginx"
 spec:
   rules:
-  - host: rabbitmq.shiftfestival.be
+  - host: rabbitmq.desiderius.me
     http:
       paths:
       - path: /

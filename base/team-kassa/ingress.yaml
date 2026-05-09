@@ -9,7 +9,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 spec:
   rules:
-  - host: kassa.shiftfestival.be # Vervang door het werkelijke domein
+  - host: kassa.desiderius.me
     http:
       paths:
       - path: /
