@@ -38,6 +38,24 @@ rules:
       - list
       - watch
   - apiGroups:
+      - "discovery.k8s.io"
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+      - create
+  - apiGroups:
       - ""
     resources:
       - services
@@ -90,6 +108,9 @@ subjects:
   - kind: ServiceAccount
     name: ingress-nginx
     namespace: ingress-nginx
+  - kind: ServiceAccount
+    name: ingress-nginx
+    namespace: shift-festival
 ---
 apiVersion: v1
 kind: ConfigMap
