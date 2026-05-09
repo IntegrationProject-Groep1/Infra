@@ -8,3 +8,5 @@ KSV-0017
 KSV-0118
 # Ignore hostPath mounts for monitoring agent
 KSV-0121
+# Ignore ClusterRole secret access for ingress-nginx (standard requirement)
+KSV-0041
