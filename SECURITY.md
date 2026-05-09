@@ -79,6 +79,11 @@ Selected services use NodePorts within assigned team ranges (30000–30100). Acc
   - **Findings:** Broad ClusterRole RBAC permissions (KSV-0041, KSV-0044, KSV-0046) and missing pod security contexts (KSV-0118) in ArgoCD's own deployments.
   - **Decision:** Accepted. ArgoCD requires cluster-wide RBAC to function as a GitOps controller — these permissions are intentional and documented by the ArgoCD project. The security context findings are in upstream code we do not modify. The `argocd/` directory is excluded from Trivy scanning (`skip-dirs: argocd` in `ci.yml`). The pinned version is reviewed on each upgrade.
 
+- [x] **A2 — Trivy: Ingress-Nginx ClusterRole permissions (KSV-0041)**
+  - **Affected file:** `base/core/ingress/ingress-nginx.yaml`
+  - **Findings:** ClusterRole 'ingress-nginx' has access to manage (list/watch) resource 'secrets'.
+  - **Decision:** Accepted. The NGINX Ingress Controller requires `list` and `watch` permissions on secrets at the cluster scope to monitor TLS certificate changes across namespaces. This is a standard requirement for the component. Finding is suppressed via inline comment `# trivy:ignore:KSV-0041`.
+
 ### Open Bevindingen / Toekomstige Verbeteringen
 - [ ] **M1 — NetworkPolicies:** Implement Egress/Ingress policies to restrict inter-pod communication (e.g., only the frontend can talk to the frontend-db).
 - [ ] **M2 — Resource Quotas:** Enforce Namespace-level resource limits to prevent noisy neighbor issues.
