@@ -134,6 +134,8 @@ spec:
       labels:
         app: ingress-nginx
     spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccountName: ingress-nginx
       securityContext:
         runAsNonRoot: true
