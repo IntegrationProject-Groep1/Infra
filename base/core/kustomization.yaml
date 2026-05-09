@@ -6,3 +6,4 @@ resources:
   - rabbitmq-ingress.yaml
   - cloudflared.yaml
   - ingress/ingress-nginx.yaml
+  - kubernetes-dashboard-ingress.yaml
