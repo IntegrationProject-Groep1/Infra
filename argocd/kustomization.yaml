@@ -7,4 +7,3 @@ resources:
   - namespace.yaml
   - install.yaml
   - image-updater/install.yaml
-  - ingress.yaml
