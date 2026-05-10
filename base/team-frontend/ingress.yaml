@@ -13,6 +13,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: frontend-drupal-service
+            name: frontend-proxy-service
             port:
               number: 80
