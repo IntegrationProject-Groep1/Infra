@@ -101,6 +101,14 @@ data:
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
       $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
 
+      // nginx-ingress binds on port 8080 (hostNetwork) so the raw SERVER_PORT
+      // leaks into Drupal's URL builder. Force correct values from the
+      // X-Forwarded-Proto header that nginx-ingress always sets to "https".
+      if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
+        $_SERVER['HTTPS'] = 'on';
+        $_SERVER['SERVER_PORT'] = 443;
+      }
+
       $base_url = getenv('DRUPAL_BASE_URL') ?: 'https://desiderius.me';
     }
 
