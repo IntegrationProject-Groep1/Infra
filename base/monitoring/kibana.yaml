@@ -71,15 +71,17 @@ spec:
           httpGet:
             path: /api/status
             port: 5601
-          initialDelaySeconds: 180
+          initialDelaySeconds: 300
           periodSeconds: 30
+          timeoutSeconds: 10
           failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /api/status
             port: 5601
-          initialDelaySeconds: 120
+          initialDelaySeconds: 240
           periodSeconds: 15
+          timeoutSeconds: 10
           failureThreshold: 5
         resources:
           requests:
