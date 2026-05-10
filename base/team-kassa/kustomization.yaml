@@ -4,6 +4,5 @@ resources:
   - postgres.yaml
   - odoo.yaml
   - heartbeat.yaml
-  - proxy.yaml
   - ingress.yaml
   - integration.yaml

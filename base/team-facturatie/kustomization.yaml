@@ -5,5 +5,4 @@ resources:
   - mariadb.yaml
   - fossbilling.yaml
   - heartbeat.yaml
-  - proxy.yaml
   - ingress.yaml

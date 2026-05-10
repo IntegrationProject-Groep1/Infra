@@ -4,8 +4,12 @@ metadata:
   name: kassa-ingress
   namespace: shift-festival
   annotations:
-    # Optioneel: voeg hier specifieke Nginx instellingen toe
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      location /web/database/manager {
+        deny all;
+        return 403;
+      }
 spec:
   ingressClassName: nginx
   rules:

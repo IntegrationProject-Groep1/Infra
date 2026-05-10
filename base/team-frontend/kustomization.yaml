@@ -4,5 +4,4 @@ resources:
   - mariadb.yaml
   - drupal.yaml
   - heartbeat.yaml
-  - proxy.yaml
   - ingress.yaml
