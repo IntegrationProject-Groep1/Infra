@@ -22,7 +22,7 @@ spec:
       - name: drupal
         image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
         imagePullPolicy: Always
-        command: ["sh", "-lc"]
+        command: ["sh", "-c"]
         args:
           - >-
             /opt/drupal/vendor/bin/drush --root=/var/www/html en qr_code --yes 2>/dev/null || true
