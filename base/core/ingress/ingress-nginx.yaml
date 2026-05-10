@@ -201,6 +201,18 @@ metadata:
 data:
   use-forwarded-headers: "true"
   compute-full-forwarded-for: "true"
+  proxy-set-headers: "shift-festival/nginx-proxy-headers"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-proxy-headers
+  labels:
+    project: shift-festival
+    managed-by: Team-Infra
+data:
+  X-Forwarded-Port: "443"
+  X-Forwarded-Proto: "https"
 ---
 apiVersion: apps/v1
 kind: Deployment
