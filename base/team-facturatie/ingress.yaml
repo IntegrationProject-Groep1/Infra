@@ -3,6 +3,9 @@ kind: Ingress
 metadata:
   name: facturatie-ingress
   namespace: shift-festival
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "shift-festival/nginx-proxy-headers"
 spec:
   ingressClassName: nginx
   rules:
