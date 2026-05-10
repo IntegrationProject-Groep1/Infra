@@ -36,7 +36,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/integrationproject-groep1/Infra.git
+    repoURL: git@github.com:integrationproject-groep1/Infra.git
     targetRevision: dev
     path: overlays/dev
   destination:
