@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: planning-ingress
+  namespace: shift-festival
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: planning.desiderius.me
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: planning-service
+            port:
+              number: 30050

@@ -5,14 +5,14 @@ metadata:
   namespace: argocd
   annotations:
     argocd-image-updater.argoproj.io/image-list: >-
-      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:dev,
-      kassa=ghcr.io/integrationproject-groep1/kassa:dev,
-      facturatie=ghcr.io/integrationproject-groep1/facturatie:dev,
-      crm=ghcr.io/integrationproject-groep1/crm:dev,
-      planning=ghcr.io/integrationproject-groep1/planning:dev,
-      identity=ghcr.io/integrationproject-groep1/identity-service:dev,
-      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:dev,
-      monitoring=ghcr.io/integrationproject-groep1/monitoring:dev
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend,
+      kassa=ghcr.io/integrationproject-groep1/kassa,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie,
+      crm=ghcr.io/integrationproject-groep1/crm,
+      planning=ghcr.io/integrationproject-groep1/planning,
+      identity=ghcr.io/integrationproject-groep1/identity-service,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat,
+      monitoring=ghcr.io/integrationproject-groep1/monitoring
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^dev$
     argocd-image-updater.argoproj.io/kassa.update-strategy: digest
