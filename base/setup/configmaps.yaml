@@ -101,9 +101,7 @@ data:
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
       $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
 
-      if ($base_url_env = getenv('DRUPAL_BASE_URL')) {
-        $base_url = $base_url_env;
-      }
+      $base_url = getenv('DRUPAL_BASE_URL') ?: 'https://desiderius.me';
     }
 
     ini_set('memory_limit', '512M');
