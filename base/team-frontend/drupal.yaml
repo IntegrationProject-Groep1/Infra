@@ -25,8 +25,8 @@ spec:
         command: ["sh", "-c"]
         args:
           - >-
-            /opt/drupal/vendor/bin/drush --root=/var/www/html en qr_code --yes 2>/dev/null || true
-            && /opt/drupal/vendor/bin/drush --root=/var/www/html cr 2>/dev/null || true
+            timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html en qr_code --yes || true
+            && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html cr || true
             && exec apache2-foreground
         securityContext:
           allowPrivilegeEscalation: false
