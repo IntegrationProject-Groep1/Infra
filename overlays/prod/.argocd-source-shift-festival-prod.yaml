@@ -15,3 +15,4 @@ kustomize:
   - ghcr.io/integrationproject-groep1/identity-service@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
   - ghcr.io/integrationproject-groep1/mailing@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
   - ghcr.io/integrationproject-groep1/planning@sha256:714c2ef83ba8bd22be606ca1b34869c9ee549501bc37e4b8d4c542fbdbfb36d2
+  - ghcr.io/integrationproject-groep1/heartbeat@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
