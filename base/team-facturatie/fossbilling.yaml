@@ -108,6 +108,10 @@ spec:
           mountPath: /var/lock/apache2
         - name: tmp
           mountPath: /tmp
+        - name: apache-proxy-config
+          mountPath: /etc/apache2/conf-enabled/trusted-proxy.conf
+          subPath: trusted-proxy.conf
+          readOnly: true
       volumes:
       - name: foss-html
         persistentVolumeClaim:
@@ -126,6 +130,9 @@ spec:
         emptyDir: {}
       - name: tmp
         emptyDir: {}
+      - name: apache-proxy-config
+        configMap:
+          name: fossbilling-apache-config
 ---
 apiVersion: v1
 kind: Service
