@@ -52,6 +52,7 @@ spec:
         - "--db_port=$(ODOO_DB_PORT)"
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
+        - "--log-handler=werkzeug:WARNING"
         ports:
         - containerPort: 8069
         env:
