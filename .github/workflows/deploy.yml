@@ -89,10 +89,6 @@ jobs:
 
             kubectl apply -k ${{ env.OVERLAY }}
 
-            # Force a rollout restart so every deployment pulls the latest :prod/:dev
-            # image even when the manifest tag hasn't changed (mutable tag pattern).
-            kubectl rollout restart deployment -n ${{ env.NAMESPACE }}
-
             # ArgoCD manages rollout health and self-healing from this point.
             # We only verify the critical shared infrastructure comes up cleanly.
             echo "Waiting for core infrastructure in ${{ env.NAMESPACE }}..."
