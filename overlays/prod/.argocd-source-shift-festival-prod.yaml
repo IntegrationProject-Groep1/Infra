@@ -9,3 +9,5 @@ kustomize:
   - ghcr.io/integrationproject-groep1/heartbeat:prod@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
   - ghcr.io/integrationproject-groep1/mailing:prod@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
   - ghcr.io/integrationproject-groep1/ip-groep1-frontend@sha256:526925a28d9b8376a98beb5da89b84a62b7aab354cecfe9b5d317fc914462f66
+  - ghcr.io/integrationproject-groep1/facturatie@sha256:83c588e1defdf5d3ee7dfb7c221cb0524da8003bf037a4b4af598d7dc2558854
+  - ghcr.io/integrationproject-groep1/crm@sha256:703d55165039a7f273d3162ca6cff7f11693552ac9ce7064aa114699ae0d2450
