@@ -3,9 +3,9 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Deploys the Kubernetes stack to the Azure VM on every push to main after
-#   CI passes, or on manual trigger. After applying the manifests it runs
-#   rollout checks and notifies Teams on success or failure.
+#   Verifies cluster connectivity after a push to main/dev.
+#   ArgoCD manages all deployments via GitOps — kubectl apply is intentionally
+#   removed to prevent mass pod restarts on every Image Updater commit.
 # =============================================================================
 
 name: Deploy Infra to Kubernetes
@@ -42,17 +42,6 @@ jobs:
             echo "NAMESPACE=shift-festival-dev" >> $GITHUB_ENV
           fi
 
-      - name: Copy files to VM via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          source: "./*"
-          target: "shiftfestival"
-          exclude: ".github,assets,README.md,*.md,CLAUDE.md,DOCUMENTATION.md,SECURITY.md"
-
       - name: Verify kubectl is available on the VM
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -63,7 +52,7 @@ jobs:
           script: |
             command -v kubectl >/dev/null 2>&1 || { echo "kubectl is not installed on the VM"; exit 1; }
 
-      - name: Apply manifests and wait for rollouts
+      - name: Verify core infrastructure is healthy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -72,159 +61,15 @@ jobs:
           port: 60022
           script: |
             set -euo pipefail
-            cd shiftfestival
 
-            if [[ ! -f setup/.env ]]; then
-              echo "setup/.env is missing on the VM. Create it before deploying."
-              exit 1
-            fi
+            echo "ArgoCD manages all deployments via GitOps (no kubectl apply)."
+            echo "Verifying core infrastructure in ${{ env.NAMESPACE }}..."
 
-            echo "CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
-              > ${{ env.OVERLAY }}/.env.cloudflare
-
-            # Sync cloudflare-tunnel-secret from GitHub Secrets into the cluster
-            kubectl create secret generic cloudflare-tunnel-secret \
-              --from-literal=CLOUDFLARE_TUNNEL_TOKEN="${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
-              -n ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
-
-            kubectl apply -k ${{ env.OVERLAY }}
-
-            # ArgoCD manages rollout health and self-healing from this point.
-            # We only verify the critical shared infrastructure comes up cleanly.
-            echo "Waiting for core infrastructure in ${{ env.NAMESPACE }}..."
             kubectl rollout status deployment/rabbitmq-broker -n ${{ env.NAMESPACE }} --timeout=5m
             kubectl rollout status deployment/postgredb       -n ${{ env.NAMESPACE }} --timeout=5m
 
-            echo "Manifests applied. ArgoCD will track full rollout health."
-            echo "Check status at: https://argocd.desiderius.me"
+            echo "Core infrastructure healthy. ArgoCD tracks full rollout health."
+            echo "Check ArgoCD at: https://argocd.desiderius.me"
 
             kubectl get pods -n ${{ env.NAMESPACE }}
             kubectl get svc  -n ${{ env.NAMESPACE }}
-
-
-#      - name: Notify Teams - deploy success
-#        if: success()
-#        run: |
-#          COMMIT_SHA="${{ github.sha }}"
-#          ACTOR="${{ github.actor }}"
-#          REF="${{ github.ref_name }}"
-#
-#          PAYLOAD=$(cat <<'TEAMS_EOF'
-#          {
-#            "type": "message",
-#            "attachments": [{
-#              "contentType": "application/vnd.microsoft.card.adaptive",
-#              "contentUrl": null,
-#              "content": {
-#                "type": "AdaptiveCard",
-#                "version": "1.4",
-#                "body": [
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "✅ Deploy successful – Kubernetes rollout",
-#                    "weight": "Bolder",
-#                    "size": "Medium",
-#                    "color": "Good",
-#                    "wrap": true
-#                  },
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "Branch: REF_PLACEHOLDER | Commit: SHA_PLACEHOLDER | By: ACTOR_PLACEHOLDER",
-#                    "isSubtle": true,
-#                    "size": "Small",
-#                    "wrap": true
-#                  },
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "The Kubernetes manifests were applied successfully and the main workloads became ready.",
-#                    "wrap": true,
-#                    "isSubtle": true,
-#                    "spacing": "Medium"
-#                  }
-#                ]
-#              }
-#            }]
-#          }
-#          TEAMS_EOF
-#          )
-#
-#          PAYLOAD="${PAYLOAD//REF_PLACEHOLDER/$REF}"
-#          PAYLOAD="${PAYLOAD//SHA_PLACEHOLDER/${COMMIT_SHA:0:7}}"
-#          PAYLOAD="${PAYLOAD//ACTOR_PLACEHOLDER/$ACTOR}"
-#
-#          if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-#            curl -s -o /dev/null -w "%{http_code}" \
-#              -H "Content-Type: application/json" \
-#              -d "${PAYLOAD}" \
-#              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
-#          fi
-
-#      - name: Collect cluster status on failure
-#        if: failure()
-#        uses: appleboy/ssh-action@v1.0.3
-#        with:
-#          host: ${{ secrets.VM_HOST }}
-#          username: ${{ secrets.VM_USER }}
-#          key: ${{ secrets.SSH_PRIVATE_KEY }}
-#          port: 60022
-#          script: |
-#            cd shiftfestival
-#            kubectl get pods -A
-#            kubectl get events -A --sort-by=.metadata.creationTimestamp | tail -50
-
-#      - name: Notify Teams - deploy failed
-#        if: failure()
-#        run: |
-#          COMMIT_SHA="${{ github.sha }}"
-#          ACTOR="${{ github.actor }}"
-#          REF="${{ github.ref_name }}"
-#
-#          PAYLOAD=$(cat <<'TEAMS_EOF'
-#          {
-#            "type": "message",
-#            "attachments": [{
-#              "contentType": "application/vnd.microsoft.card.adaptive",
-#              "contentUrl": null,
-#              "content": {
-#                "type": "AdaptiveCard",
-#                "version": "1.4",
-#                "body": [
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "❌ Deploy failed – Kubernetes rollout",
-#                    "weight": "Bolder",
-#                    "size": "Medium",
-#                    "color": "Attention",
-#                    "wrap": true
-#                  },
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "Branch: REF_PLACEHOLDER | Commit: SHA_PLACEHOLDER | By: ACTOR_PLACEHOLDER",
-#                    "isSubtle": true,
-#                    "size": "Small",
-#                    "wrap": true
-#                  },
-#                  {
-#                    "type": "TextBlock",
-#                    "text": "The manifest apply or a rollout check failed. Review the Actions log and cluster status output.",
-#                    "wrap": true,
-#                    "isSubtle": true,
-#                    "spacing": "Medium"
-#                  }
-#                ]
-#              }
-#            }]
-#          }
-#          TEAMS_EOF
-#          )
-#
-#          PAYLOAD="${PAYLOAD//REF_PLACEHOLDER/$REF}"
-#          PAYLOAD="${PAYLOAD//SHA_PLACEHOLDER/${COMMIT_SHA:0:7}}"
-#          PAYLOAD="${PAYLOAD//ACTOR_PLACEHOLDER/$ACTOR}"
-#
-#          if [[ -n "${{ secrets.TEAMS_WEBHOOK_INFRA }}" ]]; then
-#            curl -s -o /dev/null -w "%{http_code}" \
-#              -H "Content-Type: application/json" \
-#              -d "${PAYLOAD}" \
-#              "${{ secrets.TEAMS_WEBHOOK_INFRA }}"
-#          fi
