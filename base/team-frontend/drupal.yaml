@@ -22,12 +22,18 @@ spec:
       - name: drupal
         image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
         imagePullPolicy: Always
-        command: ["sh", "-c"]
+        command:
+          - sh
+          - '-c'
         args:
           - >-
-            timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html en qr_code --yes || true
-            && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html cr || true
-            && exec apache2-foreground
+            (sleep 15
+            && timeout 90 /opt/drupal/vendor/bin/drush --root=/var/www/html en
+            rabbitmq_sender rabbitmq_receiver registration_form session_enrollment
+            session_management company_invite qr_code --yes
+            && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html updb --yes
+            && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html cr
+            || true) & exec apache2-foreground
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
