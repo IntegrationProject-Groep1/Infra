@@ -13,6 +13,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: planning-service
+            name: planning-pgadmin-service
             port:
-              number: 30050
+              number: 80
