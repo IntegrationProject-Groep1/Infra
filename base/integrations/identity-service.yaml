@@ -18,6 +18,7 @@ spec:
       containers:
       - name: identity-service
         image: ghcr.io/integrationproject-groep1/identity-service:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

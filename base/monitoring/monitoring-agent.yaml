@@ -18,6 +18,7 @@ spec:
       containers:
       - name: monitoring-agent
         image: ghcr.io/integrationproject-groep1/monitoring:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

@@ -18,6 +18,7 @@ spec:
       containers:
       - name: kassa-worker
         image: ghcr.io/integrationproject-groep1/kassa:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

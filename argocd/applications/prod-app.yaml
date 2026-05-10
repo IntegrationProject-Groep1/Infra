@@ -11,7 +11,16 @@ metadata:
       crm=ghcr.io/integrationproject-groep1/crm:prod,
       planning=ghcr.io/integrationproject-groep1/planning:prod,
       identity=ghcr.io/integrationproject-groep1/identity-service:prod,
-      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod,
+      mailing=ghcr.io/integrationproject-groep1/mailing:prod
+    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa.update-strategy: digest
+    argocd-image-updater.argoproj.io/facturatie.update-strategy: digest
+    argocd-image-updater.argoproj.io/crm.update-strategy: digest
+    argocd-image-updater.argoproj.io/planning.update-strategy: digest
+    argocd-image-updater.argoproj.io/identity.update-strategy: digest
+    argocd-image-updater.argoproj.io/heartbeat.update-strategy: digest
+    argocd-image-updater.argoproj.io/mailing.update-strategy: digest
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:

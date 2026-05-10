@@ -159,6 +159,7 @@ spec:
       containers:
       - name: connector
         image: ghcr.io/integrationproject-groep1/facturatie:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

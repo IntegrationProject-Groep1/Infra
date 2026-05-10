@@ -13,6 +13,14 @@ metadata:
       identity=ghcr.io/integrationproject-groep1/identity-service:dev,
       heartbeat=ghcr.io/integrationproject-groep1/heartbeat:dev,
       monitoring=ghcr.io/integrationproject-groep1/monitoring:dev
+    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa.update-strategy: digest
+    argocd-image-updater.argoproj.io/facturatie.update-strategy: digest
+    argocd-image-updater.argoproj.io/crm.update-strategy: digest
+    argocd-image-updater.argoproj.io/planning.update-strategy: digest
+    argocd-image-updater.argoproj.io/identity.update-strategy: digest
+    argocd-image-updater.argoproj.io/heartbeat.update-strategy: digest
+    argocd-image-updater.argoproj.io/monitoring.update-strategy: digest
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: dev
   finalizers:

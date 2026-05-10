@@ -19,6 +19,7 @@ spec:
       containers:
       - name: drupal
         image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

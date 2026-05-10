@@ -23,6 +23,7 @@ spec:
       containers:
       - name: mailing
         image: ghcr.io/integrationproject-groep1/mailing:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

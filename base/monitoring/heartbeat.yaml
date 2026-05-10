@@ -18,6 +18,7 @@ spec:
       containers:
       - name: heartbeat
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
