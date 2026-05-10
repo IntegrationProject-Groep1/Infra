@@ -87,15 +87,13 @@ jobs:
               --from-literal=CLOUDFLARE_TUNNEL_TOKEN="${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}" \
               -n ${{ env.NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
 
-            kubectl apply -k ${{ env.OVERLAY }}
-
             # ArgoCD manages rollout health and self-healing from this point.
             # We only verify the critical shared infrastructure comes up cleanly.
             echo "Waiting for core infrastructure in ${{ env.NAMESPACE }}..."
             kubectl rollout status deployment/rabbitmq-broker -n ${{ env.NAMESPACE }} --timeout=5m
             kubectl rollout status deployment/postgredb       -n ${{ env.NAMESPACE }} --timeout=5m
 
-            echo "Manifests applied. ArgoCD will track full rollout health."
+            echo "ArgoCD will track full rollout health."
             echo "Check status at: https://argocd.desiderius.me"
 
             kubectl get pods -n ${{ env.NAMESPACE }}
