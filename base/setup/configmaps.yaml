@@ -99,10 +99,12 @@ data:
       $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'];
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
-      // reverse_proxy_port_header is intentionally NOT set: nginx-ingress binds
-      // on port 8080 (hostNetwork) and would leak that port into Drupal's URL
-      // builder via X-Forwarded-Port. Without this setting Symfony falls back to
-      // $_SERVER['SERVER_PORT'] which we force to 443 below.
+      // nginx-proxy-headers ConfigMap forces X-Forwarded-Port: 443 on every
+      // request, so it is safe to declare this header. Without it Symfony
+      // extracts the port from X-Forwarded-Host, which nginx-ingress sets to
+      // $best_http_host (= "desiderius.me:8080" on the hostNetwork pod),
+      // causing Drupal to generate URLs with the wrong port.
+      $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
       if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
         $_SERVER['HTTPS'] = 'on';
         $_SERVER['SERVER_PORT'] = 443;
