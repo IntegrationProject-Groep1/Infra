@@ -26,11 +26,11 @@ jobs:
     runs-on: ubuntu-latest
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
-
-    steps:
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')    steps:
       - name: Checkout code
-        uses: actions/checkout@v4      - name: Set environment variables
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
         run: |
           # Only deploy to prod (shift-festival)
           # Dev namespace was removed due to VM resource constraints
