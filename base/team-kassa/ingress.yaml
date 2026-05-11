@@ -10,10 +10,6 @@ metadata:
         deny all;
         return 403;
       }
-    nginx.ingress.kubernetes.io/configuration-snippet: |
-      proxy_set_header X-Forwarded-Host $host;
-      proxy_set_header X-Forwarded-Port 443;
-      proxy_set_header X-Forwarded-Proto https;
 spec:
   ingressClassName: nginx
   rules:
