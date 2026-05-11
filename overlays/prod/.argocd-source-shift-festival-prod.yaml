@@ -1,6 +1,6 @@
 kustomize:
   images:
-  - ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod@sha256:8c5bff415145a6acc8c376f51fe407f1589f23ab6bf773f35054959c8b28c04b
+  - ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod@sha256:6f985c66630be7fc0a83ae2f09750a716ce74e328a4cdccdbde99be3c719ccc6
   - ghcr.io/integrationproject-groep1/kassa:prod@sha256:ca86a61f6c9f13d1eadb4f323456e8a50631b83a6b3f61721f5cf4d4472e125f
   - ghcr.io/integrationproject-groep1/facturatie:prod@sha256:16be9e9d037ee513863b265160702fef55ab9baa755eb4d7d4cd22bf4859e507
   - ghcr.io/integrationproject-groep1/crm:prod@sha256:703d55165039a7f273d3162ca6cff7f11693552ac9ce7064aa114699ae0d2450
