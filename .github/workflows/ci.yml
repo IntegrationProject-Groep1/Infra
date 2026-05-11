@@ -61,22 +61,21 @@ jobs:
 
           rm -f overlays/prod/.env.cloudflare overlays/dev/.env.cloudflare
 
-          echo "✅ Kustomize render completed"
-
-      - name: Lint YAML files
+          echo "✅ Kustomize render completed"      - name: Lint YAML files
         shell: bash
         run: |
           # Install yamllint
           pip install yamllint --quiet
           
           # Lint all YAML files, excluding auto-generated ArgoCD files
+          # Using -not -path to exclude unwanted files, and ignoring find permission errors
           find . \
             -type f \
             \( -name "*.yml" -o -name "*.yaml" \) \
             -not -path "./.git/*" \
             -not -path "*/.argocd-source-*.yaml" \
-            -print0 \
-            | xargs -0 yamllint -d "{
+            2>/dev/null | while IFS= read -r file; do
+            yamllint -d "{
               extends: relaxed,
               rules: {
                 line-length: {max: 300},
@@ -93,7 +92,8 @@ jobs:
                 new-line-at-end-of-file: disable,
                 trailing-spaces: disable
               }
-            }"
+            }" "$file"
+          done
 
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y shellcheck
