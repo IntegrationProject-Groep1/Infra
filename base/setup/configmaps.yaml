@@ -89,16 +89,22 @@ data:
       '^localhost(:[0-9]+)?$',
       '^127\.0\.0\.1(:[0-9]+)?$',
       '^integrationproject-2526s2-dag01\.westeurope\.cloudapp\.azure\.com(:[0-9]+)?$',
-      '^frontend\.desiderius\.me$',
+      '^desiderius\.me$',
+      '^.*\.desiderius\.me$',
       '^.*$',
     ];
 
     if (getenv('DRUPAL_REVERSE_PROXY') === 'true') {
       $settings['reverse_proxy'] = TRUE;
+      // Trust the immediate proxy (Ingress Controller / Nginx Pod)
       $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'];
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
       $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
+
+      // FORCE HTTPS and Port 443 if we are behind a proxy
+      $_SERVER['SERVER_PORT'] = 443;
+      $_SERVER['HTTPS'] = 'on';
 
       if ($base_url_env = getenv('DRUPAL_BASE_URL')) {
         $base_url = $base_url_env;
