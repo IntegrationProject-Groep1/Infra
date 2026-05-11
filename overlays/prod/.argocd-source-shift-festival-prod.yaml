@@ -1,10 +1,10 @@
 kustomize:
   images:
   - ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod@sha256:e96a7a895ed1d89200781a09c06fd9e454c0436e3126b38cbc4f1f91dbdc4eb4
-  - ghcr.io/integrationproject-groep1/kassa:prod@sha256:dd3bd0e82c44f3bd801361773dfb800ee6bc6c1f2445de8a2f6f9529b08de797
+  - ghcr.io/integrationproject-groep1/kassa:prod@sha256:ca86a61f6c9f13d1eadb4f323456e8a50631b83a6b3f61721f5cf4d4472e125f
   - ghcr.io/integrationproject-groep1/facturatie:prod@sha256:83c588e1defdf5d3ee7dfb7c221cb0524da8003bf037a4b4af598d7dc2558854
   - ghcr.io/integrationproject-groep1/crm:prod@sha256:703d55165039a7f273d3162ca6cff7f11693552ac9ce7064aa114699ae0d2450
-  - ghcr.io/integrationproject-groep1/planning:prod@sha256:714c2ef83ba8bd22be606ca1b34869c9ee549501bc37e4b8d4c542fbdbfb36d2
+  - ghcr.io/integrationproject-groep1/planning:prod@sha256:f4a9981b47e951b45e5a2d86c094576cf505f1fa2b75be3d5413264c9ce507ab
   - ghcr.io/integrationproject-groep1/identity-service:prod@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
   - ghcr.io/integrationproject-groep1/heartbeat:prod@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
   - ghcr.io/integrationproject-groep1/mailing:prod@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
