@@ -19,25 +19,6 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: pgadmin-ingress
-  namespace: shift-festival
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: pgadmin.desiderius.me
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: pgadmin-service
-            port:
-              number: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
   name: argocd-server-ingress
   namespace: shift-festival
   annotations:
