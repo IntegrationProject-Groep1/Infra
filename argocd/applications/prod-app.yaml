@@ -2,17 +2,16 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: shift-festival-prod
-  namespace: argocd
-  annotations:
+  namespace: argocd  annotations:
     argocd-image-updater.argoproj.io/image-list: >-
-      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod,
-      kassa=ghcr.io/integrationproject-groep1/kassa:prod,
-      facturatie=ghcr.io/integrationproject-groep1/facturatie:prod,
-      crm=ghcr.io/integrationproject-groep1/crm:prod,
-      planning=ghcr.io/integrationproject-groep1/planning:prod,
-      identity=ghcr.io/integrationproject-groep1/identity-service:prod,
-      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod,
-      mailing=ghcr.io/integrationproject-groep1/mailing:prod
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend,
+      kassa=ghcr.io/integrationproject-groep1/kassa,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie,
+      crm=ghcr.io/integrationproject-groep1/crm,
+      planning=ghcr.io/integrationproject-groep1/planning,
+      identity=ghcr.io/integrationproject-groep1/identity-service,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat,
+      mailing=ghcr.io/integrationproject-groep1/mailing
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^prod$
     argocd-image-updater.argoproj.io/kassa.update-strategy: digest
