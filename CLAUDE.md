@@ -97,18 +97,18 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 
 **Deploy — GitOps via ArgoCD (primary mechanism):**
 ArgoCD watches the Git repo directly and auto-syncs on every commit:
-- `main` branch → `shift-festival` namespace (prod)
-- `dev` branch → `shift-festival-dev` namespace (dev)
+main branch → shift-festival namespace (prod)
+- dev branch → shift-festival-dev namespace (dev)
 
-Self-healing is enabled: any manual cluster change is reverted within ~3 minutes.
+Self-healing is enabled: any manual cluster change is reverted within ~1 minute.
 
 **Deploy — via GitHub Actions (secondary/emergency):**
-The `.github/workflows/deploy.yml` SCP pipeline still runs but no longer applies manifests directly. It is retained for:
+The .github/workflows/deploy.yml SCP pipeline still runs but no longer applies manifests directly. It is retained for:
 - Emergency access to the VM
-- Secret refresh: running `./scripts/create-secret.sh setup/.env <namespace>` when secrets change
+- Secret refresh: running ./scripts/create-secret.sh setup/.env <namespace> when secrets change
 
 **Image updates:**
-ArgoCD Image Updater polls GHCR every 2 minutes. When a new `prod` or `dev` tag is detected, it commits the new tag to Git, which triggers an ArgoCD sync. The per-team `pipelines/deploy.yml` build pipelines are unchanged.
+ArgoCD Image Updater polls GHCR every 1 minute. When a new prod or dev tag is detected, it commits the new tag to Git, which triggers an ArgoCD sync. The per-team pipelines/deploy.yml build pipelines are unchanged.
 
 **Secrets Bootstrap (one-time per environment):**
 Secrets are not managed by kustomize — ArgoCD does not have filesystem access to `.env` files. Run once on the VM:

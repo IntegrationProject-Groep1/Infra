@@ -130,6 +130,7 @@ spec:
       containers:
       - args:
         - run
+        - --interval=1m
         env:
         - name: APPLICATIONS_API
           valueFrom:
