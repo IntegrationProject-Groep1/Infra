@@ -98,10 +98,11 @@ data:
       $settings['reverse_proxy'] = TRUE;
       // Trust all proxies in a K8s environment is standard practice
       $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR']];
-      $settings['reverse_proxy_trusted_headers'] = \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PORT | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
+      $settings['reverse_proxy_trusted_headers'] = \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
-      $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
+      // We explicitly DO NOT trust X-Forwarded-Port because the Ingress might be running on 8080 internally
+      // $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
 
       // FORCE HTTPS and Port 443 if we are behind a proxy
       $_SERVER['SERVER_PORT'] = 443;
