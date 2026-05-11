@@ -202,6 +202,7 @@ data:
   use-forwarded-headers: "true"
   compute-full-forwarded-for: "true"
   proxy-set-headers: "shift-festival/nginx-proxy-headers"
+  port-in-redirect: "false"
 ---
 apiVersion: v1
 kind: ConfigMap

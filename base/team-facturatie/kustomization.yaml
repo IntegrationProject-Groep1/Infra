@@ -6,3 +6,4 @@ resources:
   - fossbilling.yaml
   - heartbeat.yaml
   - ingress.yaml
+  - apache-config.yaml

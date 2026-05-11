@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fossbilling-apache-config
+data:
+  trusted-proxy.conf: |
+    <IfModule mod_remoteip.c>
+        RemoteIPHeader X-Forwarded-For
+        RemoteIPInternalProxy 10.0.0.0/8
+        RemoteIPInternalProxy 172.16.0.0/12
+        RemoteIPInternalProxy 192.168.0.0/16
+    </IfModule>
+
+    # Detect HTTPS from reverse proxy headers
+    SetEnvIf X-Forwarded-Proto "https" HTTPS=on
