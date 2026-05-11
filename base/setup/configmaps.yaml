@@ -117,16 +117,6 @@ data:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: frontend-rabbitmq-sender-services
-data:
-  rabbitmq_sender.services.yml: |
-    services:
-      rabbitmq_sender.client:
-        class: Drupal\rabbitmq_sender\RabbitMQClient
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
   name: facturatie-nginx-config
 data:
   default.conf: |
