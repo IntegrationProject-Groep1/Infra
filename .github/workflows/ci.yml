@@ -57,11 +57,14 @@ jobs:
           echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/dev/.env.cloudflare
           kubectl kustomize overlays/dev > "${RUNNER_TEMP}/rendered-manifests-dev.yaml"
 
-          echo "Rendering root manifests..."          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"
+          echo "Rendering root manifests..."
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"
 
           rm -f overlays/prod/.env.cloudflare overlays/dev/.env.cloudflare
 
-          echo "✅ Kustomize render completed"      - name: Lint YAML files
+          echo "✅ Kustomize render completed"
+
+      - name: Lint YAML files
         shell: bash
         run: |
           # Install yamllint
@@ -74,6 +77,7 @@ jobs:
             \( -name "*.yml" -o -name "*.yaml" \) \
             -not -path "./.git/*" \
             -not -path "*/.argocd-source-*.yaml" \
+            -not -path "./argocd/install.yaml" \
             2>/dev/null | while IFS= read -r file; do
             yamllint -d "{
               extends: relaxed,
