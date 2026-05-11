@@ -147,18 +147,15 @@ jobs:
 
           # Team Frontend
           check deployment frontend-drupal       shift-festival
-          check deployment frontend-proxy        shift-festival
           check deployment frontend-db           shift-festival
 
           # Team Kassa
           check deployment kassa-web             shift-festival
-          check deployment kassa-proxy           shift-festival
           check deployment kassa-integration     shift-festival
           check deployment kassa-db              shift-festival
 
           # Team Facturatie
           check deployment fossbilling-app       shift-festival
-          check deployment facturatie-proxy      shift-festival
           check deployment facturatie-db         shift-festival
 
           # Integrations
