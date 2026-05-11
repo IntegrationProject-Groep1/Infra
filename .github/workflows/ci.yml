@@ -62,18 +62,18 @@ jobs:
 
           rm -f overlays/prod/.env.cloudflare overlays/dev/.env.cloudflare
 
-          echo "✅ Kustomize render completed"
-
-      - name: Install yamllint
-        run: pip install yamllint --quiet
-
-      - name: Lint YAML files
+          echo "✅ Kustomize render completed"      - name: Lint YAML files
         shell: bash
         run: |
+          # Install yamllint
+          pip install yamllint --quiet
+          
+          # Lint all YAML files, excluding auto-generated ArgoCD files
           find . \
             -type f \
             \( -name "*.yml" -o -name "*.yaml" \) \
             -not -path "./.git/*" \
+            -not -path "*/.argocd-source-*.yaml" \
             -print0 \
             | xargs -0 yamllint -d "{
               extends: relaxed,
