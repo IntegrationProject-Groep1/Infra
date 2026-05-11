@@ -96,8 +96,9 @@ data:
 
     if (getenv('DRUPAL_REVERSE_PROXY') === 'true') {
       $settings['reverse_proxy'] = TRUE;
-      // Trust the immediate proxy (Ingress Controller / Nginx Pod)
-      $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'];
+      // Trust all proxies in a K8s environment is standard practice
+      $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR']];
+      $settings['reverse_proxy_trusted_headers'] = \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PORT | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
       $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
