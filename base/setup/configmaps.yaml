@@ -24,11 +24,11 @@ data:
         }
         location / {
             proxy_pass             http://kassa-web-service:8069;
-            proxy_set_header       Host $host;
+            proxy_set_header       Host $http_host;
             proxy_set_header       X-Real-IP $remote_addr;
             proxy_set_header       X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header       X-Forwarded-Proto https;
-            proxy_set_header       X-Forwarded-Host $host;
+            proxy_set_header       X-Forwarded-Host $http_host;
             proxy_redirect         off;
             proxy_buffering        off;
         }
@@ -48,7 +48,6 @@ data:
             proxy_set_header   X-Real-IP $remote_addr;
             proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header   X-Forwarded-Proto https;
-            proxy_set_header   X-Forwarded-Host $host;
             proxy_set_header   X-Forwarded-Port 443;
         }
     }
@@ -99,18 +98,11 @@ data:
       $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'];
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
-      // nginx-proxy-headers ConfigMap forces X-Forwarded-Port: 443 on every
-      // request, so it is safe to declare this header. Without it Symfony
-      // extracts the port from X-Forwarded-Host, which nginx-ingress sets to
-      // $best_http_host (= "desiderius.me:8080" on the hostNetwork pod),
-      // causing Drupal to generate URLs with the wrong port.
       $settings['reverse_proxy_port_header'] = 'X-Forwarded-Port';
-      if (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https') {
-        $_SERVER['HTTPS'] = 'on';
-        $_SERVER['SERVER_PORT'] = 443;
-      }
 
-      $base_url = getenv('DRUPAL_BASE_URL') ?: 'https://desiderius.me';
+      if ($base_url_env = getenv('DRUPAL_BASE_URL')) {
+        $base_url = $base_url_env;
+      }
     }
 
     ini_set('memory_limit', '512M');
@@ -122,43 +114,8 @@ metadata:
 data:
   rabbitmq_sender.services.yml: |
     services:
-      rabbitmq_sender.session_create_request_sender:
-        class: Drupal\rabbitmq_sender\SessionCreateRequestSender
-      rabbitmq_sender.session_update_request_sender:
-        class: Drupal\rabbitmq_sender\SessionUpdateRequestSender
-      rabbitmq_sender.session_delete_request_sender:
-        class: Drupal\rabbitmq_sender\SessionDeleteRequestSender
-      rabbitmq_sender.session_view_request_sender:
-        class: Drupal\rabbitmq_sender\SessionViewRequestSender
-      rabbitmq_sender.event_ended_sender:
-        class: Drupal\rabbitmq_sender\EventEndedSender
-      rabbitmq_sender.new_registration_sender:
-        class: Drupal\rabbitmq_sender\NewRegistrationSender
-      rabbitmq_sender.calendar_invite_sender:
-        class: Drupal\rabbitmq_sender\CalendarInviteSender
-      rabbitmq_sender.user_created_sender:
-        class: Drupal\rabbitmq_sender\UserCreatedSender
-      rabbitmq_sender.user_updated_sender:
-        class: Drupal\rabbitmq_sender\UserUpdatedSender
-      rabbitmq_sender.user_checkin_sender:
-        class: Drupal\rabbitmq_sender\UserCheckinSender
-      rabbitmq_sender.user_registered_sender:
-        class: Drupal\rabbitmq_sender\UserRegisteredSender
-      rabbitmq_sender.user_unregistered_sender:
-        class: Drupal\rabbitmq_sender\UserUnregisteredSender
-      rabbitmq_sender.company_member_removed_sender:
-        class: Drupal\rabbitmq_sender\CompanyMemberRemovedSender
-      rabbitmq_sender.monitoring_log_sender:
-        class: Drupal\rabbitmq_sender\MonitoringLogSender
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: fossbilling-apache-config
-data:
-  trusted-proxy.conf: |
-    SetEnvIf X-Forwarded-Proto "^https$" HTTPS=on
-    SetEnvIf X-Forwarded-Proto "^https$" SERVER_PORT=443
+      rabbitmq_sender.client:
+        class: Drupal\rabbitmq_sender\RabbitMQClient
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -170,11 +127,9 @@ data:
         listen 80;
         location / {
             proxy_pass         http://facturatie-app-service:80;
-            proxy_set_header   Host $host;
+            proxy_set_header   Host $http_host;
             proxy_set_header   X-Real-IP $remote_addr;
             proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header   X-Forwarded-Proto https;
-            proxy_set_header   X-Forwarded-Host $host;
             proxy_redirect     https:// http://;
         }
     }
