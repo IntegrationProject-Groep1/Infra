@@ -2,7 +2,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: shift-festival-dev
-  namespace: argocd  annotations:
+  namespace: argocd
+  annotations:
     argocd-image-updater.argoproj.io/image-list: >-
       frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend,
       kassa=ghcr.io/integrationproject-groep1/kassa,
