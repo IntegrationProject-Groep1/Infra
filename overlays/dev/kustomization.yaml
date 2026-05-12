@@ -158,21 +158,3 @@ patches:
         path: /spec/ports/0/nodePort
       - op: remove
         path: /spec/ports/1/nodePort
-
-images:
-  - name: ghcr.io/integrationproject-groep1/heartbeat
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/crm
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/identity-service
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/planning
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/facturatie
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/kassa
-    newTag: dev
-  - name: ghcr.io/integrationproject-groep1/monitoring
-    newTag: dev
