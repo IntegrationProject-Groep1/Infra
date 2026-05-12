@@ -12,3 +12,4 @@ kustomize:
   - ghcr.io/integrationproject-groep1/crm@sha256:703d55165039a7f273d3162ca6cff7f11693552ac9ce7064aa114699ae0d2450
   - ghcr.io/integrationproject-groep1/identity-service@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
   - ghcr.io/integrationproject-groep1/ip-groep1-frontend@sha256:eaedf265b89b6f290f4818edc26a40e1f5892f810e33867e1325478caae9efbb
+  - ghcr.io/integrationproject-groep1/mailing@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
