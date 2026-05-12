@@ -214,6 +214,11 @@ spec:
               key: RABBITMQFACTURATIE_PASS
         - name: BILLING_API_URL
           value: "http://facturatie-app-service/api"
+        - name: BILLING_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: BILLING_API_TOKEN
         - name: TEAMS_WEBHOOK_FACTURATIE
           valueFrom:
             secretKeyRef:
