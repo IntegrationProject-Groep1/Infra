@@ -37,7 +37,7 @@ metadata:
     argocd-image-updater.argoproj.io/mailing.update-strategy: digest
     argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^prod$
     argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
-    argocd-image-updater.argoproj.io/write-back-method: git:kustomization.yaml
+    argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -47,6 +47,7 @@ spec:
     repoURL: https://github.com/integrationproject-groep1/Infra.git
     targetRevision: main
     path: overlays/prod
+    kustomize: {}
   destination:
     server: https://kubernetes.default.svc
     namespace: shift-festival

@@ -29,7 +29,7 @@ metadata:
     argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/heartbeat.allow-tags: regexp:^dev$
     argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/monitoring.update-strategy: digest
     argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/monitoring.allow-tags: regexp:^dev$
-    argocd-image-updater.argoproj.io/write-back-method: git:kustomization.yaml
+    argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: dev
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -39,6 +39,7 @@ spec:
     repoURL: https://github.com/integrationproject-groep1/Infra.git
     targetRevision: dev
     path: overlays/dev
+    kustomize: {}
   destination:
     server: https://kubernetes.default.svc
     namespace: shift-festival-dev
