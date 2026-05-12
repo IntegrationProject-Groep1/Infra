@@ -5,14 +5,14 @@ metadata:
   namespace: argocd
   annotations:
     argocd-image-updater.argoproj.io/image-list: >-
-      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod,
-      kassa=ghcr.io/integrationproject-groep1/kassa:prod,
-      facturatie=ghcr.io/integrationproject-groep1/facturatie:prod,
-      crm=ghcr.io/integrationproject-groep1/crm:prod,
-      planning=ghcr.io/integrationproject-groep1/planning:prod,
-      identity=ghcr.io/integrationproject-groep1/identity-service:prod,
-      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:prod,
-      mailing=ghcr.io/integrationproject-groep1/mailing:prod
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend,
+      kassa=ghcr.io/integrationproject-groep1/kassa,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie,
+      crm=ghcr.io/integrationproject-groep1/crm,
+      planning=ghcr.io/integrationproject-groep1/planning,
+      identity=ghcr.io/integrationproject-groep1/identity-service,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat,
+      mailing=ghcr.io/integrationproject-groep1/mailing
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^prod$
     argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
@@ -38,7 +38,6 @@ metadata:
     argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^prod$
     argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
     argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/write-back-target: kustomization.yaml
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:
     - resources-finalizer.argocd.argoproj.io
