@@ -5,30 +5,38 @@ metadata:
   namespace: argocd
   annotations:
     argocd-image-updater.argoproj.io/image-list: >-
-      ghcr.io/integrationproject-groep1/ip-groep1-frontend,
-      ghcr.io/integrationproject-groep1/kassa,
-      ghcr.io/integrationproject-groep1/facturatie,
-      ghcr.io/integrationproject-groep1/crm,
-      ghcr.io/integrationproject-groep1/planning,
-      ghcr.io/integrationproject-groep1/identity-service,
-      ghcr.io/integrationproject-groep1/heartbeat,
-      ghcr.io/integrationproject-groep1/mailing
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/ip-groep1-frontend.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/ip-groep1-frontend.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/kassa.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/kassa.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/facturatie.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/facturatie.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/crm.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/crm.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/planning.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/planning.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/identity-service.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/identity-service.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/heartbeat.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/heartbeat.allow-tags: regexp:^prod$
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/mailing.update-strategy: digest
-    argocd-image-updater.argoproj.io/ghcr.io/integrationproject-groep1/mailing.allow-tags: regexp:^prod$
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend,
+      kassa=ghcr.io/integrationproject-groep1/kassa,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie,
+      crm=ghcr.io/integrationproject-groep1/crm,
+      planning=ghcr.io/integrationproject-groep1/planning,
+      identity=ghcr.io/integrationproject-groep1/identity-service,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat,
+      mailing=ghcr.io/integrationproject-groep1/mailing
+    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
+    argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+    argocd-image-updater.argoproj.io/kassa.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/kassa.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa
+    argocd-image-updater.argoproj.io/facturatie.update-strategy: digest
+    argocd-image-updater.argoproj.io/facturatie.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/facturatie.kustomize.image-name: ghcr.io/integrationproject-groep1/facturatie
+    argocd-image-updater.argoproj.io/crm.update-strategy: digest
+    argocd-image-updater.argoproj.io/crm.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/crm.kustomize.image-name: ghcr.io/integrationproject-groep1/crm
+    argocd-image-updater.argoproj.io/planning.update-strategy: digest
+    argocd-image-updater.argoproj.io/planning.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/planning.kustomize.image-name: ghcr.io/integrationproject-groep1/planning
+    argocd-image-updater.argoproj.io/identity.update-strategy: digest
+    argocd-image-updater.argoproj.io/identity.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/identity.kustomize.image-name: ghcr.io/integrationproject-groep1/identity-service
+    argocd-image-updater.argoproj.io/heartbeat.update-strategy: digest
+    argocd-image-updater.argoproj.io/heartbeat.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/heartbeat.kustomize.image-name: ghcr.io/integrationproject-groep1/heartbeat
+    argocd-image-updater.argoproj.io/mailing.update-strategy: digest
+    argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^prod$
+    argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/write-back-target: kustomization.yaml
     argocd-image-updater.argoproj.io/git-branch: main

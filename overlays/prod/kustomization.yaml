@@ -7,4 +7,20 @@ resources:
   - ../../base
   - namespace.yaml
 
-images: []
+images:
+  - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/kassa
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/facturatie
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/crm
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/planning
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/identity-service
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/heartbeat
+    newTag: prod
+  - name: ghcr.io/integrationproject-groep1/mailing
+    newTag: prod
