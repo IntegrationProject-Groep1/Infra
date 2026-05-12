@@ -40,7 +40,8 @@ spec:
     repoURL: https://github.com/integrationproject-groep1/Infra.git
     targetRevision: dev
     path: overlays/dev
-    kustomize: {}
+    kustomize:
+      images: []
   destination:
     server: https://kubernetes.default.svc
     namespace: shift-festival-dev

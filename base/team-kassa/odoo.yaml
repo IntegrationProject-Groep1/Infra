@@ -21,7 +21,7 @@ spec:
         image: busybox
         command: ["sh", "-c"]
         args:
-        - 'printf "[options]\nadmin_passwd = %s\ndb_host = kassa-db-service\ndb_port = 5432\ndata_dir = /var/lib/odoo\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
+        - 'printf "[options]\nadmin_passwd = %s\ndb_host = kassa-db-service\ndb_port = 5432\ndata_dir = /var/lib/odoo\naddons_path = /usr/lib/python3/dist-packages/odoo/addons,/var/lib/odoo/addons/17.0,/mnt/extra-addons\n" "$ODOO_MASTER_PASS" > /etc/odoo/odoo.conf'
         env:
         - name: ODOO_MASTER_PASS
           valueFrom:
@@ -36,6 +36,21 @@ spec:
         volumeMounts:
         - name: odoo-conf
           mountPath: /etc/odoo
+      - name: fetch-addons
+        image: alpine/git
+        command: ["sh", "-c"]
+        args:
+        - 'git clone --depth=1 --filter=blob:none --sparse https://github.com/IntegrationProject-Groep1/Kassa.git /tmp/repo &&
+           cd /tmp/repo &&
+           git sparse-checkout set addons/kassa_pos_custom &&
+           cp -r addons/kassa_pos_custom /mnt/extra-addons/'
+        securityContext:
+          runAsNonRoot: false
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+        volumeMounts:
+        - name: extra-addons
+          mountPath: /mnt/extra-addons
       containers:
       - name: odoo
         image: odoo:17
@@ -101,6 +116,9 @@ spec:
         - name: odoo-conf
           mountPath: /etc/odoo
           readOnly: true
+        - name: extra-addons
+          mountPath: /mnt/extra-addons
+          readOnly: true
         readinessProbe:
           tcpSocket:
             port: 8069
@@ -112,6 +130,8 @@ spec:
       - name: tmp
         emptyDir: {}
       - name: odoo-conf
+        emptyDir: {}
+      - name: extra-addons
         emptyDir: {}
 ---
 apiVersion: v1
