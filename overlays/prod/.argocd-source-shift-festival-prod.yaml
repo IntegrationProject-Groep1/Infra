@@ -8,3 +8,9 @@ kustomize:
   - ghcr.io/integrationproject-groep1/identity-service:prod@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
   - ghcr.io/integrationproject-groep1/heartbeat:prod@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
   - ghcr.io/integrationproject-groep1/mailing:prod@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
+  - ghcr.io/integrationproject-groep1/kassa@sha256:8c315a8d66ffbb20b08759ed44ccd4389d2316b8959fa094b306e08704a1e278
+  - ghcr.io/integrationproject-groep1/facturatie@sha256:88fd3ea13cb5331e08240e3368122c7766515ab1163d837e708e0a3594f0d6ef
+  - ghcr.io/integrationproject-groep1/planning@sha256:1677be465489836a9bd734cbb90425282309edc5db4708a473cc115158a648b7
+  - ghcr.io/integrationproject-groep1/identity-service@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
+  - ghcr.io/integrationproject-groep1/heartbeat@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
+  - ghcr.io/integrationproject-groep1/mailing@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
