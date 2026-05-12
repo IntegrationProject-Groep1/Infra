@@ -6,3 +6,5 @@ namespace: shift-festival
 resources:
   - ../../base
   - namespace.yaml
+
+images: []
