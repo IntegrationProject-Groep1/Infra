@@ -30,12 +30,12 @@ spec:
           value: "rabbitmq-service"
         - name: RABBITMQ_PORT
           value: "5672"
-        - name: RABBITMQ_USER
+        - name: RABBITMQMONITORING_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQMONITORING_USER
-        - name: RABBITMQ_PASS
+        - name: RABBITMQMONITORING_PASS
           valueFrom:
             secretKeyRef:
               name: shift-secrets
