@@ -45,9 +45,6 @@ spec:
     server: https://kubernetes.default.svc
     namespace: shift-festival-dev
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
