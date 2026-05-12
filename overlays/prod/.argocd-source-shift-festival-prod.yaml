@@ -1,0 +1,10 @@
+kustomize:
+  images:
+  - ghcr.io/integrationproject-groep1/ip-groep1-frontend:prod@sha256:8ea8bc6df8797b6f4029295cc20af24a7bd94566b2e0691359c66893fed0efde
+  - ghcr.io/integrationproject-groep1/kassa:prod@sha256:ca86a61f6c9f13d1eadb4f323456e8a50631b83a6b3f61721f5cf4d4472e125f
+  - ghcr.io/integrationproject-groep1/facturatie:prod@sha256:88fd3ea13cb5331e08240e3368122c7766515ab1163d837e708e0a3594f0d6ef
+  - ghcr.io/integrationproject-groep1/crm:prod@sha256:703d55165039a7f273d3162ca6cff7f11693552ac9ce7064aa114699ae0d2450
+  - ghcr.io/integrationproject-groep1/planning:prod@sha256:6f36d708916d3ea6b52e91540dad048cba718c47e451586879ec7817ba5f2513
+  - ghcr.io/integrationproject-groep1/identity-service:prod@sha256:94df49d00ba8d9b0622b8ef7f1f3e0926a32a16ac87d5ee42db9319cadb76491
+  - ghcr.io/integrationproject-groep1/heartbeat:prod@sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
+  - ghcr.io/integrationproject-groep1/mailing:prod@sha256:515501e47a7d9126dc589e698648dbd56e1dc8d5355382ac2f4550af75456eb8
