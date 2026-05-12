@@ -38,7 +38,7 @@ metadata:
     argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^prod$
     argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
     argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/write-back-target: kustomize:kustomization.yaml
+    argocd-image-updater.argoproj.io/write-back-target: overlays/prod/kustomization.yaml
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:
     - resources-finalizer.argocd.argoproj.io
