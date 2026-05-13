@@ -239,7 +239,7 @@ Pods start crashing → ArgoCD detects Degraded
     ↓  (grace period: 2 minutes continuous Degraded, ignores slow startups)
 ArgoCD Notifications fires simultaneously:
   → Webhook → GitHub Actions (triggers auto-rollback workflow)
-  → Teams message to #Infra + owning team: "⚠️ Rollback gestart voor <app>"
+  → Teams message to #Infra + owning team: "⚠️ Rollback started for <app>"
     ↓
 GitHub Actions auto-rollback workflow:
   → git revert HEAD on main (undoes Image Updater's image tag commit)

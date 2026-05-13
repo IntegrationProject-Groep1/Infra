@@ -384,7 +384,7 @@ New :prod image deployed → ArgoCD syncs
 Pods crash → ArgoCD detects Degraded
     ↓  (after 2 minute grace period — normal slow startups are ignored)
 ArgoCD Notifications fires:
-  → Teams message to #Infra and owning team: "⚠️ Rollback gestart voor <service>"
+  → Teams message to #Infra and owning team: "⚠️ Rollback started for <service>"
   → Webhook triggers GitHub Actions auto-rollback workflow
     ↓
 GitHub Actions:
@@ -394,7 +394,7 @@ GitHub Actions:
 ArgoCD detects the revert commit → syncs → previous image deployed
     ↓
 ArgoCD Notifications:
-  → Teams message: "✅ Rollback succesvol — <service> draait op vorige versie"
+  → Teams message: "✅ Rollback successful — <service> is running on previous version"
 ```
 
 ### Why developer work is safe

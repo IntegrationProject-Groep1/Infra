@@ -32,7 +32,7 @@ spec:
         - name: FLEET_ENROLL
           value: "1"
         - name: FLEET_URL
-          value: "https://fleet-server:8220" # Pas aan indien nodig
+          value: "https://fleet-server:8220" # Adjust if necessary
         - name: FLEET_ENROLLMENT_TOKEN
           valueFrom:
             secretKeyRef:
