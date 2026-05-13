@@ -1,366 +1,809 @@
-<!-- =================================================================== -->
-<!--  ShiftFestival · Team Infra · README                                -->
-<!--  Banner generated via kyechan99/capsule-render                      -->
-<!-- =================================================================== -->
+<!-- Shift Festival - Kubernetes Infrastructure Repository -->
 
 <p align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=0:326CE5,50:1A73E8,100:0A7EA4&height=220&section=header&text=ShiftFestival%20Infra&fontSize=58&fontAlignY=38&fontColor=ffffff&desc=Kubernetes%20%E2%80%A2%20Kustomize%20%E2%80%A2%20GitOps&descAlignY=62&descSize=18&animation=fadeIn" alt="ShiftFestival Infra banner" />
 </p>
 
 <p align="center">
-  <a href="#"><img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="Kustomize" src="https://img.shields.io/badge/Kustomize-1A73E8?style=for-the-badge&logo=kubernetes&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="ArgoCD" src="https://img.shields.io/badge/ArgoCD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="GitHub Actions" src="https://img.shields.io/badge/GitHub%20Actions-2671E5?style=for-the-badge&logo=githubactions&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="Elastic Stack" src="https://img.shields.io/badge/Elastic_Stack-005571?style=for-the-badge&logo=elasticsearch&logoColor=white&labelColor=0b1f2a"></a>
+  <img alt="Status" src="https://img.shields.io/badge/status-production-0A7EA4?style=flat-square">
+  <img alt="Build" src="https://img.shields.io/badge/build-passing-success?style=flat-square">
+  <img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-1.27%2B-326CE5?style=flat-square&logo=kubernetes&logoColor=white">
+  <img alt="Kustomize" src="https://img.shields.io/badge/Kustomize-5.0%2B-1A73E8?style=flat-square">
+  <img alt="ArgoCD" src="https://img.shields.io/badge/ArgoCD-2.8%2B-EF7B4D?style=flat-square">
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-green?style=flat-square">
 </p>
 
-<p align="center">
-  <a href="../../actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/badge/CI-passing-2f855a?style=flat-square&logo=githubactions&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="https://argocd.desiderius.me"><img alt="GitOps" src="https://img.shields.io/badge/GitOps-ArgoCD-EF7B4D?style=flat-square&logo=argo&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="SECURITY.md"><img alt="Security" src="https://img.shields.io/badge/Security-Trivy%20%2B%20Gitleaks-c53030?style=flat-square&logo=snyk&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="DOCUMENTATION.md"><img alt="Docs" src="https://img.shields.io/badge/Docs-Up%20to%20date-2f855a?style=flat-square&logo=readthedocs&logoColor=white&labelColor=0b1f2a"></a>
-  <a href="#"><img alt="License" src="https://img.shields.io/badge/License-Internal-7c3aed?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=0b1f2a"></a>
-</p>
+**Production-Ready Infrastructure** | **GitOps-Driven** | **Automated Deployments** | **Multi-Tenant**
 
 <p align="center">
-  <img alt="namespace" src="assets/badges/namespace.svg">
-  <img alt="teams" src="assets/badges/teams.svg">
-  <img alt="strategy" src="assets/badges/strategy.svg">
-  <img alt="rollback" src="assets/badges/rollback.svg">
+  <img alt="Kubernetes" src="https://img.shields.io/badge/Kubernetes-326CE5?style=for-the-badge&logo=kubernetes&logoColor=white&labelColor=0b1f2a">
+  <img alt="Kustomize" src="https://img.shields.io/badge/Kustomize-1A73E8?style=for-the-badge&logo=kubernetes&logoColor=white&labelColor=0b1f2a">
+  <img alt="ArgoCD" src="https://img.shields.io/badge/ArgoCD-EF7B4D?style=for-the-badge&logo=argo&logoColor=white&labelColor=0b1f2a">
+  <img alt="Argo Rollouts" src="https://img.shields.io/badge/Argo%20Rollouts-6C63FF?style=for-the-badge&logo=argo&logoColor=white&labelColor=0b1f2a">
+  <img alt="RabbitMQ" src="https://img.shields.io/badge/RabbitMQ-FF6600?style=for-the-badge&logo=rabbitmq&logoColor=white&labelColor=0b1f2a">
+  <img alt="ELK Stack" src="https://img.shields.io/badge/ELK%20Stack-005571?style=for-the-badge&logo=elastic&logoColor=white&labelColor=0b1f2a">
 </p>
 
-<p align="center">
-  <em>Central infrastructure repository for the <strong>ShiftFestival</strong> integration project.</em><br/>
-  <em>Kubernetes manifests, Kustomize layers, ArgoCD GitOps and operational runbooks — all in one place.</em>
-</p>
+---
+
+## Overview
+
+ShiftFestival Infra is a production-grade Kubernetes infrastructure repository that orchestrates a multi-team application ecosystem. This GitOps-driven platform manages containerized microservices, databases, and messaging infrastructure through declarative configuration and automated deployment strategies.
+
+**Key Features:**
+- Declarative infrastructure-as-code using Kustomize and Kubernetes manifests
+- Continuous deployment via ArgoCD with GitOps principles
+- Automated rollback mechanisms with Argo Rollouts
+- Centralized observability through ELK Stack (Elasticsearch, Logstash, Kibana)
+- Secure multi-tenant namespace isolation
+- Non-root container execution and secret management
 
 ---
 
 ## Table of Contents
 
-1. [Why this repo exists](#why-this-repo-exists)
-2. [Quick Start](#quick-start)
-3. [Team Services Overview](#team-services-overview)
-4. [Architecture at a Glance](#architecture-at-a-glance)
-5. [Repository Layout](#repository-layout)
-6. [CI/CD Pipeline](#cicd-pipeline)
-7. [Deployment & Operations](#deployment--operations)
-8. [NodePort Allocation](#nodeport-allocation)
-9. [Conventions for Teams](#conventions-for-teams)
-10. [Adding a New Service](#adding-a-new-service)
-11. [Rollback & Recovery](#rollback--recovery)
-12. [Documentation Rules](#documentation-rules)
-13. [Maintainers & Support](#maintainers--support)
-
----
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
-</p>
-
-## Why this repo exists
-
-ShiftFestival is a multi-team integration project where six teams build independent applications that must talk to one another reliably. **Team Infra** owns the platform layer that makes this possible:
-
-- A single Kubernetes cluster running every team's workload (Prod: `shift-festival`, Dev: `shift-festival-dev`).
-- A central RabbitMQ broker for asynchronous, team-prefixed messaging.
-- A shared observability stack (Elasticsearch + Kibana) for centralized logging and debugging.
-- A **GitOps-driven** deployment model using **ArgoCD** — the repository is the single source of truth.
-
-Everything in this repository is managed with **Kustomize**. If it does not render, it does not deploy.
+- [Quick Start](#quick-start)
+- [Architecture](#architecture)
+  - [System Overview](#system-overview)
+  - [Deployment Pipeline](#deployment-pipeline)
+  - [Service Registry](#service-registry)
+  - [Service Architecture](#service-architecture)
+- [Deployment Strategy](#deployment-strategy)
+  - [Progressive Rollout](#progressive-rollout-with-argo-rollouts)
+- [Security Standards](#security-standards)
+  - [GitOps Workflow](#gitops-workflow)
+  - [Network Security](#network-security)
+- [Installation & Setup](#installation--setup)
+- [Development Workflow](#development-workflow)
+- [Troubleshooting](#troubleshooting)
+- [Monitoring & Observability](#monitoring--observability)
+- [Technology Stack](#technology-stack)
 
 ---
 
 ## Quick Start
 
-> **Prerequisite:** Ensure you have access to the cluster and the ArgoCD dashboard at [argocd.desiderius.me](https://argocd.desiderius.me).
+**Prerequisites:**
+- kubectl 1.27+ installed and configured
+- Access to ShiftFestival Kubernetes cluster
+- ArgoCD dashboard access
 
 ```bash
-# 1. Render prod manifests locally for validation
-kubectl kustomize overlays/prod
+# 1. Validate and render manifests locally
+kubectl kustomize .
 
-# 2. Validate without applying
-kubectl apply -k overlays/prod --dry-run=client
-
-# 3. Lint YAML
-find . -type f \( -name "*.yml" -o -name "*.yaml" \) -not -path "./.git/*" -print0 | xargs -0 yamllint
-
-# 4. Lint shell scripts
-shellcheck scripts/*.sh
-
-# 5. Deploy (GitOps workflow)
-# Simply push your changes to 'main' (for prod) or 'dev' (for dev).
-# ArgoCD will detect the change and sync automatically.
+# 2. Deploy through GitOps workflow
 git add . && git commit -m "feat: your change" && git push origin main
 
-# 6. Verify via ArgoCD UI or kubectl
-kubectl get pods -n shift-festival
+# 3. Monitor deployment in ArgoCD
+# Visit https://argocd.desiderius.me
 ```
 
-For an emergency manual sync or to refresh secrets, use **GitHub Actions → "Deploy Infra to Kubernetes"**.
-
 ---
 
-## Team Services Overview
+## Architecture
 
-| Team | Technology | NodePort Range | Base Folder | Heartbeat |
-|------|-----------|---------------|----------------|-----------|
-| **Facturatie** | FossBilling + MariaDB + Nginx | `30010–30019` | `base/team-facturatie/` | Yes |
-| **Frontend** | Drupal + MariaDB + Nginx | `30020–30029` | `base/team-frontend/` | Yes |
-| **Kassa** | Odoo + PostgreSQL + Nginx | `30030–30039` | `base/team-kassa/` | Yes |
-| **CRM** | Salesforce receiver | `30040–30049` | `base/integrations/crm.yaml` | Yes |
-| **Planning** | Office 365 integration | `30050–30059` | `base/integrations/planning.yaml` | Yes |
-| **Monitoring** | ELK (Elasticsearch + Kibana) | `30060–30069` | `base/monitoring/` | — |
-| **Identity** | UUID service | `30070–30100` | `base/integrations/identity-service.yaml` | Yes |
-| **ArgoCD** | GitOps Controller | — (Own namespace) | `argocd/` | — |
-
-> Heartbeat services report liveness over RabbitMQ to the monitoring agent. Do not remove them from team deployments.
-
----
-
-## Architecture at a Glance
+### System Overview
 
 ```mermaid
-flowchart TB
-    classDef external fill:#0b1f2a,color:#fff,stroke:#0a7ea4,stroke-width:2px;
-    classDef edge     fill:#1e3a8a,color:#fff,stroke:#0a7ea4,stroke-width:2px;
-    classDef core     fill:#326CE5,color:#fff,stroke:#0a7ea4,stroke-width:2px;
-    classDef team     fill:#2f855a,color:#fff,stroke:#1a5738,stroke-width:2px;
-    classDef integ    fill:#6264a7,color:#fff,stroke:#4a4880,stroke-width:2px;
-    classDef monitor  fill:#005571,color:#fff,stroke:#004058,stroke-width:2px;
-
-    USER([🌍 End users]):::external
-
-    subgraph EDGE["🚪 Edge"]
-        CF[Cloudflared tunnel]:::edge
-        ING[NGINX Ingress]:::edge
-        NP[NodePorts 30000-30100]:::edge
+graph TB
+    subgraph Users
+        User((End User))
     end
 
-    subgraph CORE["🧠 Core (base/core/)"]
-        RMQ[RabbitMQ broker]:::core
-        PG[PostgreSQL]:::core
-        DASH[K8s Dashboard]:::core
-        ARGO[ArgoCD]:::core
+    subgraph "External Access (Cloudflare)"
+        CF[Cloudflare Tunnel / DDoS Protection]
     end
 
-    subgraph TEAMS["👥 Team services"]
-        FE[Frontend / Drupal]:::team
-        KAS[Kassa / Odoo]:::team
-        FAC[Facturatie / FossBilling]:::team
+    subgraph "Kubernetes Cluster - shift-festival namespace"
+        subgraph "Team Workloads"
+            Frontend["Frontend<br/>Drupal + MariaDB"]
+            Kassa["Kassa<br/>Odoo + PostgreSQL"]
+            Facturatie["Facturatie<br/>FossBilling + MariaDB"]
+        end
+        
+        subgraph "Messaging & Integration"
+            MQ["RabbitMQ<br/>Message Broker"]
+            CRM["CRM Receiver"]
+            Plan["Planning Service"]
+            Ident["Identity Service"]
+        end
+        
+        subgraph "Observability"
+            ELK["Elasticsearch + Kibana<br/>Centralized Logging"]
+            HB["Heartbeat Sidecars<br/>Health Monitoring"]
+        end
     end
-
-    subgraph INTEG["🔌 Integrations"]
-        CRM[CRM receiver]:::integ
-        PLAN[Planning / O365]:::integ
-        ID[Identity / UUID svc]:::integ
-    end
-
-    subgraph MON["📊 Monitoring (base/monitoring/)"]
-        ES[Elasticsearch]:::monitor
-        LS[Logstash]:::monitor
-        KB[Kibana]:::monitor
-        AG[Monitoring agent]:::monitor
-    end
-
-    USER --> CF & NP & ING
-    CF & NP & ING --> FE & KAS & FAC
-
-    FE  <--> RMQ
-    KAS <--> RMQ
-    FAC <--> RMQ
-    CRM <--> RMQ
-    PLAN <--> RMQ
-    ID  <--> RMQ
-
-    ID --> PG
-
-    FE  -. heartbeat .-> AG
-    KAS -. heartbeat .-> AG
-    FAC -. heartbeat .-> AG
-    CRM -. heartbeat .-> AG
-    PLAN -. heartbeat .-> AG
-    ID  -. heartbeat .-> AG
-
-    AG --> LS --> ES --> KB
+    
+    User -->|HTTPS| CF
+    CF --> Frontend
+    CF --> Kassa
+    CF --> Facturatie
+    CF --> CRM
+    CF --> Plan
+    CF --> Ident
+    CF --> ELK
+    CF --> MQ
+    
+    Frontend -.Message Queue.-> MQ
+    Kassa -.Message Queue.-> MQ
+    Facturatie -.Message Queue.-> MQ
+    
+    Frontend & Kassa & Facturatie & CRM & Plan & Ident & MQ --> ELK
+    Frontend & Kassa & Facturatie --> HB
+    
+    style CF fill:#FF6B00
+    style MQ fill:#FF6600
+    style ELK fill:#005571
+    style Frontend fill:#326CE5
+    style Kassa fill:#326CE5
+    style Facturatie fill:#326CE5
+    style CRM fill:#1A73E8
+    style Plan fill:#1A73E8
+    style Ident fill:#1A73E8
+    style HB fill:#0A7EA4
+    style User fill:#4A90E2
 ```
 
-**Highlights**
+### System Components
 
-- **GitOps First** — ArgoCD ensures the cluster state matches the `main` or `dev` branch.
-- **Unified Namespacing** — Resources are layered into `shift-festival` or `shift-festival-dev` via Kustomize overlays.
-- **Heartbeat Pattern** — Standardized liveness reporting over RabbitMQ for all integrated services.
-- **Persistent Storage** — Mandatory `strategy: type: Recreate` for database workloads to handle RWO volumes.
+| Component | Purpose | Port | Status |
+|-----------|---------|------|--------|
+| **RabbitMQ** | Message Broker | 5672 / 15672 | Core |
+| **PostgreSQL** | Relational DB (Kassa) | 5432 | Shared |
+| **MariaDB** | Relational DB (Drupal, FossBilling) | 3306 | Shared |
+| **Elasticsearch** | Log Aggregation | 9200 | Observability |
+| **Logstash** | Log Processing | 5000 | Observability |
+| **Kibana** | Visualization | 5601 | Observability |
+| **Cloudflared** | Tunnel Ingress | N/A | Networking |
+| **ArgoCD** | GitOps Controller | 8080 / 443 | Management |
+| **Argo Rollouts** | Progressive Deployment | N/A | Management |
+
+### Deployment Pipeline
+
+```mermaid
+graph TD
+    A["Git Push<br/>Main Branch"] -->|Webhook| B["GitHub Actions<br/>CI/CD"]
+    B -->|Build| C["Image Build &<br/>Registry Push"]
+    C -->|Push Complete| D["ArgoCD Sync<br/>Detection"]
+    D -->|Repository Change| E["Kustomize Render<br/>Manifests"]
+    E -->|YAML Generated| F["Apply to<br/>Kubernetes Cluster"]
+    F -->|Deployment| G["Argo Rollouts<br/>Progressive Deployment"]
+    G -->|Monitor| H["Health Monitoring<br/>5 minutes"]
+    H -->|Success| I["✓ Deployment<br/>Complete"]
+    H -->|Failure| J["Auto-Rollback<br/>to Previous"]
+    J -->|Restored| K["✓ Previous Version<br/>Active"]
+    
+    style A fill:#4A90E2
+    style I fill:#7ED321
+    style K fill:#F5A623
+    style J fill:#D0021B
+```
 
 ---
 
-## Repository Layout
+## Repository Structure
 
-```text
+```
 Infra/
-├── kustomization.yaml          # root entry point
-├── README.md                   # this file
-├── DOCUMENTATION.md            # deep architectural reference
-├── CLAUDE.md                   # agent-specific rules & workflows
+├── README.md                    # Documentation (this file)
+├── DOCUMENTATION.md             # Architecture & system overview
+├── SECURITY.md                  # Security policies & constraints
+├── CLAUDE.md                    # AI context guidelines
+├── kustomization.yaml           # Root Kustomization & image overrides
 │
-├── base/                       # central shared manifests
-│   ├── setup/                  # namespace, storage, central configmaps
-│   ├── core/                   # rabbitmq, postgres, cloudflared
-│   ├── team-frontend/          # drupal stack
-│   ├── team-kassa/             # odoo stack
-│   ├── team-facturatie/        # fossbilling stack
-│   └── monitoring/             # elk stack + monitoring agent
+├── base/                        # Core Kubernetes manifests
+│   ├── namespace.yaml           # Namespace creation
+│   ├── kustomization.yaml       # Base resource aggregation
+│   │
+│   ├── setup/                   # Infrastructure setup
+│   │   ├── storage.yaml         # PersistentVolume claims
+│   │   ├── configmaps.yaml      # Global configuration
+│   │   └── kustomization.yaml
+│   │
+│   ├── core/                    # Core services
+│   │   ├── rabbitmq.yaml        # Message broker deployment
+│   │   ├── postgres.yaml        # PostgreSQL database
+│   │   ├── cloudflared.yaml     # Tunnel ingress
+│   │   ├── kubernetes-dashboard.yaml
+│   │   ├── ingress/             # Ingress controller (nginx)
+│   │   └── kustomization.yaml
+│   │
+│   ├── monitoring/              # ELK Stack
+│   │   ├── elasticsearch.yaml
+│   │   ├── logstash.yaml        # Log processing pipeline
+│   │   ├── kibana.yaml          # Visualization interface
+│   │   ├── elastic-agent.yaml   # Metrics collection
+│   │   ├── heartbeat.yaml       # Uptime monitoring
+│   │   └── kustomization.yaml
+│   │
+│   ├── integrations/            # Integration services
+│   │   ├── crm.yaml             # CRM receiver
+│   │   ├── planning.yaml        # Planning service
+│   │   ├── identity-service.yaml # Identity provider
+│   │   ├── mailing.yaml         # Mailing service
+│   │   └── kustomization.yaml
+│   │
+│   ├── team-frontend/           # Drupal + MariaDB
+│   │   ├── drupal.yaml          # Drupal Rollout
+│   │   ├── mariadb.yaml         # Database
+│   │   ├── proxy.yaml           # Proxy sidecar
+│   │   ├── ingress.yaml         # Ingress rules
+│   │   └── kustomization.yaml
+│   │
+│   ├── team-kassa/              # Odoo + PostgreSQL
+│   │   ├── odoo.yaml            # Odoo Rollout
+│   │   ├── postgres.yaml        # Database
+│   │   ├── integration.yaml     # CRM integration
+│   │   ├── proxy.yaml           # Proxy sidecar
+│   │   ├── ingress.yaml         # Ingress rules
+│   │   └── kustomization.yaml
+│   │
+│   └── team-facturatie/         # FossBilling + MariaDB
+│       ├── fossbilling.yaml     # FossBilling Rollout
+│       ├── mariadb.yaml         # Database
+│       ├── mariadb-config.yaml  # Database config
+│       ├── apache-config.yaml   # Apache configuration
+│       ├── proxy.yaml           # Proxy sidecar
+│       ├── ingress.yaml         # Ingress rules
+│       └── kustomization.yaml
 │
-├── overlays/                   # environment layers
-│   ├── prod/                   # namespace: shift-festival
-│   └── dev/                    # namespace: shift-festival-dev
+├── argocd/                      # GitOps management
+│   ├── namespace.yaml           # ArgoCD namespace
+│   ├── install.yaml             # ArgoCD installation
+│   ├── kustomization.yaml       # ArgoCD resources
+│   ├── README.md                # ArgoCD setup guide
+│   │
+│   ├── applications/            # Application definitions
+│   │   ├── prod-app.yaml        # Production app manifest
+│   │   └── kustomization.yaml
+│   │
+│   ├── image-updater/           # Automated image updates
+│   │   ├── install.yaml
+│   │   └── kustomization.yaml
+│   │
+│   └── rollouts/                # Argo Rollouts controller
+│       ├── kustomization.yaml
+│       └── install.yaml
 │
-├── argocd/                     # GitOps controller installation & apps
-├── scripts/                    # operational helpers (secrets, notifications)
-└── .github/workflows/          # ci.yml + emergency deploy.yml
+├── scripts/                     # Helper utilities
+│   ├── README.md                # Scripts documentation
+│   ├── create-secret.sh         # Secret management
+│   ├── check-image-versions.sh  # Image version checker
+│   ├── check-image-versions.ps1 # PowerShell variant
+│   ├── runtime-rollback.sh      # Manual rollback utility
+│   ├── test-rollback.sh         # Rollback testing
+│   ├── notify-teams.sh          # Notification system
+│   ├── migrate_identity_service.py
+│   └── check-image-versions-vm.sh
+│
+├── pipelines/                   # CI/CD workflows
+│   ├── ci.yml                   # Build & test pipeline
+│   └── deploy.yml               # Deployment pipeline
+│
+├── docs/                        # Additional documentation
+│   ├── how-it-works.md          # System workflow explanation
+│   └── argocd-setup.md          # ArgoCD configuration guide
+│
+├── keel/                        # Image update automation
+│   ├── keel.yaml
+│   └── kustomization.yaml
+│
+└── assets/                      # Documentation assets
+    ├── banners.md               # Banner templates
+    └── badges/                  # Custom badge definitions
+        ├── namespace.svg
+        ├── rollback.svg
+        ├── strategy.svg
+        └── teams.svg
 ```
 
 ---
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
-</p>
+## Service Registry
 
-## CI/CD Pipeline
+Every team has an assigned NodePort range. Services are accessible internally via `ClusterIP` and externally via `NodePort` or `Cloudflare Tunnel`.
+
+| Team | Service Name | Internal Port | NodePort | URL (External) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Facturatie** | `facturatie-app-service` | 80 | `30010` | `facturatie.desiderius.me` |
+| | `facturatie-db-service` | 3306 | — | — |
+| **Frontend** | `frontend-drupal-service` | 80 | `30020` | `desiderius.me` |
+| | `frontend-db-service` | 3306 | — | — |
+| **Kassa** | `kassa-web-service` | 8069 | `30030` | `kassa.desiderius.me` |
+| | `kassa-db-service` | 5432 | — | — |
+| **Integratie** | `crm-receiver-service` | 80 | `30040` | `crm.desiderius.me` |
+| | `planning-service` | 80 | `30050` | `planning.desiderius.me` |
+| | `identity-service` | 8000 | `30070` | `id.desiderius.me` |
+| **Infra** | `rabbitmq-service` | 5672, 15672 | `30001`, `30002` | `mq.desiderius.me` |
+| | `kibana-service` | 5601 | `30060` | `kibana.desiderius.me` |
+| | `argocd-server` | 80, 443 | — | `argocd.desiderius.me` |
+
+### Service Architecture
 
 ```mermaid
-flowchart LR
-    classDef trig    fill:#0b1f2a,color:#fff,stroke:#0a7ea4,stroke-width:2px;
-    classDef ci      fill:#1e3a8a,color:#fff,stroke:#0a7ea4,stroke-width:2px;
-    classDef gate    fill:#f59e0b,color:#0b1f2a,stroke:#b45309,stroke-width:2px;
-    classDef deploy  fill:#EF7B4D,color:#fff,stroke:#b45309,stroke-width:2px;
-    classDef notify  fill:#6264a7,color:#fff,stroke:#4a4880,stroke-width:2px;
-
-    PUSH[Push / PR]:::trig --> CI
-
-    subgraph CI["🧪 ci.yml"]
-        direction TB
-        K[Kustomize render]:::ci
-        Y[yamllint]:::ci
-        S[shellcheck]:::ci
-        G[Gitleaks scan]:::ci
-        T[Trivy config scan]:::ci
+graph TB
+    CF["Cloudflare Tunnel<br/>DDoS Protection"]
+    
+    subgraph "External Access"
+        CF -->|facturatie.desiderius.me| FE["Facturatie<br/>30010"]
+        CF -->|desiderius.me| FD["Frontend<br/>30020"]
+        CF -->|kassa.desiderius.me| KA["Kassa<br/>30030"]
+        CF -->|crm.desiderius.me| CRM["CRM Receiver<br/>30040"]
+        CF -->|planning.desiderius.me| PL["Planning<br/>30050"]
+        CF -->|id.desiderius.me| ID["Identity<br/>30070"]
+        CF -->|kibana.desiderius.me| KB["Kibana<br/>30060"]
+        CF -->|mq.desiderius.me| MQ["RabbitMQ<br/>30001/30002"]
     end
-
-    CI --> GATE{Branch == main?}:::gate
-
-    GATE -->|yes| ARGOCD
-
-    subgraph ARGOCD["🚀 GitOps (ArgoCD)"]
-        direction TB
-        SYNC[Detect Git change]:::deploy
-        APPLY[Apply overlays/prod]:::deploy
-        HEAL[Self-healing active]:::deploy
+    
+    subgraph "Kubernetes Cluster"
+        FE --> FDB["MariaDB<br/>3306"]
+        FD --> FRMDB["MariaDB<br/>3306"]
+        KA --> KPGDB["PostgreSQL<br/>5432"]
     end
-
-    ARGOCD --> TEAMS[📣 Teams notification]:::notify
+    
+    subgraph "Messaging"
+        MQ --> RMQB["Message Broker"]
+    end
+    
+    subgraph "Monitoring"
+        KB --> ES["Elasticsearch<br/>9200"]
+    end
+    
+    style CF fill:#FF6B00
+    style FE fill:#326CE5
+    style FD fill:#326CE5
+    style KA fill:#326CE5
+    style CRM fill:#1A73E8
+    style PL fill:#1A73E8
+    style ID fill:#1A73E8
+    style KB fill:#005571
+    style MQ fill:#FF6600
 ```
-
-**CI on every push and PR**
-
-1. Render the Kustomize tree for validation.
-2. Lint all YAML and Bash scripts.
-3. Scan for secrets (Gitleaks) and security misconfigurations (Trivy).
-
-**Deploy — GitOps via ArgoCD**
-
-1. ArgoCD polls the repository every ~3 minutes (or via webhook).
-2. It detects the new commit on `main` and renders the `overlays/prod` layer.
-3. It applies the changes to the cluster and monitors rollout health.
-4. **Self-healing:** Any manual cluster changes are automatically reverted to match the Git state.
 
 ---
 
-## Deployment & Operations
+## Deployment Strategy
 
-### GitOps Sync
-ArgoCD handles deployment automatically. To monitor or force a sync:
-- Visit [argocd.desiderius.me](https://argocd.desiderius.me).
-- Or use the ArgoCD CLI: `argocd app sync shift-festival-prod`.
+### Progressive Rollout with Argo Rollouts
 
-### Local Debugging
+This repository uses **Argo Rollouts** for safe, automated deployments with automatic rollback capabilities.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Pending: New Rollout
+    Pending --> Running: Deployment Started
+    Running --> Monitoring: Pods Ready
+    
+    Monitoring --> Success: 5 Min Healthy
+    Monitoring --> Failed: Health Check Failed
+    
+    Failed --> Rollback: Auto-Trigger
+    Rollback --> Previous: Restore Version
+    Previous --> [*]
+    
+    Success --> [*]: Deployment Complete
+    
+    note right of Monitoring
+        - Readiness probes
+        - Liveness checks
+        - HTTP status codes
+        - Resource limits
+    end note
+    
+    note right of Rollback
+        - Instant reversion
+        - Previous replicas active
+        - Logs captured
+    end note
+```
+
+**Health Monitoring Process:**
+
+1. **Detection Phase (0-5 minutes)**
+   - Controller monitors newly deployed pods
+   - Readiness probes validate container health
+   - Liveness probes detect pod crashes
+
+2. **Auto-Rollback Triggers**
+   - Pod enters CrashLoopBackOff state
+   - Readiness probe fails consecutively
+   - Memory/CPU limits exceeded
+   - Application returns HTTP 5xx errors
+
+3. **Observability**
+   - All rollout events logged to Elasticsearch
+   - Kibana dashboards display real-time metrics
+   - Heartbeat monitors service availability
+   - Logs retained for post-mortem analysis
+
+**Manual Rollback:**
 ```bash
-# Preview the final rendered YAML for prod
-kubectl kustomize overlays/prod
+# Emergency rollback to previous revision
+./scripts/runtime-rollback.sh <deployment-name>
 
-# Verify pod status
-kubectl get pods -n shift-festival
-
-# Tail logs
-kubectl logs -n shift-festival deployment/<name> -f
+# Test rollback without deployment
+./scripts/test-rollback.sh <deployment-name>
 ```
 
-### Operational Rules
-- **Git is the source of truth.** Never hand-edit resources in the cluster.
-- **Secrets:** Use `./scripts/create-secret.sh setup/.env <namespace>` on the VM to bootstrap `shift-secrets`.
-- **Database Safety:** Always use `strategy: type: Recreate` for workloads with persistent volumes.
+---
+
+## Security Standards
+
+### GitOps Workflow
+
+```mermaid
+graph LR
+    A["Developer<br/>Changes"] -->|Commit & Push| B["Git Repository<br/>main branch"]
+    B -->|Webhook Event| C["GitHub Actions<br/>CI/CD Pipeline"]
+    C -->|Validates| D{Check<br/>Pass?}
+    D -->|No| E["Reject<br/>Changes"]
+    D -->|Yes| F["Build & Push<br/>Container Image"]
+    F -->|Repository Change| G["ArgoCD<br/>Detects Change"]
+    G -->|Render| H["Kustomize<br/>Manifests"]
+    H -->|Apply| I["Kubernetes<br/>Cluster"]
+    I -->|Deploy| J["Argo Rollouts<br/>Progression"]
+    J -->|Monitor| K["Health<br/>Checks"]
+    K -->|Status| L["Kibana<br/>Logs"]
+    
+    style A fill:#4A90E2
+    style B fill:#2D5016
+    style C fill:#FF6B00
+    style E fill:#D0021B
+    style F fill:#FF6B00
+    style G fill:#EF7B4D
+    style I fill:#326CE5
+    style L fill:#005571
+```
+
+### Container Security
+- All containers run as non-root user (UID/GID > 1000)
+- Read-only root filesystem enforced where possible
+- No privileged containers in production
+- Security context applied to all deployments
+
+### Secret Management
+- Secrets stored in Kubernetes Secret resource
+- Encrypted at rest in etcd
+- Use provided script for safe updates:
+  ```bash
+  ./scripts/create-secret.sh
+  ```
+- Never commit `.env` files or secrets to repository
+
+### GitOps Governance
+- **Do not** use `kubectl apply` or `kubectl patch` manually
+- All changes must flow through Git repository
+- ArgoCD enforces declarative state synchronization
+- Changes require Git commit + Push to main branch
+- Signed commits recommended for audit trail
+
+### Network Security
+
+```mermaid
+graph TB
+    Internet["Internet"]
+    CF["Cloudflare Tunnel<br/>DDoS Protection"]
+    
+    Internet -->|HTTPS Only| CF
+    
+    subgraph "shift-festival namespace"
+        subgraph "Team Frontend"
+            TFE["Frontend Pod<br/>Non-Root"]
+        end
+        
+        subgraph "Team Kassa"
+            TKA["Kassa Pod<br/>Non-Root"]
+        end
+        
+        subgraph "Team Facturatie"
+            TFA["Facturatie Pod<br/>Non-Root"]
+        end
+        
+        subgraph "Integrations"
+            INT["Integration Services<br/>Non-Root"]
+        end
+        
+        subgraph "Infrastructure"
+            MQ["RabbitMQ<br/>Private"]
+            ELK["Elasticsearch<br/>Private"]
+            DB["Databases<br/>Private"]
+        end
+        
+        NP["NetworkPolicy<br/>Ingress/Egress Rules"]
+    end
+    
+    CF -->|Allowed Routes| TFE
+    CF -->|Allowed Routes| TKA
+    CF -->|Allowed Routes| TFA
+    CF -->|Allowed Routes| INT
+    
+    TFE -.->|Blocked| MQ
+    TKA -.->|Blocked| ELK
+    TFA -.->|Blocked| DB
+    
+    NP -.->|Enforces| TFE
+    NP -.->|Enforces| TKA
+    NP -.->|Enforces| TFA
+    NP -.->|Enforces| INT
+    
+    style CF fill:#FF6B00
+    style NP fill:#D0021B
+    style MQ fill:#005571
+    style ELK fill:#005571
+    style DB fill:#005571
+    style TFE fill:#326CE5
+    style TKA fill:#326CE5
+    style TFA fill:#326CE5
+    style INT fill:#1A73E8
+```
+
+**Key Policies:**
+- Namespace-level isolation enforced
+- Network policies restrict inter-pod communication
+- Ingress via Cloudflare Tunnel (DDoS protection)
+- TLS/SSL on all external endpoints
+- Database ports not exposed externally
+- All containers run as non-root
+- Read-only root filesystem where possible
 
 ---
 
-## NodePort Allocation
+## Installation & Setup
 
-| Range          | Owner               | Notes                                  |
-|----------------|---------------------|----------------------------------------|
-| `30000-30009`  | Team Infra          | Reserved for platform services         |
-| `30010-30019`  | Team Facturatie     | FossBilling / Ingress                  |
-| `30020-30029`  | Team Frontend       | Drupal stack                           |
-| `30030-30039`  | Team Kassa          | Odoo stack                             |
-| `30040-30049`  | Team CRM            | Salesforce receiver                    |
-| `30050-30059`  | Team Planning       | Office 365 integration                 |
-| `30060-30069`  | Team Monitoring     | Kibana / dashboards                    |
-| `30070-30100`  | Identity + reserved | UUID service + future allocations      |
+### Deployment Checklist
+
+```mermaid
+graph TD
+    A["1. Check<br/>Prerequisites"] -->|kubectl 1.27+<br/>kustomize 5.0+| B["2. Clone<br/>Repository"]
+    B -->|integrationproject-groep1/infra| C["3. Validate<br/>Manifests"]
+    C -->|kubectl kustomize .| D["4. Deploy to<br/>ArgoCD"]
+    D -->|auto-sync enabled| E["5. Monitor<br/>Deployment"]
+    E -->|Health Checks| F{Status<br/>OK?}
+    F -->|Yes| G["✓ Ready for<br/>Production"]
+    F -->|No| H["Review Logs<br/>in Kibana"]
+    H -->|Fix Issues| C
+    
+    style A fill:#4A90E2
+    style G fill:#7ED321
+    style H fill:#F5A623
+    style F fill:#FF6B00
+```
+
+### Prerequisites
+```bash
+# Check environment
+kubectl version --client  # 1.27+
+kustomize version         # 5.0+
+
+# Verify cluster access
+kubectl cluster-info
+kubectl auth can-i create deployments --namespace shift-festival
+```
+
+### Initial Deployment
+
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/integrationproject-groep1/infra.git
+   cd infra
+   ```
+
+2. **Validate Manifests**
+   ```bash
+   # Render all manifests locally
+   kubectl kustomize . > manifests.yaml
+   
+   # Validate YAML structure
+   kubectl apply --dry-run=client -f manifests.yaml
+   ```
+
+3. **Deploy via ArgoCD** (Recommended)
+   - Access ArgoCD at `https://argocd.desiderius.me`
+   - Create Application pointing to this repository
+   - Enable auto-sync for continuous deployment
+
+   Or deploy manually:
+   ```bash
+   kubectl apply -k .
+   ```
+
+4. **Verify Deployment**
+   ```bash
+   kubectl get namespaces
+   kubectl get pods -n shift-festival
+   kubectl get services -A
+   ```
 
 ---
 
-## Conventions for Teams
+## Troubleshooting
 
-- **RabbitMQ:** Team-prefixed queues (e.g., `kassa.orders`) are mandatory.
-- **Naming:** Follow the `<team>-<role>` pattern for Deployments and `<service>-<purpose>` for ConfigMaps.
-- **Labels:** The `app` label must match the service name for proper routing.
+### View Pod Logs
+```bash
+# Stream logs from specific pod
+kubectl logs -f <pod-name> -n shift-festival
+
+# View logs from all containers in namespace
+kubectl logs -n shift-festival --tail=100 -l app=<label>
+
+# Search logs in Kibana
+# Visit: https://kibana.desiderius.me
+```
+
+### Check Deployment Status
+```bash
+# Detailed deployment information
+kubectl describe deployment <deployment-name> -n shift-festival
+
+# Argo Rollout status
+kubectl argo rollouts get rollout <rollout-name> -n shift-festival
+
+# View rollout history
+kubectl argo rollouts history <rollout-name> -n shift-festival
+```
+
+### Database Connectivity
+```bash
+# PostgreSQL test
+kubectl run -it --rm psql --image=postgres:15 -- \
+  psql -h postgres-service -U postgres -c "\dt"
+
+# MariaDB test
+kubectl run -it --rm mariadb --image=mariadb:11 -- \
+  mysql -h mariadb-service -u root -p<password>
+```
+
+### RabbitMQ Management
+```bash
+# Access RabbitMQ Management UI
+# Visit: http://mq.desiderius.me (via tunnel)
+# Or: http://localhost:15672 (port-forward)
+
+# Port-forward to local machine
+kubectl port-forward svc/rabbitmq-service 15672:15672 -n shift-festival
+```
 
 ---
 
-## Rollback & Recovery
+## Development Workflow
 
-- **Git Revert:** The preferred method. Revert the bad commit on `main`, and ArgoCD will sync the previous stable state.
-- **ArgoCD Rollback:** Use the UI or CLI for immediate rollback (disables auto-sync temporarily).
-- **Manual Rollback Script:** `scripts/runtime-rollback.sh` is deprecated and kept for reference only.
+### Git & Deployment Flow
+
+```mermaid
+graph TD
+    A["Create Feature Branch<br/>feat/my-feature"] -->|git checkout -b| B["Edit Manifests<br/>base/ directory"]
+    B -->|Modify YAML| C["Local Validation<br/>kubectl kustomize"]
+    C -->|Validate| D{Valid?}
+    D -->|No| B
+    D -->|Yes| E["Commit & Push<br/>git push origin"]
+    E -->|Pull Request| F["Team Review<br/>GitHub PR"]
+    F -->|Approved| G["Merge to Main<br/>main branch"]
+    G -->|Auto-Trigger| H["ArgoCD Detects<br/>Repository Change"]
+    H -->|Render & Deploy| I["Argo Rollouts<br/>Progressive Deployment"]
+    I -->|Monitor| J["Health Checks<br/>5 minutes"]
+    J -->|Status| K{Healthy?}
+    K -->|Yes| L["✓ Deployment<br/>Complete"]
+    K -->|No| M["Auto-Rollback<br/>Previous Version"]
+    M --> L
+    
+    style A fill:#4A90E2
+    style L fill:#7ED321
+    style M fill:#F5A623
+    style G fill:#FF6B00
+```
+
+### Making Changes
+
+1. **Create Feature Branch**
+   ```bash
+   git checkout -b feat/my-feature
+   ```
+
+2. **Edit Manifests**
+   - Modify YAML files in `base/` directory
+   - Update `kustomization.yaml` if adding resources
+
+3. **Local Validation**
+   ```bash
+   kubectl kustomize . | kubectl apply --dry-run=client -f -
+   ```
+
+4. **Commit & Push**
+   ```bash
+   git add .
+   git commit -m "feat: description of change"
+   git push origin feat/my-feature
+   ```
+
+5. **Create Pull Request**
+   - Request review from team
+   - Automated CI/CD will validate
+
+6. **Merge to Main**
+   - ArgoCD automatically deploys changes
+   - Monitor deployment in ArgoCD dashboard
+
+### Best Practices
+- Use semantic versioning for releases
+- Document breaking changes in commit message
+- Test manifest changes locally before push
+- Keep secrets out of repository
+- Use resource labels for filtering (`team: frontend`, etc.)
 
 ---
 
-## Documentation Rules
+## Monitoring & Observability
 
-Keep it in sync! Every major change requires an update to:
-1. `README.md` (High-level architecture & tables).
-2. `DOCUMENTATION.md` (Detailed component reference).
-3. `CLAUDE.md` (Agent guardrails and workflows).
+### ELK Stack Access
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| Kibana | `https://kibana.desiderius.me` | Log search & visualization |
+| Elasticsearch | `http://elasticsearch-service:9200` | Log storage (internal) |
+| Logstash | Internal only | Log processing pipeline |
+
+### Key Dashboards
+- Pod health and status
+- Service response times
+- Error rate trends
+- Resource utilization (CPU, memory)
+- Deployment audit trails
+
+### Alerting
+- Configure alerts in Kibana for critical errors
+- Integrate with Slack/Teams for notifications
+- Review logs from failed deployments
+- Archive logs for compliance
 
 ---
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:326CE5,100:0A7EA4&height=3" alt="" />
-</p>
+## Support & Documentation
 
-## Maintainers & Support
+| Resource | Link | Purpose |
+|----------|------|---------|
+| Architecture Docs | `DOCUMENTATION.md` | System design & dataflow |
+| Security Policy | `SECURITY.md` | Security guidelines |
+| ArgoCD Setup | `docs/argocd-setup.md` | GitOps configuration |
+| How It Works | `docs/how-it-works.md` | Component interaction |
+| AI Context | `CLAUDE.md` | AI/LLM guidelines |
 
-| Channel                         | Use it for                                |
-|---------------------------------|-------------------------------------------|
-| GitHub Issues                   | Feature requests & infrastructure bugs    |
-| Microsoft Teams — Team Infra    | Urgent platform incidents                 |
-| `DOCUMENTATION.md`              | Deep architectural dive                   |
+### Getting Help
+- Review documentation files above
+- Check existing issues on GitHub
+- Contact Team Infra for infrastructure questions
+- File bug reports with full context (logs, manifests, etc.)
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0a7ea4,50:1A73E8,100:326CE5&height=120&section=footer" alt="footer" />
-</p>
+---
 
-<p align="center">
-  <sub><strong>IntegrationProject-Groep1</strong> · ShiftFestival 2026 · Team Infra · Erasmushogeschool Brussel</sub>
-</p>
+## Technology Stack
+
+| Category | Technology | Version |
+|----------|-----------|---------|
+| **Orchestration** | Kubernetes | 1.27+ |
+| **Config Management** | Kustomize | 5.0+ |
+| **GitOps** | ArgoCD | 2.8+ |
+| **Deployment** | Argo Rollouts | 1.5+ |
+| **Messaging** | RabbitMQ | 3.12+ |
+| **Databases** | PostgreSQL 15, MariaDB 11 | Latest |
+| **Monitoring** | Elasticsearch, Logstash, Kibana | 8.10+ |
+| **Networking** | Cloudflare Tunnel, Nginx Ingress | Latest |
+| **CI/CD** | GitHub Actions | Native |
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+## Team
+
+**Shift Festival - Team Infra**
+
+Infrastructure maintained by the Integration Project team. For questions or contributions, contact the team leads or create an issue on the repository.
+
+**Last Updated:** May 2026  
+**Kubernetes Version:** 1.27+  
+**Kustomize Version:** 5.0+

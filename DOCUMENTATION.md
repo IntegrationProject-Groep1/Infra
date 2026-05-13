@@ -1,11 +1,7 @@
 # Shift Festival — Kubernetes Infrastructure Documentation
 
 This document is the team reference for the Shift Festival Kubernetes
-infrastructure. It is meant to be read alongside `README.md`:
-
-- `README.md` — quick-start, prerequisites, how to deploy.
-- `DOCUMENTATION.md` (this file) — what each component is, how it fits
-  together, and what to look at when something breaks.
+infrastructure. It is meant to be read alongside `README.md`.
 
 ---
 
@@ -14,221 +10,108 @@ infrastructure. It is meant to be read alongside `README.md`:
 Shift Festival is a multi-team application platform deployed on a single
 Kubernetes cluster. Three product teams (Frontend, Kassa, Facturatie) each run
 an application + database, glued together by a central message broker
-(RabbitMQ) and a shared monitoring stack (Elasticsearch + Kibana + Dozzle).
+(RabbitMQ) and a shared monitoring stack.
 
-Everything is managed with **Kustomize**. The project uses a **base/overlay** structure:
+### High-level Dataflow
 
-- `base/` — core manifests (shared between all environments).
-- `overlays/prod/` — production environment (namespace: `shift-festival`).
-- `overlays/dev/` — development environment (namespace: `shift-festival-dev`).
+```mermaid
+graph TD
+    subgraph Users
+        User((End User))
+    end
 
-### High-level dataflow
+    subgraph "External Access (Cloudflare)"
+        CF[Cloudflare Tunnel / Ingress]
+    end
 
-```
-              ┌──────────────────────┐
-              │     End users        │
-              └──────────┬───────────┘
-                         │  HTTPS (Cloudflare/NodePort)
-       ┌─────────────────┼─────────────────┐
-       ▼                 ▼                 ▼
-  ┌─────────┐       ┌─────────┐       ┌─────────────┐
-  │ Frontend│       │  Kassa  │       │ Facturatie  │
-  │ (Drupal)│       │ (Odoo)  │       │(FossBilling)│
-  └────┬────┘       └────┬────┘       └─────┬───────┘
-       │ MariaDB         │ Postgres         │ MariaDB
-       │                 │                  │
-  ┌────┴────┐       ┌────┴────┐       ┌────┴────┐
-  │Heartbeat│       │Heartbeat│       │Heartbeat│ (Standalone Services)
-  └────┬────┘       └────┬────┘       └────┬────┘
-       │                 │                  │
-       ▼                 ▼                  ▼
-  ┌──────────┐        ┌──────────────────┐
-  │ RabbitMQ │◀──────▶│ Integrations     │
-  └──────────┘        │ (CRM, Planning)  │
-                      └──────────────────┘
+    subgraph "Team Workloads (shift-festival namespace)"
+        Frontend[Frontend - Drupal]
+        Kassa[Kassa - Odoo]
+        Facturatie[Facturatie - FossBilling]
+        
+        FDB[(MariaDB)]
+        KDB[(PostgreSQL)]
+        BDB[(MariaDB)]
+        
+        Frontend <--> FDB
+        Kassa <--> KDB
+        Facturatie <--> BDB
+    end
 
-   Cross-cutting:  Dozzle (container logs)  •  Elasticsearch + Kibana
+    subgraph "Messaging & Logic"
+        MQ{RabbitMQ Broker}
+        CRM[CRM Receiver]
+        Plan[Planning Service]
+        Ident[Identity Service]
+    end
+
+    subgraph "Monitoring"
+        ELK[(Elasticsearch + Kibana)]
+        HB[Heartbeat Sidecars]
+    end
+
+    User --> CF
+    CF --> Frontend
+    CF --> Kassa
+    CF --> Facturatie
+
+    Frontend -- Async Events --> MQ
+    Kassa -- Async Events --> MQ
+    Facturatie -- Async Events --> MQ
+
+    MQ <--> CRM
+    MQ <--> Plan
+    MQ <--> Ident
+
+    HB -- Metrics/Logs --> ELK
+    Frontend -.-> HB
+    Kassa -.-> HB
+    Facturatie -.-> HB
 ```
 
 ---
 
 ## 2. Layered architecture
 
-The deployment is organized in several folders. The root `kustomization.yaml` acts as an entry point for production and Keel.
+The deployment is managed with **Kustomize** using a flattened root structure for maximum transparency and GitOps stability.
 
-| Folder              | Purpose                                                |
-|---------------------|--------------------------------------------------------|
-| `base/`             | Core manifests shared across environments.             |
-| `overlays/prod/`    | Production configuration (namespace `shift-festival`). |
-| `overlays/dev/`     | Dev configuration (namespace `shift-festival-dev`).    |
-| `keel/`             | Keel automated deployment tool (DEPRECATED).           |
+### GitOps Flow
 
-### Environment Selection
-- **Production:** `kubectl apply -k overlays/prod`
-- **Development:** `kubectl apply -k overlays/dev`
+```mermaid
+sequenceDiagram
+    participant Dev as Developer
+    participant Git as GitHub (Main Branch)
+    participant GHCR as GitHub Container Registry
+    participant Updater as ArgoCD Image Updater
+    participant Argo as ArgoCD Controller
+    participant Cluster as Kubernetes Cluster
 
+    Dev->>Git: Git Push (Code)
+    Git->>GHCR: CI/CD Build & Push (:latest)
+    Updater->>GHCR: Poll for new Digest
+    Updater->>Git: Commit new Digest to kustomization.yaml
+    Argo->>Git: Poll for changes
+    Argo->>Cluster: Sync Manifests
+    Cluster->>Cluster: Argo Rollout (Canary/Health Check)
+    Note over Cluster: Automatic Rollback if Health Fails
+```
 
 ---
 
 ## 3. Conventions
 
-These conventions are applied automatically by the root `kustomization.yaml`
-and are relied on across all manifests.
-
 ### Namespace
-All resources are deployed into **`shift-festival`**.
+- `shift-festival` — Application workloads.
+- `argocd` — GitOps management.
+- `argo-rollouts` — Rollout controller.
 
-### Common labels (applied to every resource)
+### Common labels
 - `project: shift-festival`
 - `managed-by: Team-Infra`
-
-### Per-resource label
-- `app: <service-name>` — used as the selector for Services.
-  Example: `app: frontend-drupal`, `app: rabbitmq`.
-
-### Naming
-- Deployments: `<team>-<role>` — e.g. `frontend-drupal`, `kassa-db`.
-- Services: `<deployment-name>-service` — e.g. `frontend-db-service`.
-- ConfigMaps: `<service>-<purpose>` — e.g. `kassa-nginx-config`.
-
-### Secrets
-All credentials come from a single Secret called **`shift-secrets`**, generated
-manually per environment. Required keys include:
-
-| Key                       | Used by                  |
-|---------------------------|--------------------------|
-| `RABBITMQ_DEFAULT_USER`   | RabbitMQ broker          |
-| `RABBITMQ_DEFAULT_PASS`   | RabbitMQ broker          |
-| `DRUPAL_DB_ROOT_PASS`     | Frontend MariaDB         |
-| `ODOO_DB_PASS`            | Kassa PostgreSQL         |
-| `FOSSBILLING_DB_PASS`     | Facturatie MariaDB       |
-
-The `.env` file used to generate these secrets is gitignored — never commit it.
-
-A second Secret, **`shift-certs`**, holds the SSL certificates mounted into
-Nginx proxies and RabbitMQ. It is **not** generated by this repo and must be
-created out-of-band before deploying.
+- `app: <service-name>`
 
 ---
 
 ## 4. Component reference
 
-### 4.1 `setup/` — Foundation
-
-| File              | Resource(s)                                             |
-|-------------------|---------------------------------------------------------|
-| `namespace.yaml`  | `Namespace shift-festival`                              |
-| `storage.yaml`    | PVCs for RabbitMQ, Frontend MariaDB, Elasticsearch, etc. |
-| `configmaps.yaml` | Central ConfigMaps for Nginx, RabbitMQ, Drupal, etc.    |
-
-### 4.2 `core/` — Shared infrastructure
-
-#### RabbitMQ (`core/rabbitmq.yaml`)
-Central message broker. Every heartbeat service and integration worker talks to it.
-
-- Image: `rabbitmq:3-management-alpine`
-- Ports: `5672` (AMQP), `15672` (management UI)
-- Config: `rabbitmq-config` ConfigMap in `setup/configmaps.yaml`.
-
-#### Dozzle (`core/dozzle.yaml`)
-Real-time container log viewer for ops.
-
-- Service: `dozzle-service` → NodePort `30002`.
-
-### 4.3 Team stacks
-
-Every team follows the same shape:
-
-```
-[Database]  ←──  [Application + heartbeat service]  ←──  [Nginx proxy (SSL) or Ingress]
-```
-
-#### `team-frontend/` — Drupal
-
-- **Database**: MariaDB (`frontend-db`).
-- **App**: Drupal (`frontend-drupal`) + Heartbeat service.
-- **Proxy**: Nginx proxy (`frontend-proxy`) on NodePort **30020**.
-
-#### `team-kassa/` — Odoo
-
-- **Database**: PostgreSQL (`kassa-db`).
-- **App**: Odoo (`kassa-web`) + Heartbeat service.
-- **Proxy**: Nginx proxy (`kassa-proxy`) on NodePort **30030**.
-
-#### `team-facturatie/` — FossBilling
-
-- **Database**: MariaDB (`facturatie-db`).
-- **App**: FossBilling (`fossbilling-app`) + Heartbeat service.
-- **Access**: Managed via NGINX Ingress Controller on `facturatie.desiderius.me`. NodePort **30010**.
-
-### 4.4 `integrations/` — Async workers
-
-- **CRM**: Salesforce receiver (`integration-crm`).
-- **Planning**: Office 365 integration (`integration-planning`) + PostgreSQL (`planning-db`).
-- **Identity**: UUID service.
-
-### 4.5 `monitoring/` — Observability
-
-- **Elasticsearch**: Central log storage.
-- **Kibana**: Visualization UI on NodePort **30061**.
-- **Monitoring Agent**: Collects heartbeats and metrics.
-
----
-
-## 5. Networking and external access
-
-### External access (NodePort map)
-
-| NodePort | Service                  | What it is                  |
-|----------|--------------------------|-----------------------------|
-| 30000    | `rabbitmq-service`       | RabbitMQ AMQP               |
-| 30001    | `rabbitmq-service`       | RabbitMQ management UI (SSL)|
-| 30002    | `dozzle-service`         | Dozzle log viewer (HTTPS)   |
-| 30010    | `facturatie-ingress`     | FossBilling (via Ingress)   |
-| 30020    | `frontend-proxy-service` | Drupal (HTTPS)              |
-| 30030    | `kassa-proxy-service`    | Odoo (HTTPS)                |
-| 30061    | `kibana-service`         | Kibana UI                   |
-
----
-
-## 6. Standalone Heartbeat Services
-
-Heartbeats are deployed as standalone services (e.g., `kassa-heartbeat`). They poll the application's Service URL and publish liveness data to RabbitMQ.
-
----
-
-## 7. Storage
-
-Key PVCs:
-- `rabbitmq-data-pvc`: Persistence for RabbitMQ.
-- `frontend-db-data-pvc`: Persistence for Frontend MariaDB.
-- `facturatie-db-data-pvc`: Persistence for Facturatie MariaDB.
-- `es-data-pvc`: Persistence for Elasticsearch (needs mounting).
-
----
-
-## 8. Day-to-day operations
-
-Refer to `README.md` for common commands (kubectl, kustomize).
-Refer to `docs/argocd-setup.md` for GitOps-related operations.
-
----
-
-## 9. Known gaps and TODOs
-
-1. **`shift-certs` Secret**: Referenced by proxies and RabbitMQ but must be created manually.
-2. **Persistent storage**:
-   - Mount `es-data-pvc` into Elasticsearch.
-   - Add PVCs for `kassa-db` and `planning-db`.
-3. **Logstash**: `monitoring/logstash.yaml` is currently an empty placeholder.
-4. **Hardcoded credentials**: Some services (e.g., Planning DB) still use hardcoded passwords that should move to `shift-secrets`.
-5. **GitOps Migration**: Finalize the transition to ArgoCD for all components and update all legacy documentation.
-
----
-
-## 10. Glossary
-
-- **Kustomize**: YAML overlay tool for managing environment-specific configurations.
-- **GitOps**: Operational model where Git is the single source of truth for infrastructure.
-- **ArgoCD**: The GitOps controller used in this project.
-- **NodePort**: Kubernetes service type used for external access in this cluster.
+Refer to `README.md` for the full port-allocation and service list.

@@ -31,9 +31,9 @@ echo "Expected images from ArgoCD:"
 echo "==================================="
 echo ""
 
-# Show what's in the ArgoCD source file
-if [ -f "overlays/prod/.argocd-source-shift-festival-prod.yaml" ]; then
-    grep "sha256" overlays/prod/.argocd-source-shift-festival-prod.yaml | sed 's/^[[:space:]]*//'
+# Show what's in the root kustomization.yaml
+if [ -f "kustomization.yaml" ]; then
+    grep -A 100 "images:" kustomization.yaml | grep -E "name:|newTag:" | sed 's/^[[:space:]]*//'
 else
-    echo "⚠️  .argocd-source-shift-festival-prod.yaml not found"
+    echo "⚠️  kustomization.yaml not found"
 fi

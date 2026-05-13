@@ -1,11 +1,15 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: fossbilling-app
 spec:
   replicas: 1
   strategy:
-    type: Recreate
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: fossbilling-app
@@ -15,9 +19,9 @@ spec:
         app: fossbilling-app
     spec:
       securityContext:
-        runAsNonRoot: false
-        runAsUser: 0
-        fsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 33
+        fsGroup: 33
       initContainers:
       - name: copy-app-files
         image: fossbilling/fossbilling:latest
@@ -32,8 +36,8 @@ spec:
               echo "App files already present, skipping copy."
             fi
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 33
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
         volumeMounts:
@@ -41,10 +45,10 @@ spec:
           mountPath: /mnt/html
       - name: init-data-dirs
         image: busybox
-        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 777 /data/cache /data/log && mkdir -p /uploads && chmod -R 777 /uploads"]
+        command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 775 /data/cache /data/log && mkdir -p /uploads && chmod -R 775 /uploads"]
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
+          runAsNonRoot: true
+          runAsUser: 33
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
         volumeMounts:

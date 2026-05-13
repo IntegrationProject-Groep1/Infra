@@ -20,7 +20,7 @@ on:
     branches: ["main", "dev", "prod", "fix/ci"]
     tags: ["v*"]
     paths-ignore:
-      - 'overlays/**/.argocd-source-*.yaml'
+      - 'kustomization.yaml'
   pull_request:
     branches: ["main", "dev", "prod", "fix/ci"]
   workflow_dispatch:
@@ -48,11 +48,8 @@ jobs:
           echo "Rendering base..."
           kubectl kustomize base > /dev/null
 
-          echo "Rendering overlays/prod..."
-          kubectl kustomize overlays/prod > "${RUNNER_TEMP}/rendered-manifests-prod.yaml"
-
-          echo "Rendering root manifests..."
-          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests-root.yaml"
+          echo "Rendering root manifests (Production)..."
+          kubectl kustomize . > "${RUNNER_TEMP}/rendered-manifests.yaml"
 
           echo "✅ Kustomize render completed"
 
