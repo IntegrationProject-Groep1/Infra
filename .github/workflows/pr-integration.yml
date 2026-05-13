@@ -80,10 +80,10 @@ jobs:
           kubectl get nodes
 
       # -----------------------------------------------------------------------
-      # STEP 2 — Apply prod overlay
+      # STEP 2 — Apply root manifests (Production)
       #
-      # kubectl apply -k overlays/prod does the following:
-      #   1. Kustomize renders the full manifest tree (base + overlay patches)
+      # kubectl apply -k . does the following:
+      #   1. Kustomize renders the full manifest tree (base + root patches)
       #   2. The rendered YAML is sent to the Kubernetes API
       #   3. The API validates each resource against its schema
       #   4. If all resources pass validation, they are stored in etcd
@@ -94,30 +94,11 @@ jobs:
       # because the ghcr.io images require authentication or do not yet exist.
       # This is expected and does not affect the exit code of kubectl apply.
       # -----------------------------------------------------------------------
-      - name: Create placeholder env files for secretGenerators
-        run: |
-          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/prod/.env.cloudflare
-          echo "CLOUDFLARE_TUNNEL_TOKEN=ci_placeholder" > overlays/dev/.env.cloudflare
-
-      - name: Apply prod overlay (shift-festival)
-        run: kubectl apply -k overlays/prod
+      - name: Apply root manifests (shift-festival)
+        run: kubectl apply -k .
 
       # -----------------------------------------------------------------------
-      # STEP 3 — Apply dev overlay
-      #
-      # Same manifest tree as prod, but targeting shift-festival-dev. Both
-      # overlays can coexist on the same cluster because they use different
-      # namespaces.
-      # -----------------------------------------------------------------------
-      - name: Apply dev overlay (shift-festival-dev)
-        run: kubectl apply -k overlays/dev
-
-      - name: Cleanup placeholder env files
-        run: |
-          rm -f overlays/prod/.env.cloudflare overlays/dev/.env.cloudflare
-
-      # -----------------------------------------------------------------------
-      # STEP 4 — Verify key named resources exist
+      # STEP 3 — Verify key named resources exist
       #
       # We check for specific resources by name. This is more reliable than
       # counting resources because it tells you exactly which Deployment or
@@ -178,40 +159,8 @@ jobs:
           echo ""
           echo "✅ All expected resources exist in shift-festival"
 
-      - name: Verify key resources exist in shift-festival-dev (dev)
-        shell: bash
-        run: |
-          echo "Checking that dev overlay created the same resources in shift-festival-dev..."
-          FAILED=0
-
-          check() {
-            local kind=$1 name=$2 ns=$3
-            if kubectl get "${kind}" "${name}" -n "${ns}" --no-headers &>/dev/null; then
-              echo "  ✅ ${kind}/${name} exists in ${ns}"
-            else
-              echo "  ❌ ${kind}/${name} NOT FOUND in ${ns}"
-              FAILED=$((FAILED + 1))
-            fi
-          }
-
-          check deployment rabbitmq-broker       shift-festival-dev
-          check deployment frontend-drupal       shift-festival-dev
-          check deployment kassa-web             shift-festival-dev
-          check deployment fossbilling-app       shift-festival-dev
-          check deployment identity-service      shift-festival-dev
-          check statefulset elasticsearch        shift-festival-dev
-
-          if [[ "${FAILED}" -gt 0 ]]; then
-            echo ""
-            echo "❌ ${FAILED} resource(s) missing in dev overlay"
-            exit 1
-          fi
-
-          echo ""
-          echo "✅ All expected resources exist in shift-festival-dev"
-
       # -----------------------------------------------------------------------
-      # STEP 5 — Print full cluster snapshot (always runs, even on failure)
+      # STEP 4 — Print full cluster snapshot (always runs, even on failure)
       #
       # This output is visible in the GitHub Actions log and helps you
       # debug exactly what went wrong when a step fails.
@@ -234,12 +183,6 @@ jobs:
           kubectl get pvc -n shift-festival || true
           echo "--- Secrets ---"
           kubectl get secrets -n shift-festival || true
-          echo ""
-
-          echo "========================================"
-          echo "  DEV (shift-festival-dev) — all resources"
-          echo "========================================"
-          kubectl get all -n shift-festival-dev || true
           echo ""
 
           echo "========================================"
