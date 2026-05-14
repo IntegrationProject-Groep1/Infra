@@ -12,3 +12,5 @@ KSV-0121
 KSV-0041
 # Ignore ExternalName services used for cross-namespace routing (ArgoCD/Dashboard)
 KSV-0108
+# Ignore elastic-agent config Secret — password value is ${ELASTICSEARCH_PASSWORD} env var reference, not hardcoded
+KSV-0109

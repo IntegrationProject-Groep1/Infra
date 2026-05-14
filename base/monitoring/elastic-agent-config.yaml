@@ -1,9 +1,8 @@
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: elastic-agent-config
-# trivy:ignore:KSV-0109
-data:
+stringData:
   elastic-agent.yml: |
     outputs:
       default:
