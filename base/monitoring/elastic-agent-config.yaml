@@ -40,6 +40,7 @@ stringData:
             metricsets:
               - node
             period: 30s
+            timeout: 10s
             hosts:
               - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -51,6 +52,7 @@ stringData:
             metricsets:
               - pod
             period: 30s
+            timeout: 10s
             hosts:
               - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -62,6 +64,7 @@ stringData:
             metricsets:
               - container
             period: 30s
+            timeout: 10s
             hosts:
               - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
