@@ -58,6 +58,14 @@ stringData:
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
             add_metadata: true
+            processors:
+              - drop_event:
+                  when:
+                    or:
+                      - equals:
+                          kubernetes.pod.status.phase: "Succeeded"
+                      - equals:
+                          kubernetes.pod.status.phase: "Failed"
           - data_stream:
               dataset: kubernetes.container
               type: metrics
@@ -70,3 +78,11 @@ stringData:
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
             add_metadata: true
+            processors:
+              - drop_event:
+                  when:
+                    or:
+                      - equals:
+                          kubernetes.pod.status.phase: "Succeeded"
+                      - equals:
+                          kubernetes.pod.status.phase: "Failed"
