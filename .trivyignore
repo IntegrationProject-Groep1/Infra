@@ -16,3 +16,5 @@ KSV-0108
 KSV-0109
 # Ignore root initContainers in kassa-db and fossbilling — chown/chmod on existing root-owned volume directories requires root; privilege escalation is disabled
 KSV-0118
+# Ignore nodes/proxy permission for elastic-agent — required to access kubelet metrics endpoint on port 10250 for kubernetes/metrics collection
+KSV-0047
