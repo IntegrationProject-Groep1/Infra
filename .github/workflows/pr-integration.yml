@@ -93,6 +93,9 @@ jobs:
       # because the ghcr.io images require authentication or do not yet exist.
       # This is expected and does not affect the exit code of kubectl apply.
       # -----------------------------------------------------------------------
+      - name: Install Argo Rollouts CRDs
+        run: kubectl apply -f https://github.com/argoproj/argo-rollouts/releases/latest/download/install.yaml
+
       - name: Apply root manifests (shift-festival)
         run: kubectl apply -k .
 
@@ -126,22 +129,22 @@ jobs:
           check deployment cloudflared           shift-festival
 
           # Team Frontend
-          check deployment frontend-drupal       shift-festival
+          check rollout    frontend-drupal        shift-festival
           check deployment frontend-db           shift-festival
 
           # Team Kassa
-          check deployment kassa-web             shift-festival
+          check rollout    kassa-web              shift-festival
           check deployment kassa-integration     shift-festival
           check deployment kassa-db              shift-festival
 
           # Team Facturatie
-          check deployment fossbilling-app       shift-festival
+          check rollout    fossbilling-app        shift-festival
           check deployment facturatie-db         shift-festival
 
           # Integrations
           check deployment integration-crm       shift-festival
           check deployment integration-planning  shift-festival
-          check deployment identity-service      shift-festival
+          check rollout    identity-service       shift-festival
 
           # Monitoring
           check statefulset elasticsearch        shift-festival

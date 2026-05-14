@@ -114,15 +114,13 @@ kind: Service
 metadata:
   name: rabbitmq-service
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: rabbitmq
   ports:
     - name: amqp
       port: 5672
       targetPort: 5672
-      nodePort: 30000
     - name: mgmt
       port: 15672
       targetPort: 15672
-      nodePort: 30001
