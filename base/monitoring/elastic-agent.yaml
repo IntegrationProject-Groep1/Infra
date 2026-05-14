@@ -51,7 +51,7 @@ spec:
         livenessProbe:
           httpGet:
             host: 127.0.0.1
-            path: /
+            path: /stats
             port: 6791
           initialDelaySeconds: 30
           periodSeconds: 30
@@ -60,7 +60,7 @@ spec:
         readinessProbe:
           httpGet:
             host: 127.0.0.1
-            path: /
+            path: /stats
             port: 6791
           initialDelaySeconds: 15
           periodSeconds: 10
