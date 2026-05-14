@@ -1,0 +1,205 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-db
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend-drupal
+      ports:
+        - port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-facturatie-db
+spec:
+  podSelector:
+    matchLabels:
+      app: facturatie-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: fossbilling-app
+        - podSelector:
+            matchLabels:
+              app: facturatie-connector
+      ports:
+        - port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kassa-db
+spec:
+  podSelector:
+    matchLabels:
+      app: kassa-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: kassa-web
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-postgredb
+spec:
+  podSelector:
+    matchLabels:
+      app: postgredb
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: identity-service
+        - podSelector:
+            matchLabels:
+              app: pgadmin
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-crm-db
+spec:
+  podSelector:
+    matchLabels:
+      app: crm-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: crm
+      ports:
+        - port: 3306
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-planning-db
+spec:
+  podSelector:
+    matchLabels:
+      app: planning-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: planning
+        - podSelector:
+            matchLabels:
+              app: planning-pgadmin
+      ports:
+        - port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-elasticsearch
+spec:
+  podSelector:
+    matchLabels:
+      app: elasticsearch
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: kibana
+        - podSelector:
+            matchLabels:
+              app: logstash
+        - podSelector:
+            matchLabels:
+              app: elastic-agent
+      ports:
+        - port: 9200
+        - port: 9300
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq
+spec:
+  podSelector:
+    matchLabels:
+      app: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: frontend-drupal
+        - podSelector:
+            matchLabels:
+              app: facturatie-connector
+        - podSelector:
+            matchLabels:
+              app: kassa-integration
+        - podSelector:
+            matchLabels:
+              app: crm
+        - podSelector:
+            matchLabels:
+              app: identity-service
+        - podSelector:
+            matchLabels:
+              app: planning
+        - podSelector:
+            matchLabels:
+              app: mailing
+        - podSelector:
+            matchLabels:
+              app: logstash
+        - podSelector:
+            matchLabels:
+              app: monitoring-agent
+        - podSelector:
+            matchLabels:
+              app: crm-heartbeat
+        - podSelector:
+            matchLabels:
+              app: facturatie-heartbeat
+        - podSelector:
+            matchLabels:
+              app: frontend-heartbeat
+        - podSelector:
+            matchLabels:
+              app: identity-heartbeat
+        - podSelector:
+            matchLabels:
+              app: kassa-heartbeat
+        - podSelector:
+            matchLabels:
+              app: planning-heartbeat
+        - podSelector:
+            matchLabels:
+              app: monitoring-heartbeat
+      ports:
+        - port: 5672
+        - port: 15672

@@ -21,7 +21,7 @@ stringData:
               - filesystem
               - diskio
               - load
-            period: 10s
+            period: 30s
             hostfs: /hostfs
 
       - id: kubernetes-metrics
@@ -36,7 +36,7 @@ stringData:
               dataset: kubernetes.node
             metricsets:
               - node
-            period: 10s
+            period: 30s
             hosts:
               - "https://${NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -48,7 +48,7 @@ stringData:
               dataset: kubernetes.pod
             metricsets:
               - pod
-            period: 10s
+            period: 30s
             hosts:
               - "https://${NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
@@ -60,7 +60,7 @@ stringData:
               dataset: kubernetes.container
             metricsets:
               - container
-            period: 10s
+            period: 30s
             hosts:
               - "https://${NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token

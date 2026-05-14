@@ -18,3 +18,4 @@ resources:
   - team-facturatie/
   - integrations/
   - monitoring/
+  - network-policies.yaml
