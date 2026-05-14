@@ -63,10 +63,9 @@ kind: Service
 metadata:
   name: frontend-proxy-service
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: frontend-proxy
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30020

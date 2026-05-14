@@ -70,10 +70,9 @@ kind: Service
 metadata:
   name: kassa-proxy-service
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: kassa-proxy
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30030

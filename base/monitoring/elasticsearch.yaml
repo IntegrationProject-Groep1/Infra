@@ -112,8 +112,7 @@ spec:
     - name: rest
       port: 9200
       targetPort: 9200
-      nodePort: 30060
     - name: inter-node
       port: 9300
       targetPort: 9300
-  type: NodePort
+  type: ClusterIP

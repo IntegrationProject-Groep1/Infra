@@ -23,10 +23,9 @@ metadata:
   name: kubernetes-dashboard-nodeport
   namespace: kubernetes-dashboard
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     k8s-app: kubernetes-dashboard
   ports:
     - port: 443
       targetPort: 8443
-      nodePort: 30003

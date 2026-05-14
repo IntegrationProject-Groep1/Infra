@@ -189,10 +189,9 @@ kind: Service
 metadata:
   name: pgadmin-service
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: pgadmin
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30004

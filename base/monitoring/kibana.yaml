@@ -110,5 +110,4 @@ spec:
   ports:
     - port: 5601
       targetPort: 5601
-      nodePort: 30061
-  type: NodePort
+  type: ClusterIP
