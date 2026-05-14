@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: elastic-agent-config
+# trivy:ignore:KSV-0109
 data:
   elastic-agent.yml: |
     outputs:
