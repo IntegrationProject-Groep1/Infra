@@ -53,14 +53,14 @@ spec:
             command: ["elastic-agent", "status"]
           initialDelaySeconds: 60
           periodSeconds: 30
-          timeoutSeconds: 5
+          timeoutSeconds: 15
           failureThreshold: 5
         readinessProbe:
           exec:
             command: ["elastic-agent", "status"]
           initialDelaySeconds: 30
           periodSeconds: 15
-          timeoutSeconds: 5
+          timeoutSeconds: 15
           failureThreshold: 3
         volumeMounts:
         - name: config
