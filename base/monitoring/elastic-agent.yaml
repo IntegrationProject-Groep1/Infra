@@ -13,6 +13,7 @@ spec:
       labels:
         app: elastic-agent
     spec:
+      serviceAccountName: elastic-agent
       terminationGracePeriodSeconds: 30
       # trivy:ignore:KSV-0009
       hostNetwork: true
@@ -20,6 +21,7 @@ spec:
       containers:
       - name: elastic-agent
         image: docker.elastic.co/beats/elastic-agent:8.17.0
+        args: ["-e", "-c", "/etc/elastic-agent/elastic-agent.yml"]
         env:
         - name: NODE_NAME
           valueFrom:
@@ -29,26 +31,22 @@ spec:
           value: /hostfs
         - name: STATE_PATH
           value: /usr/share/elastic-agent/state
-        - name: FLEET_ENROLL
-          value: "1"
-        - name: FLEET_URL
-          value: "https://fleet-server:8220" # Adjust if necessary
-        - name: FLEET_ENROLLMENT_TOKEN
+        - name: ELASTICSEARCH_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: FLEET_ENROLLMENT_TOKEN
+              key: ELASTIC_PASSWORD
         securityContext:
           runAsUser: 0
-          privileged: True
+          privileged: true
           readOnlyRootFilesystem: false
         resources:
           requests:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 100m
+            memory: 300Mi
           limits:
-            cpu: 600m
-            memory: 1200Mi
+            cpu: 400m
+            memory: 600Mi
         livenessProbe:
           exec:
             command: ["elastic-agent", "status"]
@@ -60,12 +58,19 @@ spec:
           initialDelaySeconds: 15
           periodSeconds: 10
         volumeMounts:
+        - name: config
+          mountPath: /etc/elastic-agent/elastic-agent.yml
+          subPath: elastic-agent.yml
+          readOnly: true
         - name: hostfs
           mountPath: /hostfs
           readOnly: true
         - name: state
           mountPath: /usr/share/elastic-agent/state
       volumes:
+      - name: config
+        configMap:
+          name: elastic-agent-config
       - name: hostfs
         # trivy:ignore:KSV-0121
         hostPath:

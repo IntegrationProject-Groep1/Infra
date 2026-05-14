@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elastic-agent-config
+data:
+  elastic-agent.yml: |
+    outputs:
+      default:
+        type: elasticsearch
+        hosts:
+          - "http://elasticsearch-service:9200"
+        username: "elastic"
+        password: "${ELASTICSEARCH_PASSWORD}"
+
+    inputs:
+      - type: system/metrics
+        streams:
+          - metricsets:
+              - cpu
+              - memory
+              - filesystem
+              - diskio
+              - load
+            period: 10s
+            hostfs: /hostfs
+
+      - type: kubernetes/metrics
+        streams:
+          - metricsets:
+              - node
+              - pod
+              - container
+            period: 10s
+            hosts:
+              - "https://${NODE_NAME}:10250"
+            bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+            ssl.verification_mode: none
+            add_metadata: true
