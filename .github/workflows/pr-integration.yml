@@ -93,6 +93,9 @@ jobs:
       # because the ghcr.io images require authentication or do not yet exist.
       # This is expected and does not affect the exit code of kubectl apply.
       # -----------------------------------------------------------------------
+      - name: Install Argo Rollouts CRDs
+        run: kubectl apply -f https://github.com/argoproj/argo-rollouts/releases/latest/download/crds.yaml
+
       - name: Apply root manifests (shift-festival)
         run: kubectl apply -k .
 
