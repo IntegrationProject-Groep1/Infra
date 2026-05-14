@@ -14,3 +14,5 @@ KSV-0041
 KSV-0108
 # Ignore elastic-agent config Secret — password value is ${ELASTICSEARCH_PASSWORD} env var reference, not hardcoded
 KSV-0109
+# Ignore root initContainer in kassa-db — chown is required so PostgreSQL (uid 70) owns its data directory; fsGroup alone sets GID but not UID ownership
+KSV-0118

@@ -47,9 +47,9 @@ spec:
         image: busybox
         command: ["sh", "-c", "mkdir -p /data/cache /data/log /data/uploads && chmod -R 775 /data/cache /data/log && mkdir -p /uploads && chmod -R 775 /uploads"]
         securityContext:
-          runAsNonRoot: false
-          runAsUser: 0
-          allowPrivilegeEscalation: true
+          runAsNonRoot: true
+          runAsUser: 33
+          allowPrivilegeEscalation: false
           readOnlyRootFilesystem: false
         volumeMounts:
         - name: foss-data
