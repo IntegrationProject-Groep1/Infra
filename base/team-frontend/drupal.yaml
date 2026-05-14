@@ -47,6 +47,7 @@ spec:
           readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
+          protocol: TCP
         env:
         - name: DRUPAL_DB_HOST
           value: "frontend-db-service"

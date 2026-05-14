@@ -76,6 +76,7 @@ spec:
         - "--log-handler=werkzeug:WARNING"
         ports:
         - containerPort: 8069
+          protocol: TCP
         env:
         - name: ODOO_DB_NAME
           valueFrom:

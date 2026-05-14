@@ -72,6 +72,9 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_INFRA
+        ports:
+        - containerPort: 8000
+          protocol: TCP
         resources:
           requests:
             memory: "128Mi"

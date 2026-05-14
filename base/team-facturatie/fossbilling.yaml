@@ -39,7 +39,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 33
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         volumeMounts:
         - name: foss-html
           mountPath: /mnt/html
@@ -50,7 +50,7 @@ spec:
           runAsNonRoot: true
           runAsUser: 33
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
         volumeMounts:
         - name: foss-data
           mountPath: /data
@@ -64,6 +64,7 @@ spec:
           readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
+          protocol: TCP
         env:
         - name: DB_HOST
           value: "facturatie-db-service"
