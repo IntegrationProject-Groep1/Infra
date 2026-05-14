@@ -24,29 +24,46 @@ stringData:
             period: 30s
             hostfs: /hostfs
 
-      - type: kubernetes/metrics
+      - id: kubernetes-node-metrics
+        type: kubernetes/metrics
+        use_output: default
+        meta:
+          package:
+            name: kubernetes
+            version: 1.52.0
+        data_stream:
+          namespace: default
         streams:
-          - metricsets:
+          - data_stream:
+              dataset: kubernetes.node
+              type: metrics
+            metricsets:
               - node
             period: 30s
             hosts:
-              - "https://${NODE_NAME}:10250"
+              - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
             add_metadata: true
-          - metricsets:
+          - data_stream:
+              dataset: kubernetes.pod
+              type: metrics
+            metricsets:
               - pod
             period: 30s
             hosts:
-              - "https://${NODE_NAME}:10250"
+              - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
             add_metadata: true
-          - metricsets:
+          - data_stream:
+              dataset: kubernetes.container
+              type: metrics
+            metricsets:
               - container
             period: 30s
             hosts:
-              - "https://${NODE_NAME}:10250"
+              - "https://${env.NODE_NAME}:10250"
             bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
             ssl.verification_mode: none
             add_metadata: true
