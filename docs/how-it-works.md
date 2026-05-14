@@ -265,7 +265,7 @@ Done — no manual kubectl needed
 
 ## 7. Image updates — ArgoCD Image Updater
 
-ArgoCD Image Updater replaces the old Keel image watcher.
+ArgoCD Image Updater is used for image automation.
 
 ### How it works
 

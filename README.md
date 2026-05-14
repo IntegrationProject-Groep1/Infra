@@ -285,11 +285,8 @@ Infra/
 │   ├── how-it-works.md          # System workflow explanation
 │   └── argocd-setup.md          # ArgoCD configuration guide
 │
-├── keel/                        # Image update automation
-│   ├── keel.yaml
-│   └── kustomization.yaml
-│
-└── assets/                      # Documentation assets
+├── assets/                      # Documentation assets
+
     ├── banners.md               # Banner templates
     └── badges/                  # Custom badge definitions
         ├── namespace.svg

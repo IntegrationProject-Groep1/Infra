@@ -18,11 +18,11 @@ base/               Main manifests — namespace set to shift-festival
   integrations/     CRM, Planning, Identity Service
   monitoring/       ELK stack + monitoring agent
 
-argocd/             ArgoCD installation manifests + Application CRDs
+argocd/             # ArgoCD installation manifests + Application CRDs
   applications/     prod-app.yaml (points ArgoCD at root)
   image-updater/    ArgoCD Image Updater
-keel/               DEPRECATED — image updater replaced by ArgoCD Image Updater
 scripts/            Bootstrap + notification scripts
+
 docs/               Architecture and process documentation
 ```
 
@@ -52,7 +52,7 @@ The stack runs on Kubernetes and is composed of:
 - **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging and observability.
 - **Cloudflared** — Secure external access tunnel for selected services. Routes are managed in the Cloudflare Zero Trust dashboard (token-based, no local config file).
 - **ArgoCD** — GitOps controller installed in the `argocd` namespace. Watches the Git repo and auto-syncs changes to the cluster. Exposed at `argocd.desiderius.me` via Cloudflare Tunnel.
-- **ArgoCD Image Updater** — Polls GHCR for new image tags and writes back the updated tag to Git, triggering an ArgoCD sync. Replaces Keel.
+- **ArgoCD Image Updater** — Polls GHCR for new image tags and writes back the updated tag to Git, triggering an ArgoCD sync.
 
 **Team Services:**
 - Frontend (Drupal, ports 30020–30029)

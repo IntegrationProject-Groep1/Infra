@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-05-13  
 **Status:** Production (Consolidated & Hardened)  
-**Scope:** Kubernetes Manifests (`base/`, `argocd/`, `keel/`)
+**Scope:** Kubernetes Manifests (`base/`, `argocd/`)
 
 ---
 

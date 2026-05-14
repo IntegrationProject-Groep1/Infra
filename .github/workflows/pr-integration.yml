@@ -5,8 +5,7 @@
 # PURPOSE:
 #   Validates that every pull request to main or dev can be deployed without
 #   errors by spinning up a real Kubernetes cluster (kind) inside GitHub
-#   Actions and applying all three manifest trees: overlays/prod, keel/, and
-#   overlays/dev.
+#   Actions and applying the manifest tree.
 #
 # HOW IT WORKS:
 #   kind (Kubernetes IN Docker) runs a full Kubernetes control plane and
