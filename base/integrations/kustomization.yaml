@@ -7,3 +7,4 @@ resources:
   - planning.yaml
   - planning-ingress.yaml
   - mailing.yaml
+  - crm-mcp.yaml
