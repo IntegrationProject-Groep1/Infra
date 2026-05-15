@@ -134,23 +134,25 @@ jobs:
 
           # Team Kassa
           check rollout    kassa-web              shift-festival
-          check deployment kassa-integration     shift-festival
+          check rollout    kassa-integration      shift-festival
           check deployment kassa-db              shift-festival
 
           # Team Facturatie
           check rollout    fossbilling-app        shift-festival
+          check rollout    facturatie-connector   shift-festival
           check deployment facturatie-db         shift-festival
 
           # Integrations
-          check deployment integration-crm       shift-festival
-          check deployment integration-planning  shift-festival
+          check rollout    integration-crm        shift-festival
+          check rollout    integration-planning   shift-festival
+          check rollout    mailing-service        shift-festival
           check rollout    identity-service       shift-festival
 
           # Monitoring
           check statefulset elasticsearch        shift-festival
           check deployment kibana               shift-festival
           check deployment logstash             shift-festival
-          check deployment monitoring-agent     shift-festival
+          check rollout    monitoring-agent      shift-festival
 
           if [[ "${FAILED}" -gt 0 ]]; then
             echo ""

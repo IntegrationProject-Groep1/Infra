@@ -1,9 +1,15 @@
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: crm-heartbeat
 spec:
   replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: crm-heartbeat
@@ -45,12 +51,18 @@ spec:
               name: shift-secrets
               key: RABBITMQCRM_PASSRAW
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: identity-heartbeat
 spec:
   replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: identity-heartbeat
@@ -92,12 +104,18 @@ spec:
               name: shift-secrets
               key: RABBITMQ_DEFAULT_PASS
 ---
-apiVersion: apps/v1
-kind: Deployment
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: planning-heartbeat
 spec:
   replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: planning-heartbeat
