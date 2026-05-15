@@ -36,6 +36,7 @@ spec:
           readOnlyRootFilesystem: true
         ports:
         - containerPort: 8000
+          protocol: TCP
         env:
         - name: RABBITMQ_HOST
           value: "rabbitmq-service"
