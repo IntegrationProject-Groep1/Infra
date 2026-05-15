@@ -75,7 +75,7 @@ spec:
         - name: SESSION_TTL_SECONDS
           value: "3600"
         - name: MCP_SERVERS
-          value: "sessions@http://localhost:8001/mcp,monitoring@http://localhost:8005/mcp"
+          value: "sessions@http://localhost:8001/mcp,monitoring@http://localhost:8005/mcp,kassa@http://kassa-mcp-service:8004/mcp"
         livenessProbe:
           tcpSocket:
             port: 8000
