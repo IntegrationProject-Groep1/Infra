@@ -24,7 +24,7 @@ images:
   digest: sha256:00c834f7b2df05ae545ab8235e6379f304127d2152d9fa83c9daae5d96f1ea73
 - name: ghcr.io/integrationproject-groep1/heartbeat
   newName: ghcr.io/integrationproject-groep1/heartbeat
-  digest: sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
+  digest: sha256:4639d203fa0b73fbb1e62b539be6517f98ec10f4d6b89e4fc1257f143658ddd4
 - name: ghcr.io/integrationproject-groep1/mailing
   newName: ghcr.io/integrationproject-groep1/mailing
   digest: sha256:3d45cfb1f1cfd5607226568878bad5a19ad0b352d03a7070af5cf00662fa78d3
