@@ -146,6 +146,7 @@ jobs:
               --include="*.sh" \
               --exclude-dir=".git" \
               --exclude-dir=".github" \
+              --exclude-dir="argocd" \
               --exclude="*.example" \
               . 2>/dev/null || true)
             if [[ -n "${matches}" ]]; then
