@@ -416,6 +416,44 @@ The auto-rollback only touches the Infra repo — specifically, the automatic co
 
 ---
 
+## 10b. Argo Rollouts — hoe een canary deploy verloopt
+
+> **Bijgewerkt: 2026-05-15** — Alle services die draaien op een GHCR-image zijn omgezet van `Deployment` naar `Rollout`. Dit verandert het deploy-verloop na een ArgoCD sync.
+
+### Stap-voor-stap na een image update
+
+```
+ArgoCD Image Updater detecteert nieuw digest op GHCR
+    ↓
+Image Updater commit naar kustomization.yaml in Infra repo
+    ↓
+ArgoCD detecteert de nieuwe commit → start sync
+    ↓
+Argo Rollouts pikt de nieuwe image op en start canary:
+  → nieuwe pod(s) starten op met het nieuwe image
+  → 100% van het verkeer gaat naar de nieuwe pods
+  → canary-fase: Argo Rollouts wacht 5 minuten
+    ↓
+Na 5 minuten:
+  Als pods gezond  → revisie wordt "stable", oude pods worden opgeruimd
+  Als pods crashen → Rollout gaat naar Degraded, handmatige interventie nodig
+```
+
+ArgoCD toont de app als `Synced + Progressing` tijdens de 5-minuten canary pause. Dit is normaal — de sync is geslaagd, de Rollout loopt nog.
+
+### Image tag conventie (actueel)
+
+| Trigger | Image tag | Omgeving |
+|---|---|---|
+| Push naar `dev` branch in team repo (na CI) | `:latest-dev` | — (geen dev namespace geconfigureerd) |
+| Release tag `v*` op `main` in team repo (na CI) | `:latest` | `shift-festival` (prod) |
+
+ArgoCD Image Updater bewaakt uitsluitend de `:latest` tag voor productie. De `:latest-dev` tag wordt gebouwd maar momenteel nergens automatisch uitgerold.
+
+> **Nota:** de `docs/how-it-works.md` beschrijft op sommige plaatsen nog een overlay-structuur (`overlays/prod`, `overlays/dev`) en een dev-namespace (`shift-festival-dev`). De infrastructuur is vereenvoudigd naar één root-kustomization en één productie-namespace (`shift-festival`). De architectuur-beschrijving is correct; de paden en namespace-namen zijn niet meer actueel.
+
+---
+
 ## 11. What this means for developers
 
 ### For all teams

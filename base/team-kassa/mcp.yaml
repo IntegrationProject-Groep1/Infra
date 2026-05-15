@@ -1,0 +1,87 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: kassa-mcp
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: kassa-mcp
+  template:
+    metadata:
+      labels:
+        app: kassa-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: kassa-mcp
+        image: ghcr.io/integrationproject-groep1/kassa:latest
+        imagePullPolicy: Always
+        command: ["python", "mcp_server.py"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8004
+          protocol: TCP
+        env:
+        - name: ODOO_URL
+          value: "http://kassa-web-service:8069"
+        - name: ODOO_DB
+          value: "odoo_kassa"
+        - name: ODOO_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_USER
+        - name: ODOO_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_PASS
+        - name: PORT
+          value: "8004"
+        readinessProbe:
+          tcpSocket:
+            port: 8004
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8004
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kassa-mcp-service
+spec:
+  selector:
+    app: kassa-mcp
+  ports:
+  - port: 8004
+    targetPort: 8004
+    nodePort: 30031
+  type: NodePort
