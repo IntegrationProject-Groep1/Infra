@@ -47,6 +47,7 @@ spec:
           readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
+          protocol: TCP
         livenessProbe:
           tcpSocket:
             port: 80

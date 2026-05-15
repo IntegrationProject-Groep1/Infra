@@ -28,6 +28,7 @@ spec:
       - name: chatbot
         image: ghcr.io/integrationproject-groep1/chatbot:latest
         imagePullPolicy: Always
+        command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -76,7 +77,7 @@ spec:
         - name: SESSION_TTL_SECONDS
           value: "3600"
         - name: MCP_SERVERS
-          value: "sessions@http://localhost:8001/mcp,monitoring@http://localhost:8005/mcp,kassa@http://kassa-mcp-service:8004/mcp"
+          value: "kassa@http://kassa-mcp-service:8004/mcp"
         livenessProbe:
           tcpSocket:
             port: 8000
@@ -98,77 +99,8 @@ spec:
         - name: tmp
           mountPath: /tmp
 
-      # ── Sessions MCP sidecar (Drupal JSON:API → port 8001) ───────────────────
-      - name: sessions-mcp
-        image: ghcr.io/integrationproject-groep1/chatbot:latest
-        imagePullPolicy: Always
-        command: ["python", "/app/src/mcp_servers/sessions.py"]
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        env:
-        - name: FRONTEND_BASE_URL
-          value: "https://desiderius.me"
-        - name: PORT
-          value: "8001"
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "25m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
-        volumeMounts:
-        - name: tmp-sessions
-          mountPath: /tmp
-
-      # ── Monitoring MCP sidecar (Elasticsearch → port 8005) ───────────────────
-      - name: monitoring-mcp
-        image: ghcr.io/integrationproject-groep1/chatbot:latest
-        imagePullPolicy: Always
-        command: ["python", "/app/src/mcp_servers/monitoring.py"]
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        env:
-        - name: ELASTICSEARCH_URL
-          value: "http://elasticsearch-service:9200"
-        - name: ES_USERNAME
-          value: "elastic"
-        - name: ES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: ELASTIC_PASSWORD
-        - name: ES_LOGS_INDEX
-          value: "logs-*"
-        - name: ES_HEARTBEAT_INDEX
-          value: "heartbeats-*"
-        - name: PORT
-          value: "8005"
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "25m"
-          limits:
-            memory: "128Mi"
-            cpu: "100m"
-        volumeMounts:
-        - name: tmp-monitoring
-          mountPath: /tmp
-
       volumes:
       - name: tmp
-        emptyDir: {}
-      - name: tmp-sessions
-        emptyDir: {}
-      - name: tmp-monitoring
         emptyDir: {}
 ---
 apiVersion: v1
