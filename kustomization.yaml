@@ -21,7 +21,7 @@ images:
   digest: sha256:e5bb7da1d260901d8c0a8309e9bff45de43fe66e84b8bf102070cb3915af4b60
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
-  digest: sha256:d346414518516438b00843714f7744e34670f163e9715ae2b37c368de3455252
+  digest: sha256:7356b41f4e5d4519bdab57527e2944347582ad2d790ddb2c9025f6b8a536467c
 - name: ghcr.io/integrationproject-groep1/heartbeat
   newName: ghcr.io/integrationproject-groep1/heartbeat
   digest: sha256:4639d203fa0b73fbb1e62b539be6517f98ec10f4d6b89e4fc1257f143658ddd4
