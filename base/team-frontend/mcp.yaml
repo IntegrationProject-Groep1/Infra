@@ -23,7 +23,7 @@ spec:
         runAsUser: 1000
       containers:
       - name: frontend-mcp
-        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend-integratie:latest
+        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
