@@ -6,28 +6,28 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:0408ecfeca2fb14218b330e6700390b0cc5df4dcf96677cf5dda432735df9ca6
+  digest: sha256:1eb824fa158baa681c04cf65bc8ee096f1916d6e271cd3c1cd16f4a767344114
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:00bbefdbb5ffe406d655ef82b94df9f883257621dc902a8c6b662a9114b38dab
+  digest: sha256:33f47ccb2991c82c051bf28d38f0e1628742e4dfa286788555f417174ba6d029
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
-  digest: sha256:aa509bb73171bef8c13d6cdff7e3103064b9fda440c6d03e3ab46422941242a1
+  digest: sha256:a1b83e769ffc8030251419047fe40024d341d76f982f8b3120a57942f206eaa5
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:d1402059a89c6c5359506dbc738901884d0bd73c604cc97664e4fdb3ccbe40fa
+  digest: sha256:586663eaea495f6ae39f7ee16279948ecc04c3d0e37da85f04aa3267c7154ac1
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
-  digest: sha256:60bb2997519e2a9d801a0bf2f6eabe6e7901e11ba4968b1f78c833b4fb7affc8
+  digest: sha256:e5bb7da1d260901d8c0a8309e9bff45de43fe66e84b8bf102070cb3915af4b60
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
-  digest: sha256:00c834f7b2df05ae545ab8235e6379f304127d2152d9fa83c9daae5d96f1ea73
+  digest: sha256:7356b41f4e5d4519bdab57527e2944347582ad2d790ddb2c9025f6b8a536467c
 - name: ghcr.io/integrationproject-groep1/heartbeat
   newName: ghcr.io/integrationproject-groep1/heartbeat
-  digest: sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
+  digest: sha256:4639d203fa0b73fbb1e62b539be6517f98ec10f4d6b89e4fc1257f143658ddd4
 - name: ghcr.io/integrationproject-groep1/mailing
   newName: ghcr.io/integrationproject-groep1/mailing
-  digest: sha256:c6f68ecbce5ba0e46463d68a60e46139691a2a7f694ab759197d7b8eae6ea46e
+  digest: sha256:3d45cfb1f1cfd5607226568878bad5a19ad0b352d03a7070af5cf00662fa78d3
 patches:
 - target:
     kind: Rollout
