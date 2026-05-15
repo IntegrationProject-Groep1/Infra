@@ -8,7 +8,7 @@ spec:
     canary:
       steps:
       - setWeight: 100
-      - pause: {duration: 5m}
+      - pause: {duration: 3m}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -61,7 +61,7 @@ spec:
     canary:
       steps:
       - setWeight: 100
-      - pause: {duration: 5m}
+      - pause: {duration: 3m}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -114,7 +114,7 @@ spec:
     canary:
       steps:
       - setWeight: 100
-      - pause: {duration: 5m}
+      - pause: {duration: 3m}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
