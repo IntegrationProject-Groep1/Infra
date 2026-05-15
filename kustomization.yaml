@@ -1,42 +1,47 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 resources:
-  - base
-  - argocd/rollouts
-
+- base
+- argocd/rollouts
 images:
-  - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/kassa
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/facturatie
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/crm
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/planning
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/identity-service
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/heartbeat
-    newTag: latest
-  - name: ghcr.io/integrationproject-groep1/mailing
-    newTag: latest
-
+- name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+  newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+  digest: sha256:0408ecfeca2fb14218b330e6700390b0cc5df4dcf96677cf5dda432735df9ca6
+- name: ghcr.io/integrationproject-groep1/kassa
+  newName: ghcr.io/integrationproject-groep1/kassa
+  digest: sha256:97ab51e46f27ffc675a23458bca1463342621d49416b720c2d143f0d808bac8c
+- name: ghcr.io/integrationproject-groep1/facturatie
+  newName: ghcr.io/integrationproject-groep1/facturatie
+  digest: sha256:aa509bb73171bef8c13d6cdff7e3103064b9fda440c6d03e3ab46422941242a1
+- name: ghcr.io/integrationproject-groep1/crm
+  newName: ghcr.io/integrationproject-groep1/crm
+  digest: sha256:d1402059a89c6c5359506dbc738901884d0bd73c604cc97664e4fdb3ccbe40fa
+- name: ghcr.io/integrationproject-groep1/planning
+  newName: ghcr.io/integrationproject-groep1/planning
+  digest: sha256:60bb2997519e2a9d801a0bf2f6eabe6e7901e11ba4968b1f78c833b4fb7affc8
+- name: ghcr.io/integrationproject-groep1/identity-service
+  newName: ghcr.io/integrationproject-groep1/identity-service
+  digest: sha256:00c834f7b2df05ae545ab8235e6379f304127d2152d9fa83c9daae5d96f1ea73
+- name: ghcr.io/integrationproject-groep1/heartbeat
+  newName: ghcr.io/integrationproject-groep1/heartbeat
+  digest: sha256:708f605bf70e69b15c74d2f66e032da25f01e919e4ce72077037d476a5533caa
+- name: ghcr.io/integrationproject-groep1/mailing
+  newName: ghcr.io/integrationproject-groep1/mailing
+  digest: sha256:c6f68ecbce5ba0e46463d68a60e46139691a2a7f694ab759197d7b8eae6ea46e
 patches:
-  - target:
-      kind: Rollout
-      name: frontend-drupal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "250m"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/memory
-        value: "512Mi"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/cpu
-        value: "1000m"
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: "1Gi"
+- target:
+    kind: Rollout
+    name: frontend-drupal
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "250m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/memory
+      value: "512Mi"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/cpu
+      value: "1000m"
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/limits/memory
+      value: "1Gi"
