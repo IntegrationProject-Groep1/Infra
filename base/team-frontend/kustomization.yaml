@@ -5,3 +5,4 @@ resources:
   - drupal.yaml
   - heartbeat.yaml
   - ingress.yaml
+  - mcp.yaml

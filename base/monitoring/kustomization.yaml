@@ -12,3 +12,4 @@ resources:
   - elastic-agent-config.yaml
   - elastic-agent-rbac.yaml
   - elastic-agent.yaml
+  - mcp.yaml

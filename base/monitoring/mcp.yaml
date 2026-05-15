@@ -1,0 +1,80 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: monitoring-mcp
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: monitoring-mcp
+  template:
+    metadata:
+      labels:
+        app: monitoring-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: monitoring-mcp
+        image: ghcr.io/integrationproject-groep1/monitoring-integratie:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8005
+          protocol: TCP
+        env:
+        - name: ES_HOST
+          value: "http://elasticsearch-service:9200"
+        - name: ES_ADMIN_USER
+          value: "elastic"
+        - name: ES_ADMIN_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ELASTIC_PASSWORD
+        - name: PORT
+          value: "8005"
+        readinessProbe:
+          tcpSocket:
+            port: 8005
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8005
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-mcp-service
+spec:
+  selector:
+    app: monitoring-mcp
+  ports:
+  - port: 8005
+    targetPort: 8005
+  type: ClusterIP

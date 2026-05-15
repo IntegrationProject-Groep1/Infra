@@ -34,6 +34,9 @@ spec:
         - podSelector:
             matchLabels:
               app: facturatie-connector
+        - podSelector:
+            matchLabels:
+              app: facturatie-mcp
       ports:
         - port: 3306
 ---
@@ -136,6 +139,12 @@ spec:
         - podSelector:
             matchLabels:
               app: elastic-agent
+        - podSelector:
+            matchLabels:
+              app: chatbot
+        - podSelector:
+            matchLabels:
+              app: monitoring-mcp
       ports:
         - port: 9200
         - port: 9300

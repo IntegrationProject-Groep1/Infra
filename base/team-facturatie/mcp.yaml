@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: facturatie-mcp
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: facturatie-mcp
+  template:
+    metadata:
+      labels:
+        app: facturatie-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: facturatie-mcp
+        image: ghcr.io/integrationproject-groep1/facturatie:latest
+        imagePullPolicy: Always
+        command: ["python", "-m", "src.services.mcp_server"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8007
+          protocol: TCP
+        env:
+        - name: BILLING_API_URL
+          value: "http://facturatie-app-service:80/api"
+        - name: BILLING_API_USERNAME
+          value: "admin"
+        - name: BILLING_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: BILLING_API_TOKEN
+        - name: DB_HOST
+          value: "facturatie-db-service"
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_NAME
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: FOSSBILLING_DB_PASS
+        - name: PORT
+          value: "8007"
+        readinessProbe:
+          tcpSocket:
+            port: 8007
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8007
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: facturatie-mcp-service
+spec:
+  selector:
+    app: facturatie-mcp
+  ports:
+  - port: 8007
+    targetPort: 8007
+    nodePort: 30011
+  type: NodePort

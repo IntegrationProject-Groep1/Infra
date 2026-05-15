@@ -1,0 +1,84 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: frontend-mcp
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 5m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: frontend-mcp
+  template:
+    metadata:
+      labels:
+        app: frontend-mcp
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: frontend-mcp
+        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend-integratie:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8006
+          protocol: TCP
+        env:
+        - name: FRONTEND_BASE_URL
+          value: "http://frontend-drupal-service:80"
+        - name: DRUPAL_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_ADMIN_USER
+        - name: DRUPAL_ADMIN_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DRUPAL_ADMIN_PASS
+        - name: PORT
+          value: "8006"
+        readinessProbe:
+          tcpSocket:
+            port: 8006
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        livenessProbe:
+          tcpSocket:
+            port: 8006
+          initialDelaySeconds: 20
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-mcp-service
+spec:
+  selector:
+    app: frontend-mcp
+  ports:
+  - port: 8006
+    targetPort: 8006
+    nodePort: 30021
+  type: NodePort

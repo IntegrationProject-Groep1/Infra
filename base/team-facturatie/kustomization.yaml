@@ -7,3 +7,4 @@ resources:
   - heartbeat.yaml
   - ingress.yaml
   - apache-config.yaml
+  - mcp.yaml
