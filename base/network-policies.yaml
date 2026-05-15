@@ -200,6 +200,9 @@ spec:
         - podSelector:
             matchLabels:
               app: monitoring-heartbeat
+        - podSelector:
+            matchLabels:
+              app: chatbot
       ports:
         - port: 5672
         - port: 15672
