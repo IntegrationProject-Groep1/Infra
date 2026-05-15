@@ -37,8 +37,8 @@ metadata:
     argocd-image-updater.argoproj.io/mailing.update-strategy: digest
     argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
-    argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/write-back-target: kustomization.yaml
+    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
+    argocd-image-updater.argoproj.io/write-back-target: kustomization
     argocd-image-updater.argoproj.io/git-branch: main
   finalizers:
     - resources-finalizer.argocd.argoproj.io
