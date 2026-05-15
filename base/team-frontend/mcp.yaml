@@ -23,8 +23,9 @@ spec:
         runAsUser: 1000
       containers:
       - name: frontend-mcp
-        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest
+        image: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp:latest
         imagePullPolicy: Always
+        command: ["python", "mcp_server.py"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

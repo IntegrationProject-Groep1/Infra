@@ -25,6 +25,7 @@ spec:
       - name: monitoring-mcp
         image: ghcr.io/integrationproject-groep1/monitoring:latest
         imagePullPolicy: Always
+        command: ["python", "mcp_server.py"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
