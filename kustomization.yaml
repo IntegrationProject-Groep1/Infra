@@ -15,7 +15,7 @@ images:
   digest: sha256:39dd757d383b8418733a3ad8180e0c8f6260769aa8a204741783ad813945711e
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:abee3b3d6b2dd53c155414998aab7594652f7dd2faa906525da57a009a8a9835
+  digest: sha256:407e45bcabbaaf5813baeb3f0936d8544ea0d5e96f24781618f5c1baf1f6fc5e
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
   digest: sha256:68c8f55d1138e31676e1518a75ea1f1ed9996604b9e901291178c6de58511247
