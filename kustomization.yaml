@@ -15,7 +15,7 @@ images:
   digest: sha256:5694fce981a9aaad8cd7ce99bd4e146996c59615ead44b7386b6da592b3c3f8e
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:bfe5989e6d341c8fc72156064e637bbea3d980ccd20840c815792755e65019a6
+  digest: sha256:aaec3cd8f607543239cffcfd6f2e98bbddae1524a59660eac1232011d923b496
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
   digest: sha256:68c8f55d1138e31676e1518a75ea1f1ed9996604b9e901291178c6de58511247
@@ -33,7 +33,7 @@ images:
   digest: sha256:76a6a49d42defa82a3a18b2e6a585309a639a1dbc847a822ecb2054a4d50f7b2
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:5983fe4cef31514a37d5fb1ad774138e55c695b7480c7c2447701998e6dd787f
+  digest: sha256:135990f3f348098102c55430305f2ebfdb1fb29347b0cccb223ac16696926b46
 patches:
 - target:
     kind: Rollout
