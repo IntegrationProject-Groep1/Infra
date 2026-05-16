@@ -33,7 +33,7 @@ images:
   digest: sha256:602150b5c01b0da8e6e2a96e1d6c9daa71a2996dd20a30fe223f4e252e3e72cc
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:a2c3ea13ca21823d88c1af33d62e5bbd3bda838c023a30bae7f878d812e91c39
+  digest: sha256:3c2ad6f8586d29c65ea46cdf317d0fe8b22b1762e854715f8e18bffd447ca6cc
 patches:
 - target:
     kind: Rollout
