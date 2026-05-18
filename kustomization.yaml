@@ -6,7 +6,7 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:0d3b46be3f9577c2ba33e5d61f3b1c15e492f1109d3ea2c6bd7afed199359faf
+  digest: sha256:ff6ac507775b750b288be170ab7f0f2a9390cb119266b60fad2c480a202835da
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:152bd1d1d6836cfcb41ed4fc736587217820eeb2ed0abf27fb4bacaf0b7a8381
