@@ -60,7 +60,7 @@ spec:
         image: postgres:15-alpine
         command: ["sh", "-c"]
         args:
-        - 'psql -h kassa-db-service -p 5432 -U "$PGUSER" -d odoo_kassa -c "DELETE FROM ir_attachment WHERE store_fname IS NOT NULL AND (name LIKE ''%.min.js'' OR name LIKE ''%.min.css'');" || true'
+        - 'psql -h kassa-db-service -p 5432 -U "$PGUSER" -d odoo_kassa -c "DELETE FROM ir_attachment WHERE store_fname IS NOT NULL;" || true'
         env:
         - name: PGUSER
           valueFrom:
