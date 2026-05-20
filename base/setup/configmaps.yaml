@@ -157,6 +157,9 @@ data:
       rabbitmq_sender.new_registration_sender:
         class: Drupal\rabbitmq_sender\NewRegistrationSender
 
+      rabbitmq_sender.company_registration_sender:
+        class: Drupal\rabbitmq_sender\CompanyRegistrationSender
+
       rabbitmq_sender.calendar_invite_sender:
         class: Drupal\rabbitmq_sender\CalendarInviteSender
 
