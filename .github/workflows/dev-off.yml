@@ -1,0 +1,62 @@
+# =============================================================================
+# dev-off.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Stops the dev environment (shift-festival-dev) by scaling all workloads
+#   to zero. Namespace and config remain intact so dev-on can restart quickly.
+#
+# TRIGGERS:
+#   - Manual (workflow_dispatch)
+#   - Merge to main — dev env automatically shut down after a release
+#   - Schedule — every day at 22:00 Brussels time as safety net
+# =============================================================================
+
+name: Dev Environment — OFF
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: '0 20 * * *'
+
+jobs:
+  dev-off:
+    name: Stop shift-festival-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Scale down all workloads in shift-festival-dev
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            NS=shift-festival-dev
+
+            if ! kubectl get namespace "$NS" &>/dev/null; then
+              echo "Namespace $NS does not exist — nothing to do"
+              exit 0
+            fi
+
+            echo "Scaling down Deployments..."
+            kubectl scale deployment --all -n "$NS" --replicas=0 2>/dev/null || true
+
+            echo "Scaling down StatefulSets..."
+            kubectl scale statefulset --all -n "$NS" --replicas=0 2>/dev/null || true
+
+            echo "Scaling down Rollouts..."
+            for rollout in $(kubectl get rollout -n "$NS" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+              kubectl patch rollout "$rollout" -n "$NS" \
+                --type=merge -p '{"spec":{"replicas":0}}' 2>/dev/null || true
+            done
+
+            echo ""
+            echo "✅ Dev environment is DOWN"
+            kubectl get pods -n "$NS"

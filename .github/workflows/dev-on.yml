@@ -1,0 +1,76 @@
+# =============================================================================
+# dev-on.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Starts the dev environment (shift-festival-dev) by applying the
+#   overlays/dev Kustomize overlay to the cluster.
+#
+# TRIGGER:
+#   - Manual (workflow_dispatch) — triggered via GitHub UI or Teams
+#
+# WHAT IT DOES:
+#   1. Copies overlays/dev to the VM
+#   2. Applies the overlay with kubectl apply -k
+#   3. Waits for core pods to be ready
+# =============================================================================
+
+name: Dev Environment — ON
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dev-on:
+    name: Start shift-festival-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy overlay to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          source: "overlays/dev/*"
+          target: "shiftfestival/overlays/dev"
+          strip_components: 2
+
+      - name: Apply dev overlay
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+            cd shiftfestival
+
+            if [[ ! -f setup/.env ]]; then
+              echo "setup/.env missing — create shift-secrets-dev first"
+              exit 1
+            fi
+
+            # Create dev secret if it doesn't exist yet
+            if ! kubectl get secret shift-secrets -n shift-festival-dev &>/dev/null; then
+              echo "Creating shift-secrets in shift-festival-dev..."
+              kubectl create secret generic shift-secrets \
+                --from-env-file=setup/.env \
+                -n shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
+            fi
+
+            echo "Applying dev overlay..."
+            kubectl apply -k overlays/dev
+
+            echo "Waiting for core pods..."
+            kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=5m
+            kubectl rollout status deployment/postgredb       -n shift-festival-dev --timeout=5m
+
+            echo ""
+            echo "✅ Dev environment is UP"
+            kubectl get pods -n shift-festival-dev

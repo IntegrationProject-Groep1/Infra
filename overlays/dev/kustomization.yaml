@@ -1,0 +1,223 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shift-festival-dev
+
+labels:
+  - pairs:
+      project: shift-festival
+      env: dev
+      managed-by: Team-Infra
+    includeSelectors: false
+
+resources:
+  - ../../base
+
+patches:
+  # ── Dev subdomains ────────────────────────────────────────────────────────
+  - target:
+      kind: Ingress
+      name: frontend-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev.desiderius.me
+  - target:
+      kind: Ingress
+      name: kassa-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-kassa.desiderius.me
+  - target:
+      kind: Ingress
+      name: facturatie-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-facturatie.desiderius.me
+  - target:
+      kind: Ingress
+      name: planning-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-planning.desiderius.me
+  - target:
+      kind: Ingress
+      name: rabbitmq-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-rabbitmq.desiderius.me
+  - target:
+      kind: Ingress
+      name: kibana-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-kibana.desiderius.me
+
+  # ── Block PVC provisioning — pods use emptyDir, PVCs stay Pending ───────
+  - target:
+      kind: PersistentVolumeClaim
+    patch: |-
+      - op: add
+        path: /spec/storageClassName
+        value: "dev-no-provision"
+
+  # ── Scale monitoring to zero (no ELK stack in dev) ──────────────────────
+  - target:
+      kind: StatefulSet
+      name: elasticsearch
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: es-data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: kibana
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Deployment
+      name: logstash
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: DaemonSet
+      name: elastic-agent
+    patch: |-
+      - op: add
+        path: /spec/template/spec/nodeSelector
+        value:
+          non-existing-node: "true"
+
+  # ── Replace PVC volumes with emptyDir ────────────────────────────────────
+  - target:
+      kind: Deployment
+      name: rabbitmq-broker
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: rabbit-data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: postgredb
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: pgadmin
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: pgadmin-data
+          emptyDir: {}
+  - target:
+      kind: Rollout
+      name: frontend-drupal
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: drupal-files
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: frontend-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: kassa-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Rollout
+      name: kassa-integration
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: outbox-data
+          emptyDir: {}
+  - target:
+      kind: Rollout
+      name: fossbilling-app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: foss-html
+          emptyDir: {}
+      - op: replace
+        path: /spec/template/spec/volumes/1
+        value:
+          name: foss-data
+          emptyDir: {}
+      - op: replace
+        path: /spec/template/spec/volumes/2
+        value:
+          name: foss-uploads
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: facturatie-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: crm-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Deployment
+      name: planning-db
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: data
+          emptyDir: {}
+  - target:
+      kind: Rollout
+      name: integration-planning
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: token-data
+          emptyDir: {}

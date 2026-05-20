@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shift-festival-dev
+  namespace: argocd
+  annotations:
+    argocd-image-updater.argoproj.io/image-list: >-
+      frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:dev,
+      kassa=ghcr.io/integrationproject-groep1/kassa:dev,
+      facturatie=ghcr.io/integrationproject-groep1/facturatie:dev,
+      crm=ghcr.io/integrationproject-groep1/crm:dev,
+      planning=ghcr.io/integrationproject-groep1/planning:dev,
+      identity=ghcr.io/integrationproject-groep1/identity-service:dev,
+      heartbeat=ghcr.io/integrationproject-groep1/heartbeat:dev,
+      mailing=ghcr.io/integrationproject-groep1/mailing:dev,
+      chatbot=ghcr.io/integrationproject-groep1/chatbot:dev
+    argocd-image-updater.argoproj.io/frontend.update-strategy: digest
+    argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+    argocd-image-updater.argoproj.io/kassa.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/kassa.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa
+    argocd-image-updater.argoproj.io/facturatie.update-strategy: digest
+    argocd-image-updater.argoproj.io/facturatie.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/facturatie.kustomize.image-name: ghcr.io/integrationproject-groep1/facturatie
+    argocd-image-updater.argoproj.io/crm.update-strategy: digest
+    argocd-image-updater.argoproj.io/crm.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/crm.kustomize.image-name: ghcr.io/integrationproject-groep1/crm
+    argocd-image-updater.argoproj.io/planning.update-strategy: digest
+    argocd-image-updater.argoproj.io/planning.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/planning.kustomize.image-name: ghcr.io/integrationproject-groep1/planning
+    argocd-image-updater.argoproj.io/identity.update-strategy: digest
+    argocd-image-updater.argoproj.io/identity.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/identity.kustomize.image-name: ghcr.io/integrationproject-groep1/identity-service
+    argocd-image-updater.argoproj.io/heartbeat.update-strategy: digest
+    argocd-image-updater.argoproj.io/heartbeat.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/heartbeat.kustomize.image-name: ghcr.io/integrationproject-groep1/heartbeat
+    argocd-image-updater.argoproj.io/mailing.update-strategy: digest
+    argocd-image-updater.argoproj.io/mailing.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/mailing.kustomize.image-name: ghcr.io/integrationproject-groep1/mailing
+    argocd-image-updater.argoproj.io/chatbot.update-strategy: digest
+    argocd-image-updater.argoproj.io/chatbot.allow-tags: regexp:^dev$
+    argocd-image-updater.argoproj.io/chatbot.kustomize.image-name: ghcr.io/integrationproject-groep1/chatbot
+    argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
+    argocd-image-updater.argoproj.io/write-back-target: kustomization:overlays/dev
+    argocd-image-updater.argoproj.io/git-branch: Feature-dev-environment
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/integrationproject-groep1/Infra.git
+    targetRevision: Feature-dev-environment
+    path: overlays/dev
+    kustomize:
+      images: []
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shift-festival-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: shift-secrets
+      jsonPointers:
+        - /data
