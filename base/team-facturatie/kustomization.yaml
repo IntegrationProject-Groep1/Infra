@@ -4,6 +4,7 @@ resources:
   - mariadb-config.yaml
   - mariadb.yaml
   - fossbilling.yaml
+  - hpa.yaml
   - heartbeat.yaml
   - ingress.yaml
   - apache-config.yaml

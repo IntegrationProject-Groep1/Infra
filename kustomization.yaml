@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
 - base
 - argocd/rollouts
+- base/metrics-server
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
@@ -41,13 +42,13 @@ patches:
   patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/cpu
-      value: "250m"
+      value: "100m"
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/memory
       value: "512Mi"
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
-      value: "1000m"
+      value: "750m"
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/memory
       value: "1Gi"

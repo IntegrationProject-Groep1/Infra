@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - postgres.yaml
   - odoo.yaml
+  - hpa.yaml
   - heartbeat.yaml
   - ingress.yaml
   - integration.yaml
