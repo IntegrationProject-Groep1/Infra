@@ -45,7 +45,7 @@ spec:
         image: alpine/git
         command: ["sh", "-c"]
         args:
-        - 'git clone --depth=1 --filter=blob:none --sparse https://github.com/IntegrationProject-Groep1/Kassa.git /tmp/repo &&
+        - 'git clone --depth=1 --branch main --filter=blob:none --sparse https://github.com/IntegrationProject-Groep1/Kassa.git /tmp/repo &&
            cd /tmp/repo &&
            git sparse-checkout set addons/kassa_pos_custom &&
            cp -r addons/kassa_pos_custom /mnt/extra-addons/'
@@ -56,27 +56,6 @@ spec:
         volumeMounts:
         - name: extra-addons
           mountPath: /mnt/extra-addons
-      - name: clear-asset-cache
-        image: postgres:15-alpine
-        command: ["sh", "-c"]
-        args:
-        - 'psql -h kassa-db-service -p 5432 -U "$PGUSER" -d odoo_kassa -c "DELETE FROM ir_attachment WHERE store_fname IS NOT NULL;" || true'
-        env:
-        - name: PGUSER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_USER
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_PASSWORD
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 999
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
       containers:
       - name: odoo
         image: odoo:17
@@ -94,7 +73,6 @@ spec:
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         - "--log-handler=werkzeug:WARNING"
-        - "--update=kassa_pos_custom"
         ports:
         - containerPort: 8069
           protocol: TCP
