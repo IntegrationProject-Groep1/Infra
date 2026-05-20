@@ -3,7 +3,6 @@ kind: Rollout
 metadata:
   name: kassa-web
 spec:
-  replicas: 1
   strategy:
     canary:
       steps:

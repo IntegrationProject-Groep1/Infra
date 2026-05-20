@@ -15,8 +15,6 @@ spec:
     spec:
       serviceAccountName: elastic-agent
       terminationGracePeriodSeconds: 30
-      nodeSelector:
-        paused: "true"
       # trivy:ignore:KSV-0009
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
