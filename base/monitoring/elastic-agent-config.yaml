@@ -4,6 +4,15 @@ metadata:
   name: elastic-agent-config
 stringData:
   elastic-agent.yml: |
+    agent.monitoring:
+      enabled: true
+      logs: true
+      metrics: true
+      http:
+        enabled: true
+        host: 127.0.0.1
+        port: 6791
+
     outputs:
       default:
         type: elasticsearch

@@ -62,10 +62,10 @@ spec:
             host: 127.0.0.1
             path: /stats
             port: 6791
-          initialDelaySeconds: 15
+          initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
         volumeMounts:
         - name: config
           mountPath: /etc/elastic-agent/elastic-agent.yml
