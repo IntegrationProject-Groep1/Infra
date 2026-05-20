@@ -44,10 +44,10 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 300Mi
+            memory: 400Mi
           limits:
             cpu: 400m
-            memory: 600Mi
+            memory: 900Mi
         livenessProbe:
           httpGet:
             host: 127.0.0.1
