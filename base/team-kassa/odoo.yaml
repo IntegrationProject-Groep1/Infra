@@ -74,6 +74,7 @@ spec:
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         - "--log-handler=werkzeug:WARNING"
+        - "--update=kassa_pos_custom"
         ports:
         - containerPort: 8069
           protocol: TCP
