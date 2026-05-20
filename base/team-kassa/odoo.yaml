@@ -132,7 +132,8 @@ spec:
           periodSeconds: 5
       volumes:
       - name: odoo-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: kassa-odoo-data-pvc
       - name: tmp
         emptyDir: {}
       - name: odoo-conf
