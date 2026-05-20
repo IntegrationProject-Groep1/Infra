@@ -3,24 +3,22 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Stops the dev environment (shift-festival-dev) by scaling all workloads
-#   to zero. Namespace and config remain intact so dev-on can restart quickly.
+#   Stops the dev environment by suspending the ArgoCD Application when
+#   no activity has been detected on the Feature-dev-environment branch
+#   for 4 hours. The timer is shared across all teams — as long as any
+#   team pushes, the dev env stays up.
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
-#   - Merge to main — dev env automatically shut down after a release
-#   - Schedule — every day at 22:00 Brussels time as safety net
+#   - Every hour (schedule) — checks 4h inactivity
 # =============================================================================
 
 name: Dev Environment — OFF
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
   schedule:
-    - cron: '0 20 * * *'
+    - cron: '0 * * * *'
 
 jobs:
   dev-off:
@@ -28,7 +26,38 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Scale down all workloads in shift-festival-dev
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check inactivity (skip if manual)
+        if: github.event_name == 'schedule'
+        id: inactivity
+        run: |
+          # Get last commit timestamp on Feature-dev-environment
+          LAST_PUSH=$(git log origin/Feature-dev-environment -1 --format="%ct" 2>/dev/null || echo "0")
+
+          if [[ "$LAST_PUSH" == "0" ]]; then
+            echo "No commits found on Feature-dev-environment — skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NOW=$(date +%s)
+          DIFF=$(( (NOW - LAST_PUSH) / 3600 ))
+          echo "Hours since last push: $DIFF"
+
+          if [[ $DIFF -lt 4 ]]; then
+            echo "Last push was $DIFF hour(s) ago — dev env stays up"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Last push was $DIFF hour(s) ago — shutting down"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Suspend ArgoCD Application
+        if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -38,25 +67,24 @@ jobs:
           script: |
             set -euo pipefail
 
-            NS=shift-festival-dev
-
-            if ! kubectl get namespace "$NS" &>/dev/null; then
-              echo "Namespace $NS does not exist — nothing to do"
+            if ! kubectl get application shift-festival-dev -n argocd &>/dev/null; then
+              echo "ArgoCD app shift-festival-dev does not exist — nothing to do"
               exit 0
             fi
 
-            echo "Scaling down Deployments..."
-            kubectl scale deployment --all -n "$NS" --replicas=0 2>/dev/null || true
+            echo "Suspending ArgoCD app..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
 
-            echo "Scaling down StatefulSets..."
-            kubectl scale statefulset --all -n "$NS" --replicas=0 2>/dev/null || true
+            echo "Scaling down all workloads..."
+            kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
+            kubectl scale statefulset --all -n shift-festival-dev --replicas=0 2>/dev/null || true
 
-            echo "Scaling down Rollouts..."
-            for rollout in $(kubectl get rollout -n "$NS" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
-              kubectl patch rollout "$rollout" -n "$NS" \
+            for rollout in $(kubectl get rollout -n shift-festival-dev \
+              -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+              kubectl patch rollout "$rollout" -n shift-festival-dev \
                 --type=merge -p '{"spec":{"replicas":0}}' 2>/dev/null || true
             done
 
             echo ""
-            echo "✅ Dev environment is DOWN"
-            kubectl get pods -n "$NS"
+            echo "✅ Dev environment is DOWN — ArgoCD app suspended"

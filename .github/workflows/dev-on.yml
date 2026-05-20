@@ -3,22 +3,25 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Starts the dev environment (shift-festival-dev) by applying the
-#   overlays/dev Kustomize overlay to the cluster.
+#   Starts the dev environment by unsuspending the ArgoCD Application.
+#   ArgoCD then syncs the latest :dev images automatically.
 #
-# TRIGGER:
-#   - Manual (workflow_dispatch) — triggered via GitHub UI or Teams
-#
-# WHAT IT DOES:
-#   1. Copies overlays/dev to the VM
-#   2. Applies the overlay with kubectl apply -k
-#   3. Waits for core pods to be ready
+# TRIGGERS:
+#   - Manual (workflow_dispatch)
+#   - Automatically when ArgoCD Image Updater detects a new :dev image
+#     (Image Updater commits to Feature-dev-environment branch →
+#      triggers this workflow → ArgoCD unsuspended → pods start)
 # =============================================================================
 
 name: Dev Environment — ON
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - Feature-dev-environment
+    paths:
+      - 'overlays/dev/kustomization.yaml'
 
 jobs:
   dev-on:
@@ -26,21 +29,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy overlay to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 60022
-          source: "overlays/dev/*"
-          target: "shiftfestival/overlays/dev"
-          strip_components: 2
-
-      - name: Apply dev overlay
+      - name: Ensure shift-secrets exists in dev namespace
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -49,28 +38,41 @@ jobs:
           port: 60022
           script: |
             set -euo pipefail
-            cd shiftfestival
 
-            if [[ ! -f setup/.env ]]; then
-              echo "setup/.env missing — create shift-secrets-dev first"
-              exit 1
-            fi
+            kubectl create namespace shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
 
-            # Create dev secret if it doesn't exist yet
             if ! kubectl get secret shift-secrets -n shift-festival-dev &>/dev/null; then
-              echo "Creating shift-secrets in shift-festival-dev..."
-              kubectl create secret generic shift-secrets \
-                --from-env-file=setup/.env \
-                -n shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
+              echo "Creating shift-secrets in shift-festival-dev from .env.dev..."
+              if [[ -f ~/shiftfestival/setup/.env.dev ]]; then
+                kubectl create secret generic shift-secrets \
+                  --from-env-file=~/shiftfestival/setup/.env.dev \
+                  -n shift-festival-dev
+              else
+                echo "WARNING: .env.dev not found, copying from prod .env"
+                kubectl create secret generic shift-secrets \
+                  --from-env-file=~/shiftfestival/setup/.env \
+                  -n shift-festival-dev
+              fi
             fi
 
-            echo "Applying dev overlay..."
-            kubectl apply -k overlays/dev
+      - name: Unsuspend ArgoCD Application
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
 
-            echo "Waiting for core pods..."
-            kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=5m
-            kubectl rollout status deployment/postgredb       -n shift-festival-dev --timeout=5m
+            echo "Unsuspending ArgoCD app..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+
+            echo "Triggering ArgoCD sync..."
+            kubectl annotate application shift-festival-dev -n argocd \
+              argocd.argoproj.io/refresh=normal --overwrite
 
             echo ""
-            echo "✅ Dev environment is UP"
-            kubectl get pods -n shift-festival-dev
+            echo "✅ Dev environment is starting — ArgoCD syncing latest :dev images"
+            echo "Check status at: https://argocd.desiderius.me"
