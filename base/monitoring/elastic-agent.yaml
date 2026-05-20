@@ -15,8 +15,6 @@ spec:
     spec:
       serviceAccountName: elastic-agent
       terminationGracePeriodSeconds: 30
-      nodeSelector:
-        paused: "true"
       # trivy:ignore:KSV-0009
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
@@ -46,10 +44,10 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 300Mi
+            memory: 400Mi
           limits:
             cpu: 400m
-            memory: 600Mi
+            memory: 900Mi
         livenessProbe:
           httpGet:
             host: 127.0.0.1
@@ -64,10 +62,10 @@ spec:
             host: 127.0.0.1
             path: /stats
             port: 6791
-          initialDelaySeconds: 15
+          initialDelaySeconds: 60
           periodSeconds: 10
           timeoutSeconds: 5
-          failureThreshold: 3
+          failureThreshold: 5
         volumeMounts:
         - name: config
           mountPath: /etc/elastic-agent/elastic-agent.yml
