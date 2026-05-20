@@ -3,7 +3,7 @@ kind: Rollout
 metadata:
   name: kassa-web
 spec:
-  replicas: 1
+  progressDeadlineSeconds: 180
   strategy:
     canary:
       steps:
@@ -116,6 +116,9 @@ spec:
           requests:
             memory: "256Mi"
             cpu: "50m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
         volumeMounts:
         - name: odoo-data
           mountPath: /var/lib/odoo

@@ -74,3 +74,7 @@ spec:
       name: shift-secrets
       jsonPointers:
         - /data
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/replicas
