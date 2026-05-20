@@ -57,6 +57,27 @@ spec:
         volumeMounts:
         - name: extra-addons
           mountPath: /mnt/extra-addons
+      - name: clear-asset-cache
+        image: postgres:15-alpine
+        command: ["sh", "-c"]
+        args:
+        - 'psql -h kassa-db-service -p 5432 -U "$PGUSER" -d odoo_kassa -c "DELETE FROM ir_attachment WHERE name LIKE ''/web/assets/%'' AND store_fname IS NOT NULL;" || true'
+        env:
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_USER
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_PASSWORD
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 999
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
       containers:
       - name: odoo
         image: odoo:17
@@ -74,6 +95,7 @@ spec:
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         - "--log-handler=werkzeug:WARNING"
+        - "--update=kassa_pos_custom"
         ports:
         - containerPort: 8069
           protocol: TCP

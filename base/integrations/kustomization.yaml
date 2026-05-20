@@ -5,6 +5,7 @@ resources:
   - heartbeats.yaml
   - crm.yaml
   - planning.yaml
+  - hpa.yaml
   - planning-ingress.yaml
   - mailing.yaml
   - crm-mcp.yaml

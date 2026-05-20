@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - mariadb.yaml
   - drupal.yaml
+  - hpa.yaml
   - heartbeat.yaml
   - ingress.yaml
   - mcp.yaml

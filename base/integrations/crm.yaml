@@ -3,7 +3,7 @@ kind: Rollout
 metadata:
   name: integration-crm
 spec:
-  replicas: 1
+  progressDeadlineSeconds: 120
   strategy:
     canary:
       steps:

@@ -53,6 +53,8 @@ The stack runs on Kubernetes and is composed of:
 - **Cloudflared** — Secure external access tunnel for selected services. Routes are managed in the Cloudflare Zero Trust dashboard (token-based, no local config file).
 - **ArgoCD** — GitOps controller installed in the `argocd` namespace. Watches the Git repo and auto-syncs changes to the cluster. Exposed at `argocd.desiderius.me` via Cloudflare Tunnel.
 - **ArgoCD Image Updater** — Polls GHCR for new image tags and writes back the updated tag to Git, triggering an ArgoCD sync.
+- **metrics-server** — Installed in `kube-system`. Provides CPU/memory metrics to the Kubernetes HPA controller. Uses `--kubelet-insecure-tls` because the VM uses self-signed kubelet certs (standard kubeadm setup). Managed via `base/metrics-server/`.
+- **HPA (HorizontalPodAutoscaler)** — Autoscales 7 stateless Rollouts based on CPU utilization (target 70%). All HPAs use `scaleTargetRef.kind: Rollout` (argoproj.io/v1alpha1). `spec.replicas` is omitted from HPA-managed Rollout manifests; ArgoCD ignores this field via `ignoreDifferences` to prevent selfHeal conflicts. Each HPA-managed Rollout also has `progressDeadlineSeconds` set so that a pod stuck in CrashLoopBackOff automatically aborts the rollout and restores the previous version.
 
 **Team Services:**
 - Frontend (Drupal, ports 30020–30029)
@@ -67,6 +69,7 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 **Namespaces:**
 - `shift-festival` — main application namespace
 - `argocd` — ArgoCD controller and Image Updater
+- `kube-system` — metrics-server
 
 ## CI/CD Pipeline
 
@@ -92,10 +95,88 @@ Re-run whenever `setup/.env` changes.
 
 ## Rollback and Recovery
 
-- **Automatic Rollback**: Managed via **Argo Rollouts**. If a pod crashes during deployment, the rollout is automatically aborted and the previous version is kept.
-- **Manual Rollback**: `kubectl argo rollouts rollback <name> -n shift-festival` or via the ArgoCD UI.
-- **Namespace-wide recovery**: Revert the Git commit and push — ArgoCD auto-syncs within minutes.
-- **Crash scenario**: Kubernetes restarts the pod; ArgoCD marks the app Degraded. Argo Rollouts handles automated rollback for new deployments.
+All team services use Argo Rollouts (canary strategy). Rollback is managed through Argo Rollouts, not standard Deployment rollback.
+
+### Deployment flow (what happens on every git push)
+
+```
+1. ArgoCD detects commit on main → applies updated Rollout manifest
+2. Argo Rollouts starts the canary:
+   a. Starts new pod with updated image
+   b. progressDeadlineSeconds timer starts (120s or 180s depending on service)
+   c. setWeight: 100 → all traffic immediately goes to new pod
+   d. pause: 3m → 3-minute manual observation window
+   e. After 3 minutes with no abort → rollout is marked complete
+```
+
+### Failure scenario flows
+
+**Scenario A — Pod never starts (crash on boot, bad image, OOMkill):**
+```
+New pod enters CrashLoopBackOff
+  → Kubernetes restarts it (restartPolicy: Always): 10s, 20s, 40s backoff
+  → After progressDeadlineSeconds (120–180s), pod is still not Ready
+  → Argo Rollouts automatically aborts the rollout
+  → Previous stable pod stays running — no manual action needed
+  → ArgoCD marks app Degraded; Rollout stays in Aborted state until fixed
+```
+
+**Scenario B — Pod starts and runs, but crashes later (runtime error):**
+```
+Pod was healthy at deploy time → rollout completed successfully
+Pod crashes after some time
+  → Kubernetes restarts it automatically (restartPolicy: Always)
+  → If it keeps crashing → CrashLoopBackOff
+  → Manual action required: kubectl argo rollouts undo <name> -n shift-festival
+  → Or: git revert the bad commit and push → ArgoCD redeploys previous version
+```
+
+**Scenario C — Pod is running but returns errors internally (false healthy):**
+```
+Pod passes health probes → rollout completes
+App returns HTTP errors, wrong data, etc. — Kubernetes cannot detect this
+  → Spotted during the 3-minute observation window (check logs in Kibana)
+  → Manually abort: kubectl argo rollouts abort <name> -n shift-festival
+  → Previous version is restored immediately
+Note: automated detection of this scenario requires Prometheus + AnalysisTemplate
+      (not currently installed — ELK is the only observability stack)
+```
+
+**Scenario D — Probe is flaky at startup (app healthy but probe fails transiently):**
+```
+Pod starts correctly but probe fails once or twice at startup
+  → The 3-minute pause acts as an observation buffer
+  → If the pod stabilises → rollout completes normally
+  → Long-term fix: tune probe parameters (initialDelaySeconds, failureThreshold)
+      rather than relying on the pause to hide transient failures
+```
+
+### How to trigger a manual rollback
+
+**Option 1 — Argo Rollouts CLI (fastest, no Git history):**
+```bash
+kubectl argo rollouts undo <rollout-name> -n shift-festival
+# Examples:
+kubectl argo rollouts undo frontend-drupal -n shift-festival
+kubectl argo rollouts undo identity-service -n shift-festival
+```
+
+**Option 2 — Git revert (preferred, full audit trail):**
+```bash
+git revert <bad-commit-sha>
+git push origin main
+# ArgoCD auto-syncs within the next cycle and deploys the reverted manifest.
+```
+
+**Option 3 — ArgoCD UI:** Open the ArgoCD UI, find the Rollout resource, use the Abort or Rollback button.
+
+### HPA interaction with rollbacks
+
+When HPA manages a Rollout's replica count, a rollback only restores the previous pod spec (image, env vars, etc.) — it does not reset the replica count. HPA continues owning the replica count and scales normally after the rollback. This is correct behaviour.
+
+### Automated analysis (future improvement)
+
+Argo Rollouts supports AnalysisTemplates that query Prometheus metrics (e.g. HTTP error rate) to automatically gate or abort the canary window. This would cover Scenario C automatically. Not currently configured — requires a Prometheus instance, which adds memory overhead on the single-VM cluster and is out of scope for now.
 
 ## Key Constraints
 
@@ -107,6 +188,8 @@ Re-run whenever `setup/.env` changes.
 - **All Kubernetes manifests must render with `kubectl kustomize .`.**
 - **NodePorts must stay within the assigned ranges** for each team.
 - **Team-prefixed RabbitMQ queues** are mandatory; shared heartbeat routing keeps its own convention.
+- **HPA-managed Rollouts must omit `spec.replicas`** — If present, ArgoCD selfHeal resets the replica count on every sync, fighting the HPA. Leave the field absent so HPA has exclusive ownership. The `ignoreDifferences` entry in `argocd/applications/prod-app.yaml` handles runtime drift as an additional safeguard.
+- **Do not remove `base/metrics-server`** — All HPAs depend on metrics-server. Without it, HPAs report `<unknown>` utilization and stop scaling.
 
 ## Documentation Requirements
 

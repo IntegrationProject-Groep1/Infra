@@ -3,7 +3,7 @@ kind: Rollout
 metadata:
   name: frontend-drupal
 spec:
-  replicas: 1
+  progressDeadlineSeconds: 180
   strategy:
     canary:
       steps:

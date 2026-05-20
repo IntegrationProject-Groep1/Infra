@@ -3,22 +3,23 @@ kind: Kustomization
 resources:
 - base
 - argocd/rollouts
+- base/metrics-server
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:00ea2552088240d19948fba64e6b7db8aa6c5653c5e16049e6085534afe56c4a
+  digest: sha256:ed62ca6a6af85eea65c63d6c71db9f60c0e1536b97d6fb2d729b4bb661ce33e2
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:d884037abe205b3762152e39e097741fa20980cecd9a5ab5881b2da4838610a2
+  digest: sha256:7c915ee62bb628ee04893ec2f1d26fbda8fa7b9190dcf3f60c131aa9f1ba5147
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
   digest: sha256:0c295906f30203d674b560a2fdb4152971795812a5f34a858b618f6ff5779094
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:b49aeeb147513324008a4e404126ff3b27d6ebcb62c816601ab0cf05ff0d12ea
+  digest: sha256:03c6f5462b0eb9f818e45a2b1147235aa5feb85d9bdca473feee696ff4d39be4
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
-  digest: sha256:68c8f55d1138e31676e1518a75ea1f1ed9996604b9e901291178c6de58511247
+  digest: sha256:91396b632e3dc07bc5d4709199ce24357c048f1a50a9a425a22dca6f52c7277d
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
   digest: sha256:902c3dd31ac98ece086260e42ee07f765e3d40db45d3f1e5dfebed0c0d57a9fa
@@ -41,13 +42,13 @@ patches:
   patch: |-
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/cpu
-      value: "250m"
+      value: "100m"
     - op: replace
       path: /spec/template/spec/containers/0/resources/requests/memory
       value: "512Mi"
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/cpu
-      value: "1000m"
+      value: "750m"
     - op: replace
       path: /spec/template/spec/containers/0/resources/limits/memory
       value: "1Gi"
