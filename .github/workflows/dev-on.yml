@@ -100,7 +100,7 @@ jobs:
             kubectl scale deployment postgredb frontend-db kassa-db facturatie-db crm-db planning-db -n shift-festival-dev --replicas=1
 
             echo "Waiting for RabbitMQ..."
-            kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=3m
+            kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=5m
             echo "✅ Phase 1 done"
 
       - name: Phase 2 — Applications
