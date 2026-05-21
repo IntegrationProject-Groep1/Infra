@@ -18,7 +18,8 @@ metadata:
       frontend-mcp=ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp:latest,
       monitoring-mcp=ghcr.io/integrationproject-groep1/monitoring-mcp:latest,
       facturatie-mcp=ghcr.io/integrationproject-groep1/facturatie-mcp:latest,
-      crm-mcp=ghcr.io/integrationproject-groep1/crm-mcp:latest
+      crm-mcp=ghcr.io/integrationproject-groep1/crm-mcp:latest,
+      kassa-mcp=ghcr.io/integrationproject-groep1/kassa-mcp:latest
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
@@ -61,6 +62,9 @@ metadata:
     argocd-image-updater.argoproj.io/crm-mcp.update-strategy: digest
     argocd-image-updater.argoproj.io/crm-mcp.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/crm-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/crm-mcp
+    argocd-image-updater.argoproj.io/kassa-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/kassa-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa-mcp
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
     argocd-image-updater.argoproj.io/write-back-target: kustomization
     argocd-image-updater.argoproj.io/git-branch: main
