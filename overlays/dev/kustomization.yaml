@@ -121,6 +121,9 @@ patches:
         value:
           name: data
           emptyDir: {}
+      - op: add
+        path: /spec/template/spec/securityContext/fsGroup
+        value: 999
   - target:
       kind: Deployment
       name: pgadmin
@@ -157,6 +160,9 @@ patches:
         value:
           name: data
           emptyDir: {}
+      - op: add
+        path: /spec/template/spec/securityContext/fsGroup
+        value: 999
   - target:
       kind: Rollout
       name: kassa-integration
@@ -212,6 +218,9 @@ patches:
         value:
           name: data
           emptyDir: {}
+      - op: add
+        path: /spec/template/spec/securityContext/fsGroup
+        value: 999
   - target:
       kind: Rollout
       name: integration-planning
