@@ -19,7 +19,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - Feature-dev-environment
+      - dev
     paths:
       - 'overlays/dev/kustomization.yaml'
 

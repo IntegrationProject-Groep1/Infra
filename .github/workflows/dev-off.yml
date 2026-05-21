@@ -10,7 +10,7 @@
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
-#   - Every hour (schedule) — checks 4h inactivity
+#   - Every hour (schedule) — checks 4h inactivity on dev branch
 # =============================================================================
 
 name: Dev Environment — OFF
@@ -31,15 +31,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check inactivity (skip if manual)
+      - name: Check inactivity (skip if manual or push to main)
         if: github.event_name == 'schedule'
         id: inactivity
         run: |
-          # Get last commit timestamp on Feature-dev-environment
-          LAST_PUSH=$(git log origin/Feature-dev-environment -1 --format="%ct" 2>/dev/null || echo "0")
+          # Get last commit timestamp on dev branch
+          LAST_PUSH=$(git log origin/dev -1 --format="%ct" 2>/dev/null || echo "0")
 
           if [[ "$LAST_PUSH" == "0" ]]; then
-            echo "No commits found on Feature-dev-environment — skipping"
+            echo "No commits found on dev branch — skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
