@@ -4,7 +4,9 @@
       "Bash(python -m pytest tests/test_agent_v2.py -v)",
       "Bash(python -m unittest tests.test_agent_v2 -v)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sinkh\\\\source\\\\repos\\\\integrationProject\\\\Infra\\\\base\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }
