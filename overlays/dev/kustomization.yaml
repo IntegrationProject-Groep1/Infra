@@ -58,14 +58,6 @@ patches:
         path: /spec/rules/0/host
         value: dev-kibana.desiderius.me
 
-  # ── Block PVC provisioning — pods use emptyDir, PVCs stay Pending ───────
-  - target:
-      kind: PersistentVolumeClaim
-    patch: |-
-      - op: add
-        path: /spec/storageClassName
-        value: "dev-no-provision"
-
   # ── Scale non-essential services to zero ─────────────────────────────────
   - target:
       kind: Rollout
@@ -195,11 +187,6 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 0
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: es-data
-          emptyDir: {}
   - target:
       kind: Deployment
       name: kibana
@@ -223,7 +210,7 @@ patches:
         value:
           non-existing-node: "true"
 
-  # ── Replace PVC volumes with emptyDir ────────────────────────────────────
+  # ── Ephemeral volumes — test data, no persistence needed ────────────────
   - target:
       kind: Deployment
       name: rabbitmq-broker
@@ -257,74 +244,7 @@ patches:
                 mountPath: /var/lib/postgresql/data
   - target:
       kind: Deployment
-      name: pgadmin
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: pgadmin-data
-          emptyDir: {}
-  - target:
-      kind: Rollout
-      name: frontend-drupal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: drupal-files
-          emptyDir: {}
-  - target:
-      kind: Deployment
-      name: frontend-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          emptyDir: {}
-  - target:
-      kind: Deployment
       name: kassa-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          emptyDir: {}
-      - op: add
-        path: /spec/template/spec/securityContext/fsGroup
-        value: 999
-  - target:
-      kind: Rollout
-      name: kassa-integration
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: outbox-data
-          emptyDir: {}
-  - target:
-      kind: Rollout
-      name: fossbilling-app
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: foss-html
-          emptyDir: {}
-      - op: replace
-        path: /spec/template/spec/volumes/1
-        value:
-          name: foss-data
-          emptyDir: {}
-      - op: replace
-        path: /spec/template/spec/volumes/2
-        value:
-          name: foss-uploads
-          emptyDir: {}
-  - target:
-      kind: Deployment
-      name: facturatie-db
     patch: |-
       - op: replace
         path: /spec/template/spec/volumes/0
@@ -363,6 +283,24 @@ patches:
               - name: data
                 mountPath: /var/lib/postgresql/data
   - target:
+      kind: Deployment
+      name: pgadmin
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: pgadmin-data
+          emptyDir: {}
+  - target:
+      kind: Rollout
+      name: kassa-integration
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: outbox-data
+          emptyDir: {}
+  - target:
       kind: Rollout
       name: integration-planning
     patch: |-
@@ -371,3 +309,4 @@ patches:
         value:
           name: token-data
           emptyDir: {}
+
