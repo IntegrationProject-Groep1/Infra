@@ -10,7 +10,7 @@ images:
   digest: sha256:aecea6f505d1244d1eea4d0f4924065316ead460c9e8b1991a33a3f08681d3cf
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:7469ca91140fedae206d3e7b8bb3fa7af30098cef06c5e18ec8c6ba98d9f5f60
+  digest: sha256:88bde8c9d91e55d5f3860412502cfc72a0ba037ec98cc964d22b0b2e7fcc16d9
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
   digest: sha256:0c295906f30203d674b560a2fdb4152971795812a5f34a858b618f6ff5779094
