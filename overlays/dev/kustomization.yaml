@@ -66,6 +66,127 @@ patches:
         path: /spec/storageClassName
         value: "dev-no-provision"
 
+  # ── Scale non-essential services to zero ─────────────────────────────────
+  - target:
+      kind: Rollout
+      name: frontend-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: kassa-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: facturatie-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: crm-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: planning-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: identity-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: monitoring-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: chatbot-heartbeat
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: frontend-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: kassa-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: facturatie-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: crm-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: monitoring-mcp
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: mailing-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Rollout
+      name: monitoring-agent
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Deployment
+      name: pgadmin
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+  - target:
+      kind: Deployment
+      name: planning-pgadmin
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+
   # ── Scale monitoring to zero (no ELK stack in dev) ──────────────────────
   - target:
       kind: StatefulSet

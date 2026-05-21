@@ -3,14 +3,14 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Starts the dev environment by unsuspending the ArgoCD Application.
-#   ArgoCD then syncs the latest :dev images automatically.
+#   Starts the dev environment by applying the overlay directly and starting
+#   services in phases to avoid CPU spikes on the single-node VM.
+#   ArgoCD does NOT manage the dev namespace — we apply manually.
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
 #   - Automatically when ArgoCD Image Updater detects a new :dev image
-#     (Image Updater commits to Feature-dev-environment branch →
-#      triggers this workflow → ArgoCD unsuspended → pods start)
+#     and updates overlays/dev/kustomization.yaml on main
 # =============================================================================
 
 name: Dev Environment — ON
@@ -29,7 +29,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Ensure shift-secrets exists in dev namespace
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy overlay to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          source: "overlays/dev/*"
+          target: "/home/ehbstudent/shiftfestival/overlays/dev"
+          strip_components: 2
+
+      - name: Ensure namespace and secrets exist
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -38,24 +52,23 @@ jobs:
           port: 60022
           script: |
             set -euo pipefail
+            cd /home/ehbstudent/shiftfestival
 
             kubectl create namespace shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
 
             if ! kubectl get secret shift-secrets -n shift-festival-dev &>/dev/null; then
-              echo "Creating shift-secrets in shift-festival-dev from .env.dev..."
-              if [[ -f ~/shiftfestival/setup/.env.dev ]]; then
+              if [[ -f setup/.env.dev ]]; then
                 kubectl create secret generic shift-secrets \
-                  --from-env-file=~/shiftfestival/setup/.env.dev \
+                  --from-env-file=setup/.env.dev \
                   -n shift-festival-dev
               else
-                echo "WARNING: .env.dev not found, copying from prod .env"
                 kubectl create secret generic shift-secrets \
-                  --from-env-file=~/shiftfestival/setup/.env \
+                  --from-env-file=setup/.env \
                   -n shift-festival-dev
               fi
             fi
 
-      - name: Unsuspend ArgoCD Application
+      - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -64,15 +77,55 @@ jobs:
           port: 60022
           script: |
             set -euo pipefail
+            cd /home/ehbstudent/shiftfestival
 
-            echo "Unsuspending ArgoCD app..."
-            kubectl patch application shift-festival-dev -n argocd \
-              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+            kubectl apply -k overlays/dev --prune=false 2>/dev/null || true
 
-            echo "Triggering ArgoCD sync..."
-            kubectl annotate application shift-festival-dev -n argocd \
-              argocd.argoproj.io/refresh=normal --overwrite
+            kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
+            kubectl scale statefulset --all -n shift-festival-dev --replicas=0 2>/dev/null || true
+
+      - name: Phase 1 — Core (RabbitMQ + databases)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+            echo "Phase 1 — Starting RabbitMQ and databases..."
+
+            kubectl scale deployment rabbitmq-broker -n shift-festival-dev --replicas=1
+            sleep 30
+            kubectl scale deployment postgredb frontend-db kassa-db facturatie-db crm-db planning-db -n shift-festival-dev --replicas=1
+
+            echo "Waiting for RabbitMQ..."
+            kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=3m
+            echo "✅ Phase 1 done"
+
+      - name: Phase 2 — Applications
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+            echo "Phase 2 — Starting applications..."
+
+            kubectl scale deployment cloudflared -n shift-festival-dev --replicas=1
+
+            for rollout in frontend-drupal kassa-web fossbilling-app identity-service integration-crm integration-planning kassa-integration chatbot; do
+              kubectl patch rollout $rollout -n shift-festival-dev \
+                --type=merge -p '{"spec":{"replicas":1}}' 2>/dev/null || true
+              sleep 5
+            done
+
+            kubectl scale deployment frontend-proxy kassa-proxy facturatie-proxy -n shift-festival-dev --replicas=1
 
             echo ""
-            echo "✅ Dev environment is starting — ArgoCD syncing latest :dev images"
-            echo "Check status at: https://argocd.desiderius.me"
+            echo "✅ Dev environment is UP"
+            echo "Frontend: https://dev.desiderius.me"
+            echo "Kassa:    https://dev-kassa.desiderius.me"
+            echo "Facturatie: https://dev-facturatie.desiderius.me"
