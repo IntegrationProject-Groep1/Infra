@@ -44,7 +44,7 @@ De VM draait prod en dev op dezelfde node. ArgoCD auto-sync start alle pods tege
 | Kassa integration | ✅ |
 | Chatbot | ✅ |
 | Cloudflared | ✅ |
-| Heartbeats | ❌ (ImagePullBackOff — `:dev` images ontbreken) |
+| Heartbeats | ❌ (Gedeactiveerd — replicas: 0) |
 | MCP services | ❌ (niet nodig voor integration testing) |
 | ELK stack | ❌ (te zwaar) |
 | pgAdmin | ❌ |
