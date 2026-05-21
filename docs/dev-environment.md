@@ -8,8 +8,15 @@
 | Storage | `emptyDir` — geen persistentie, data weg bij pod restart |
 | Logging | Elastic Agent → prod Elasticsearch → Kibana filter op `kubernetes.namespace: shift-festival-dev`, retention 1 dag via ILM policy |
 | RabbitMQ | Aparte vhost `shift-festival-dev` |
-| Scaling | Automatisch via ArgoCD Image Updater + GitHub Actions auto-shutdown |
+| Scaling | Manueel via GitHub Actions + auto-shutdown na 4u |
 | Images | `:dev` tags via ArgoCD Image Updater |
+| Beheer | Manueel `kubectl apply -k` — geen ArgoCD auto-sync voor dev |
+
+---
+
+## Waarom geen ArgoCD auto-sync
+
+De VM draait prod en dev op dezelfde node. ArgoCD auto-sync start alle pods tegelijk op, wat CPU pieken veroorzaakt die prod beïnvloeden. Daarom wordt dev manueel beheerd via GitHub Actions workflows met gefaseerde startup.
 
 ---
 
@@ -17,26 +24,41 @@
 
 | Trigger | Actie |
 |---|---|
-| Push naar `dev` branch (eender welk team) | `:dev` image gebouwd → Image Updater update `overlays/dev/kustomization.yaml` op `dev` branch → `dev-on` triggert automatisch → ArgoCD synct → pods up |
-| 4u geen activiteit op `dev` branch | GitHub Actions cron → automatisch `dev-off` → ArgoCD suspended → pods down |
+| Push naar `dev` branch (eender welk team) | `:dev` image gebouwd → Image Updater update `overlays/dev/kustomization.yaml` op `main` → `dev-on` triggert automatisch → gefaseerde startup |
+| 4u geen activiteit op `overlays/dev/kustomization.yaml` | GitHub Actions cron → automatisch `dev-off` |
 | Manueel via GitHub Actions UI | `dev-on` of `dev-off` workflow dispatch |
 
-**Waarom volledig automatisch:**
-- Geen manuele actie nodig van andere teams
-- Alles traceerbaar in GitHub Actions logs
-- 4u inactiviteit timer is gedeeld — zolang één team pusht blijft de env actief
-- Data is sowieso weg bij elke restart (`emptyDir`)
+---
+
+## Actieve services in dev
+
+| Service | Draait in dev |
+|---|---|
+| RabbitMQ | ✅ |
+| Databases (alle) | ✅ |
+| Frontend (Drupal + proxy) | ✅ |
+| Kassa (Odoo + proxy) | ✅ |
+| Facturatie (FOSSBilling + proxy) | ✅ |
+| Identity service | ✅ |
+| CRM + Planning workers | ✅ |
+| Kassa integration | ✅ |
+| Chatbot | ✅ |
+| Cloudflared | ✅ |
+| Heartbeats | ❌ (ImagePullBackOff — `:dev` images ontbreken) |
+| MCP services | ❌ (niet nodig voor integration testing) |
+| ELK stack | ❌ (te zwaar) |
+| pgAdmin | ❌ |
+| Monitoring agent | ❌ |
 
 ---
 
 ## Manifests t.o.v. prod
 
 - `emptyDir` in plaats van PVCs (PVCs aangemaakt maar niet geprovisioneerd via `dev-no-provision` storageClass)
+- `fsGroup: 999` voor PostgreSQL databases
 - Dev subdomains in Ingress (`dev-*.desiderius.me`)
 - Namespace: `shift-festival-dev`
-- Geen ELK pods (replicas: 0)
-- `:dev` images via ArgoCD Image Updater
-- ArgoCD leest van `dev` branch, Image Updater schrijft naar `dev` branch
+- 20 van de 47 workloads op `replicas: 0`
 
 ---
 
@@ -54,10 +76,10 @@
 
 ## Resource impact
 
-| State | RAM | CPU |
+| State | RAM | CPU (stabiel) |
 |---|---|---|
-| Dev DOWN | ~55% | ~6% |
-| Dev UP | ~62% | ~9% |
+| Dev DOWN | ~55% | ~44% |
+| Dev UP | ~65% | ~50-55% |
 
 ---
 
@@ -68,8 +90,9 @@
 - [x] ArgoCD Application aanmaken (`argocd/applications/dev-app.yaml`)
 - [x] Dev subdomains in Ingress patches
 - [x] DNS records aanmaken via Cloudflare (`dev-*.desiderius.me`)
-- [x] GitHub Actions `dev-on.yml` workflow
+- [x] GitHub Actions `dev-on.yml` workflow (gefaseerde startup)
 - [x] GitHub Actions `dev-off.yml` workflow (4u inactiviteit cron)
+- [x] fsGroup patches voor PostgreSQL databases
 
 ### Monitoring
 - [ ] Kibana Data View voor `shift-festival-dev`
@@ -80,8 +103,8 @@
 
 ## Testen
 
-- [ ] Push naar `dev` branch → Image Updater update → `dev-on` triggert → pods up in K8s Dashboard
+- [ ] `dev-on` workflow → pods up gefaseerd
 - [ ] `dev.desiderius.me` → frontend laadt
-- [ ] Test user registreren → RabbitMQ dev vhost check
-- [ ] Kibana → filter op `shift-festival-dev` → logs zichtbaar
+- [ ] `dev-kassa.desiderius.me` → kassa laadt
+- [ ] RabbitMQ dev vhost check
 - [ ] 4u inactiviteit → auto-shutdown check
