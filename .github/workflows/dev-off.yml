@@ -1,0 +1,90 @@
+# =============================================================================
+# dev-off.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Stops the dev environment by suspending the ArgoCD Application when
+#   no activity has been detected on the Feature-dev-environment branch
+#   for 4 hours. The timer is shared across all teams — as long as any
+#   team pushes, the dev env stays up.
+#
+# TRIGGERS:
+#   - Manual (workflow_dispatch)
+#   - Every hour (schedule) — checks 4h inactivity on dev branch
+# =============================================================================
+
+name: Dev Environment — OFF
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 * * * *'
+
+jobs:
+  dev-off:
+    name: Stop shift-festival-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check inactivity (skip if manual or push to main)
+        if: github.event_name == 'schedule'
+        id: inactivity
+        run: |
+          # Get last commit timestamp on dev branch
+          LAST_PUSH=$(git log origin/dev -1 --format="%ct" 2>/dev/null || echo "0")
+
+          if [[ "$LAST_PUSH" == "0" ]]; then
+            echo "No commits found on dev branch — skipping"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          NOW=$(date +%s)
+          DIFF=$(( (NOW - LAST_PUSH) / 3600 ))
+          echo "Hours since last push: $DIFF"
+
+          if [[ $DIFF -lt 4 ]]; then
+            echo "Last push was $DIFF hour(s) ago — dev env stays up"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "Last push was $DIFF hour(s) ago — shutting down"
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Suspend ArgoCD Application
+        if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            if ! kubectl get application shift-festival-dev -n argocd &>/dev/null; then
+              echo "ArgoCD app shift-festival-dev does not exist — nothing to do"
+              exit 0
+            fi
+
+            echo "Suspending ArgoCD app..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+
+            echo "Scaling down all workloads..."
+            kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
+            kubectl scale statefulset --all -n shift-festival-dev --replicas=0 2>/dev/null || true
+
+            for rollout in $(kubectl get rollout -n shift-festival-dev \
+              -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+              kubectl patch rollout "$rollout" -n shift-festival-dev \
+                --type=merge -p '{"spec":{"replicas":0}}' 2>/dev/null || true
+            done
+
+            echo ""
+            echo "✅ Dev environment is DOWN — ArgoCD app suspended"

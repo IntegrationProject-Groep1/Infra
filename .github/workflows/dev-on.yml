@@ -1,0 +1,78 @@
+# =============================================================================
+# dev-on.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Starts the dev environment by unsuspending the ArgoCD Application.
+#   ArgoCD then syncs the latest :dev images automatically.
+#
+# TRIGGERS:
+#   - Manual (workflow_dispatch)
+#   - Automatically when ArgoCD Image Updater detects a new :dev image
+#     (Image Updater commits to Feature-dev-environment branch →
+#      triggers this workflow → ArgoCD unsuspended → pods start)
+# =============================================================================
+
+name: Dev Environment — ON
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'overlays/dev/kustomization.yaml'
+
+jobs:
+  dev-on:
+    name: Start shift-festival-dev
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ensure shift-secrets exists in dev namespace
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            kubectl create namespace shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
+
+            if ! kubectl get secret shift-secrets -n shift-festival-dev &>/dev/null; then
+              echo "Creating shift-secrets in shift-festival-dev from .env.dev..."
+              if [[ -f ~/shiftfestival/setup/.env.dev ]]; then
+                kubectl create secret generic shift-secrets \
+                  --from-env-file=~/shiftfestival/setup/.env.dev \
+                  -n shift-festival-dev
+              else
+                echo "WARNING: .env.dev not found, copying from prod .env"
+                kubectl create secret generic shift-secrets \
+                  --from-env-file=~/shiftfestival/setup/.env \
+                  -n shift-festival-dev
+              fi
+            fi
+
+      - name: Unsuspend ArgoCD Application
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            echo "Unsuspending ArgoCD app..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}'
+
+            echo "Triggering ArgoCD sync..."
+            kubectl annotate application shift-festival-dev -n argocd \
+              argocd.argoproj.io/refresh=normal --overwrite
+
+            echo ""
+            echo "✅ Dev environment is starting — ArgoCD syncing latest :dev images"
+            echo "Check status at: https://argocd.desiderius.me"
