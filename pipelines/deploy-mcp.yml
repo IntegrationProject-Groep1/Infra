@@ -1,15 +1,15 @@
-name: Deploy Pipeline
+name: Deploy MCP Pipeline
 
 on:
   workflow_run:
-    workflows: ["CI Pipeline"]
+    workflows: ["Deploy Pipeline"]
     types:
       - completed
   workflow_dispatch:
 
 jobs:
   build-and-push:
-    name: Build and Push Docker Image
+    name: Build and Push MCP Docker Image
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
@@ -63,23 +63,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image (dev)
+      - name: Build and push MCP image (dev)
         if: steps.vars.outputs.tag == 'latest-dev'
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./integratie
           push: true
           tags: |
-            ghcr.io/${{ steps.repo_name.outputs.value }}:latest-dev
-            ghcr.io/${{ steps.repo_name.outputs.value }}:${{ github.event.workflow_run.head_sha || github.sha }}
+            ghcr.io/${{ steps.repo_name.outputs.value }}-mcp:latest-dev
+            ghcr.io/${{ steps.repo_name.outputs.value }}-mcp:${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Build and push Docker image (prod release)
+      - name: Build and push MCP image (prod release)
         if: steps.vars.outputs.tag == 'latest'
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: ./integratie
           push: true
           tags: |
-            ghcr.io/${{ steps.repo_name.outputs.value }}:latest
-            ghcr.io/${{ steps.repo_name.outputs.value }}:${{ steps.vars.outputs.extra_tag }}
-            ghcr.io/${{ steps.repo_name.outputs.value }}:${{ github.event.workflow_run.head_sha || github.sha }}
+            ghcr.io/${{ steps.repo_name.outputs.value }}-mcp:latest
+            ghcr.io/${{ steps.repo_name.outputs.value }}-mcp:${{ steps.vars.outputs.extra_tag }}
+            ghcr.io/${{ steps.repo_name.outputs.value }}-mcp:${{ github.event.workflow_run.head_sha || github.sha }}
