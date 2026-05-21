@@ -113,7 +113,7 @@ spec:
         resources:
           requests:
             memory: "256Mi"
-            cpu: "50m"
+            cpu: "200m"
         volumeMounts:
         - name: odoo-data
           mountPath: /var/lib/odoo
