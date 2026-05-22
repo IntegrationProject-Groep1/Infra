@@ -65,6 +65,7 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+        command: ["/entrypoint.sh"]
         args:
         - "--db_user=$(ODOO_DB_USER)"
         - "--db_password=$(ODOO_DB_PASSWORD)"
