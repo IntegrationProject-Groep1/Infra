@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-session-management-services
+data:
+  session_management.services.yml: |
+    services:
+      session_management.session_service:
+        class: Drupal\session_management\SessionService
+        arguments:
+          - '@rabbitmq_sender.session_create_request_sender'
+          - '@rabbitmq_sender.session_update_request_sender'
+          - '@rabbitmq_sender.session_delete_request_sender'
+          - '@rabbitmq_sender.session_view_request_sender'
