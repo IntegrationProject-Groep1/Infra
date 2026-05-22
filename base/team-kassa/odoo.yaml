@@ -59,6 +59,7 @@ spec:
       containers:
       - name: odoo
         image: ghcr.io/integrationproject-groep1/kassa:odoo-latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
