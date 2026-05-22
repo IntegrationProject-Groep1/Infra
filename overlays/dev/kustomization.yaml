@@ -215,6 +215,23 @@ patches:
         value:
           non-existing-node: "true"
 
+  # ── FOSSBilling — html files fresh from image, config/uploads persistent ─
+  - target:
+      kind: Rollout
+      name: fossbilling-app
+    patch: |-
+      apiVersion: argoproj.io/v1alpha1
+      kind: Rollout
+      metadata:
+        name: fossbilling-app
+      spec:
+        template:
+          spec:
+            volumes:
+            - name: foss-html
+              $patch: replace
+              emptyDir: {}
+
   # ── Ephemeral volumes — test data, no persistence needed ────────────────
   - target:
       kind: Deployment
