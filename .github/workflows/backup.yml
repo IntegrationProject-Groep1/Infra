@@ -1,0 +1,81 @@
+# =============================================================================
+# backup.yml
+# ShiftFestival - Infra Team
+#
+# PURPOSE:
+#   Runs the daily database backup on the primary VM and updates the Git mirror
+#   on the backup VM. Triggered automatically every night at 02:00 UTC and can
+#   be triggered manually via workflow_dispatch.
+#
+# REQUIRED GITHUB SECRETS:
+#   VM_HOST           - Primary VM hostname (same as deploy.yml)
+#   VM_USER           - Primary VM SSH user (same as deploy.yml)
+#   SSH_PRIVATE_KEY   - Primary VM SSH private key (same as deploy.yml)
+#   BACKUP_VM_HOST    - Backup VM hostname or IP
+#   BACKUP_VM_USER    - Backup VM SSH user
+#   BACKUP_SSH_KEY    - SSH private key that has access to the backup VM
+#                       (contents of ~/.ssh/backup_key on the primary VM)
+# =============================================================================
+
+name: Backup Databases & Sync Git Mirror
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # Every day at 02:00 UTC
+  workflow_dispatch:        # Manual trigger from GitHub Actions UI
+
+jobs:
+  backup-databases:
+    name: Dump databases → backup VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run backup script on primary VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          envs: BACKUP_VM_HOST,BACKUP_VM_USER
+          script: |
+            set -euo pipefail
+
+            export BACKUP_VM_HOST="${{ secrets.BACKUP_VM_HOST }}"
+            export BACKUP_VM_USER="${{ secrets.BACKUP_VM_USER }}"
+            export BACKUP_VM_KEY="$HOME/.ssh/backup_key"
+            export KEEP_DAYS=14
+
+            # The backup script lives in the repo copy that deploy.yml syncs here
+            SCRIPT="$HOME/shiftfestival/scripts/backup-databases.sh"
+
+            if [[ ! -f "$SCRIPT" ]]; then
+              echo "backup-databases.sh not found at $SCRIPT — has deploy.yml run yet?"
+              exit 1
+            fi
+
+            bash "$SCRIPT"
+
+  sync-git-mirror:
+    name: Update Git mirror on backup VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch latest commits into mirror
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.BACKUP_VM_HOST }}
+          username: ${{ secrets.BACKUP_VM_USER }}
+          key: ${{ secrets.BACKUP_SSH_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+            MIRROR="$HOME/git-mirrors/infra.git"
+
+            if [[ ! -d "$MIRROR" ]]; then
+              echo "Git mirror not found at $MIRROR — run initial setup first."
+              echo "See docs/disaster-recovery.md Step 1.3"
+              exit 1
+            fi
+
+            cd "$MIRROR"
+            git fetch --all --prune
+            echo "Mirror updated: $(git log --oneline -1 FETCH_HEAD 2>/dev/null || echo 'no commits fetched')"

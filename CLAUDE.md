@@ -188,8 +188,9 @@ All 6 databases (3× PostgreSQL, 2× MariaDB, 1× MySQL) are backed up daily to 
 
 **When `.env` changes:** re-encrypt and transfer to backup VM:
 ```bash
-gpg --symmetric --cipher-algo AES256 --output /tmp/shift-festival.env.gpg base/setup/.env
-scp /tmp/shift-festival.env.gpg <backup-vm-user>@<backup-vm-ip>:~/secrets/
+gpg --symmetric --cipher-algo AES256 --output /tmp/env.gpg base/setup/.env
+scp -i ~/.ssh/backup_key /tmp/env.gpg groep1@integration.switzerlandnorth.cloudapp.azure.com:~/secrets/shift-festival.env.gpg
+rm /tmp/env.gpg
 ```
 
 **Estimated RTO (Recovery Time Objective):** 30–60 minutes for a full VM loss.
