@@ -35,7 +35,7 @@ spec:
             (sleep 15
             && timeout 90 /opt/drupal/vendor/bin/drush --root=/var/www/html en
             rabbitmq_sender rabbitmq_receiver registration_form session_enrollment
-            session_management company_invite qr_code jsonapi --yes
+            session_management company_invite qr_code jsonapi basic_auth --yes
             && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html updb --yes
             && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html cr
             || true) & exec apache2-foreground
