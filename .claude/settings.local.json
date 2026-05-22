@@ -9,7 +9,9 @@
       "Bash(Select-Object Name)",
       "Bash(gh api *)",
       "Bash(gh run *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }
