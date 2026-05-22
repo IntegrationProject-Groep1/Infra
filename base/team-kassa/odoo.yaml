@@ -113,15 +113,9 @@ spec:
         - name: ODOO_DB_PORT
           value: "5432"
         - name: RABBIT_HOST
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_HOST
+          value: "rabbitmq-service"
         - name: RABBIT_PORT
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_PORT
+          value: "5672"
         - name: RABBIT_USER
           valueFrom:
             secretKeyRef:
@@ -133,15 +127,9 @@ spec:
               name: shift-secrets
               key: RABBITMQKASSA_PASS
         - name: RABBIT_VHOST
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_VHOST
+          value: "/"
         - name: RABBIT_EXCHANGE
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBIT_EXCHANGE
+          value: "kassa.exchange"
         resources:
           requests:
             memory: "256Mi"
