@@ -187,6 +187,11 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 0
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: es-data
+          emptyDir: {}
   - target:
       kind: Deployment
       name: kibana
