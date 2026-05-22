@@ -68,6 +68,12 @@ jobs:
               fi
             fi
 
+            if ! kubectl get secret rabbitmq-definitions -n shift-festival-dev &>/dev/null; then
+              kubectl get secret rabbitmq-definitions -n shift-festival -o json \
+                | jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.annotations) | .metadata.namespace="shift-festival-dev"' \
+                | kubectl apply -f -
+            fi
+
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
         with:

@@ -5,12 +5,13 @@
 | Component | Details |
 |---|---|
 | Namespace | `shift-festival-dev` |
-| Storage | `emptyDir` — geen persistentie, data weg bij pod restart |
-| Logging | Elastic Agent → prod Elasticsearch → Kibana filter op `kubernetes.namespace: shift-festival-dev`, retention 1 dag via ILM policy |
+| Storage | Selectief — PVC voor app installs (Drupal, FOSSBilling + hun databases), emptyDir voor test data (overige databases, RabbitMQ) |
+| Logging | Prod Elasticsearch → Kibana filter op `kubernetes.namespace: shift-festival-dev` |
 | RabbitMQ | Aparte vhost `shift-festival-dev` |
 | Scaling | Manueel via GitHub Actions + auto-shutdown na 4u |
 | Images | `:dev` tags via ArgoCD Image Updater |
 | Beheer | Manueel `kubectl apply -k` — geen ArgoCD auto-sync voor dev |
+| Monitoring | ArgoCD UI (`argocd.desiderius.me`) — read-only pod status, Kibana voor logs |
 
 ---
 
@@ -54,8 +55,10 @@ De VM draait prod en dev op dezelfde node. ArgoCD auto-sync start alle pods tege
 
 ## Manifests t.o.v. prod
 
-- `emptyDir` in plaats van PVCs (PVCs aangemaakt maar niet geprovisioneerd via `dev-no-provision` storageClass)
-- `fsGroup: 999` voor PostgreSQL databases
+- **PVC** voor `frontend-db`, `facturatie-db`, `frontend-drupal`, `fossbilling-app` — installatie en config blijft bewaard
+- **emptyDir** voor `postgredb`, `kassa-db`, `crm-db`, `planning-db`, RabbitMQ, pgAdmin — test data weg bij pod restart
+- `postgredb` en `planning-db` hebben een initContainer (busybox chown) voor emptyDir permissies
+- `rabbitmq-definitions` secret wordt automatisch gekopieerd van `shift-festival` bij `dev-on`
 - Dev subdomains in Ingress (`dev-*.desiderius.me`)
 - Namespace: `shift-festival-dev`
 - 20 van de 47 workloads op `replicas: 0`
@@ -92,7 +95,8 @@ De VM draait prod en dev op dezelfde node. ArgoCD auto-sync start alle pods tege
 - [x] DNS records aanmaken via Cloudflare (`dev-*.desiderius.me`)
 - [x] GitHub Actions `dev-on.yml` workflow (gefaseerde startup)
 - [x] GitHub Actions `dev-off.yml` workflow (4u inactiviteit cron)
-- [x] fsGroup patches voor PostgreSQL databases
+- [x] Selectieve PVC/emptyDir storage configuratie
+- [x] `rabbitmq-definitions` secret bootstrap in `dev-on` workflow
 
 ### Monitoring
 - [ ] Kibana Data View voor `shift-festival-dev`
@@ -103,8 +107,8 @@ De VM draait prod en dev op dezelfde node. ArgoCD auto-sync start alle pods tege
 
 ## Testen
 
-- [ ] `dev-on` workflow → pods up gefaseerd
-- [ ] `dev.desiderius.me` → frontend laadt
+- [x] `dev-on` workflow → pods up gefaseerd
+- [x] `dev.desiderius.me` → frontend laadt
 - [ ] `dev-kassa.desiderius.me` → kassa laadt
 - [ ] RabbitMQ dev vhost check
 - [ ] 4u inactiviteit → auto-shutdown check
