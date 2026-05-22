@@ -151,6 +151,9 @@ spec:
         - name: rabbitmq-sender-services
           mountPath: /var/www/html/modules/custom/rabbitmq_sender/rabbitmq_sender.services.yml
           subPath: rabbitmq_sender.services.yml
+        - name: session-management-services
+          mountPath: /opt/drupal/web/modules/custom/session_management/session_management.services.yml
+          subPath: session_management.services.yml
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
@@ -169,6 +172,9 @@ spec:
       - name: rabbitmq-sender-services
         configMap:
           name: frontend-rabbitmq-sender-services
+      - name: session-management-services
+        configMap:
+          name: frontend-session-management-services
       - name: apache-run
         emptyDir: {}
       - name: apache-log

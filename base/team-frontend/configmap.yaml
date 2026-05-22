@@ -6,9 +6,10 @@ data:
   session_management.services.yml: |
     services:
       session_management.session_service:
-        class: Drupal\session_management\SessionService
+        class: Drupal\session_management\Service\SessionService
         arguments:
+          - '@logger.factory'
+          - '@uuid'
           - '@rabbitmq_sender.session_create_request_sender'
           - '@rabbitmq_sender.session_update_request_sender'
           - '@rabbitmq_sender.session_delete_request_sender'
-          - '@rabbitmq_sender.session_view_request_sender'
