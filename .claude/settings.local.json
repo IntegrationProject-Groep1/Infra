@@ -6,7 +6,10 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sinkh\\\\source\\\\repos\\\\integrationProject\\\\Infra\\\\base\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(gh api *)",
+      "Bash(gh run *)",
+      "Bash(git push *)"
     ]
   }
 }
