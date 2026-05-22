@@ -74,6 +74,19 @@ jobs:
                 | kubectl apply -f -
             fi
 
+            if ! kubectl get secret cloudflare-tunnel-secret -n shift-festival-dev &>/dev/null; then
+              kubectl get secret cloudflare-tunnel-secret -n shift-festival -o json \
+                | jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.annotations) | .metadata.namespace="shift-festival-dev"' \
+                | kubectl apply -f -
+            fi
+
+            kubectl patch secret shift-secrets -n shift-festival-dev \
+              --type=json \
+              -p='[
+                {"op":"replace","path":"/data/RABBITMQ_VHOST","value":"'"$(echo -n 'shift-festival-dev' | base64)"'"},
+                {"op":"replace","path":"/data/RABBIT_VHOST","value":"'"$(echo -n 'shift-festival-dev' | base64)"'"}
+              ]' 2>/dev/null || true
+
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -107,6 +120,13 @@ jobs:
 
             echo "Waiting for RabbitMQ..."
             kubectl rollout status deployment/rabbitmq-broker -n shift-festival-dev --timeout=5m
+
+            echo "Creating dev vhost in RabbitMQ..."
+            RABBITMQ_POD=$(kubectl get pod -n shift-festival-dev -l app=rabbitmq -o jsonpath='{.items[0].metadata.name}')
+            kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl add_vhost shift-festival-dev 2>/dev/null || true
+            for user in crm_rabbitmq facturatie_rabbitmq frontend_rabbitmq guest identity_user infra_admin kassa_rabbitmq monitoring_rabbitmq planning_rabbitmq; do
+              kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl set_permissions -p shift-festival-dev "$user" ".*" ".*" ".*" 2>/dev/null || true
+            done
             echo "✅ Phase 1 done"
 
       - name: Phase 2 — Applications

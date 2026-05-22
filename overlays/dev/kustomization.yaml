@@ -215,6 +215,17 @@ patches:
         value:
           non-existing-node: "true"
 
+  # ── FOSSBilling — html files fresh from image, config/uploads persistent ─
+  - target:
+      kind: Rollout
+      name: fossbilling-app
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: foss-html
+          emptyDir: {}
+
   # ── Ephemeral volumes — test data, no persistence needed ────────────────
   - target:
       kind: Deployment
