@@ -3,12 +3,11 @@ kind: Rollout
 metadata:
   name: kassa-web
 spec:
-  replicas: 1
   strategy:
     canary:
       steps:
       - setWeight: 100
-      - pause: {duration: 3m}
+      - pause: {duration: 1m}
   revisionHistoryLimit: 3
   selector:
     matchLabels:
@@ -46,7 +45,7 @@ spec:
         image: alpine/git
         command: ["sh", "-c"]
         args:
-        - 'git clone --depth=1 --filter=blob:none --sparse https://github.com/IntegrationProject-Groep1/Kassa.git /tmp/repo &&
+        - 'git clone --depth=1 --branch main --filter=blob:none --sparse https://github.com/IntegrationProject-Groep1/Kassa.git /tmp/repo &&
            cd /tmp/repo &&
            git sparse-checkout set addons/kassa_pos_custom &&
            cp -r addons/kassa_pos_custom /mnt/extra-addons/'
@@ -57,36 +56,17 @@ spec:
         volumeMounts:
         - name: extra-addons
           mountPath: /mnt/extra-addons
-      - name: clear-asset-cache
-        image: postgres:15-alpine
-        command: ["sh", "-c"]
-        args:
-        - 'psql -h kassa-db-service -p 5432 -U "$PGUSER" -d odoo_kassa -c "DELETE FROM ir_attachment WHERE name LIKE ''/web/assets/%'' AND store_fname IS NOT NULL;" || true'
-        env:
-        - name: PGUSER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_USER
-        - name: PGPASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: POSTGRES_PASSWORD
-        securityContext:
-          runAsNonRoot: true
-          runAsUser: 999
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
       containers:
       - name: odoo
-        image: odoo:17
+        image: ghcr.io/integrationproject-groep1/kassa-odoo:odoo-latest
+        imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+        command: ["/entrypoint.sh"]
         args:
         - "--db_user=$(ODOO_DB_USER)"
         - "--db_password=$(ODOO_DB_PASSWORD)"
@@ -95,7 +75,6 @@ spec:
         - "--db-filter=^odoo_kassa$"
         - "--proxy-mode"
         - "--log-handler=werkzeug:WARNING"
-        - "--update=kassa_pos_custom"
         ports:
         - containerPort: 8069
           protocol: TCP
@@ -133,10 +112,28 @@ spec:
           value: "kassa-db-service"
         - name: ODOO_DB_PORT
           value: "5432"
+        - name: RABBIT_HOST
+          value: "rabbitmq-service"
+        - name: RABBIT_PORT
+          value: "5672"
+        - name: RABBIT_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_USER
+        - name: RABBIT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_PASS
+        - name: RABBIT_VHOST
+          value: "/"
+        - name: RABBIT_EXCHANGE
+          value: "kassa.exchange"
         resources:
           requests:
             memory: "256Mi"
-            cpu: "50m"
+            cpu: "200m"
         volumeMounts:
         - name: odoo-data
           mountPath: /var/lib/odoo
@@ -149,13 +146,16 @@ spec:
           mountPath: /mnt/extra-addons
           readOnly: true
         readinessProbe:
-          tcpSocket:
+          httpGet:
+            path: /web/health
             port: 8069
-          initialDelaySeconds: 10
-          periodSeconds: 5
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          failureThreshold: 3
       volumes:
       - name: odoo-data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: kassa-odoo-data-pvc
       - name: tmp
         emptyDir: {}
       - name: odoo-conf

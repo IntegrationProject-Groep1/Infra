@@ -23,9 +23,9 @@ spec:
         runAsUser: 1000
       containers:
       - name: facturatie-mcp
-        image: ghcr.io/integrationproject-groep1/facturatie:latest
+        image: ghcr.io/integrationproject-groep1/facturatie-mcp:latest
         imagePullPolicy: Always
-        command: ["python", "src/services/mcp_server.py"]
+        command: ["python", "mcp_server.py"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

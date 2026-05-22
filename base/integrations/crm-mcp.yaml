@@ -23,9 +23,9 @@ spec:
         runAsUser: 1000
       containers:
       - name: crm-mcp
-        image: ghcr.io/integrationproject-groep1/crm:latest
+        image: ghcr.io/integrationproject-groep1/crm-mcp:latest
         imagePullPolicy: Always
-        command: ["node", "src/mcp_server.js"]
+        command: ["node", "mcp_server.js"]
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

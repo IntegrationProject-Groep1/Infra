@@ -23,7 +23,7 @@ spec:
         runAsUser: 1000
       containers:
       - name: monitoring-mcp
-        image: ghcr.io/integrationproject-groep1/monitoring:latest
+        image: ghcr.io/integrationproject-groep1/monitoring-mcp:latest
         imagePullPolicy: Always
         command: ["python", "mcp_server.py"]
         securityContext:

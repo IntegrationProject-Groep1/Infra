@@ -14,7 +14,13 @@ metadata:
       heartbeat=ghcr.io/integrationproject-groep1/heartbeat:latest,
       mailing=ghcr.io/integrationproject-groep1/mailing:latest,
       chatbot=ghcr.io/integrationproject-groep1/chatbot:latest,
-      monitoring=ghcr.io/integrationproject-groep1/monitoring:latest
+      monitoring=ghcr.io/integrationproject-groep1/monitoring:latest,
+      frontend-mcp=ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp:latest,
+      monitoring-mcp=ghcr.io/integrationproject-groep1/monitoring-mcp:latest,
+      facturatie-mcp=ghcr.io/integrationproject-groep1/facturatie-mcp:latest,
+      crm-mcp=ghcr.io/integrationproject-groep1/crm-mcp:latest,
+      kassa-mcp=ghcr.io/integrationproject-groep1/kassa-mcp:latest,
+      kassa-odoo=ghcr.io/integrationproject-groep1/kassa:odoo-latest
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
@@ -45,6 +51,24 @@ metadata:
     argocd-image-updater.argoproj.io/monitoring.update-strategy: digest
     argocd-image-updater.argoproj.io/monitoring.allow-tags: regexp:^latest$
     argocd-image-updater.argoproj.io/monitoring.kustomize.image-name: ghcr.io/integrationproject-groep1/monitoring
+    argocd-image-updater.argoproj.io/frontend-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/frontend-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/frontend-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
+    argocd-image-updater.argoproj.io/monitoring-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/monitoring-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/monitoring-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/monitoring-mcp
+    argocd-image-updater.argoproj.io/facturatie-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/facturatie-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/facturatie-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/facturatie-mcp
+    argocd-image-updater.argoproj.io/crm-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/crm-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/crm-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/crm-mcp
+    argocd-image-updater.argoproj.io/kassa-mcp.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa-mcp.allow-tags: regexp:^latest$
+    argocd-image-updater.argoproj.io/kassa-mcp.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa-mcp
+    argocd-image-updater.argoproj.io/kassa-odoo.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa-odoo.allow-tags: regexp:^odoo-latest$
+    argocd-image-updater.argoproj.io/kassa-odoo.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa-odoo
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
     argocd-image-updater.argoproj.io/write-back-target: kustomization
     argocd-image-updater.argoproj.io/git-branch: main

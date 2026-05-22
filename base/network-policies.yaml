@@ -172,6 +172,9 @@ spec:
               app: kassa-integration
         - podSelector:
             matchLabels:
+              app: kassa-web
+        - podSelector:
+            matchLabels:
               app: crm
         - podSelector:
             matchLabels:
