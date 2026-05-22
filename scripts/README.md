@@ -7,6 +7,8 @@ This directory contains utility and automation scripts used for managing the Shi
 | Script | Purpose |
 |---|---|
 | `create-secret.sh` | Bootstraps the `shift-secrets` Kubernetes Secret from a local `.env` file. |
+| `backup-databases.sh` | Dumps all 6 databases and rsyncs them to the backup VM. Run daily via cron. |
+| `restore-databases.sh` | Restores databases from a backup. Downloads from backup VM or reads a local directory. |
 | `notify-teams.sh` | Sends formatted notifications to Microsoft Teams via webhooks. |
 | `check-image-versions.sh` | Compares running image versions with what is defined in Git. |
 | `migrate_identity_service.py` | Helper script for database migrations (Identity Service). |

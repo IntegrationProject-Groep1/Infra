@@ -178,6 +178,22 @@ When HPA manages a Rollout's replica count, a rollback only restores the previou
 
 Argo Rollouts supports AnalysisTemplates that query Prometheus metrics (e.g. HTTP error rate) to automatically gate or abort the canary window. This would cover Scenario C automatically. Not currently configured — requires a Prometheus instance, which adds memory overhead on the single-VM cluster and is out of scope for now.
 
+## Backup and Disaster Recovery
+
+All 6 databases (3× PostgreSQL, 2× MariaDB, 1× MySQL) are backed up daily to a separate backup VM. The Infra repo is mirrored there as well for GitHub resilience. Full recovery procedure is documented in `docs/disaster-recovery.md`.
+
+**Key scripts:**
+- `scripts/backup-databases.sh` — dumps all databases and rsyncs to the backup VM (cron job, runs 02:00 daily)
+- `scripts/restore-databases.sh` — restores a specific date's backup to the running cluster
+
+**When `.env` changes:** re-encrypt and transfer to backup VM:
+```bash
+gpg --symmetric --cipher-algo AES256 --output /tmp/shift-festival.env.gpg base/setup/.env
+scp /tmp/shift-festival.env.gpg <backup-vm-user>@<backup-vm-ip>:~/secrets/
+```
+
+**Estimated RTO (Recovery Time Objective):** 30–60 minutes for a full VM loss.
+
 ## Key Constraints
 
 - **Prefer Rollouts over Deployments** for mission-critical team services to enable automated health-based rollbacks.
