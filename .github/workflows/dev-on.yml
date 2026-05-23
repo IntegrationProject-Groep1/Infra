@@ -57,15 +57,9 @@ jobs:
             kubectl create namespace shift-festival-dev --dry-run=client -o yaml | kubectl apply -f -
 
             if ! kubectl get secret shift-secrets -n shift-festival-dev &>/dev/null; then
-              if [[ -f setup/.env.dev ]]; then
-                kubectl create secret generic shift-secrets \
-                  --from-env-file=setup/.env.dev \
-                  -n shift-festival-dev
-              else
-                kubectl create secret generic shift-secrets \
-                  --from-env-file=setup/.env \
-                  -n shift-festival-dev
-              fi
+              kubectl get secret shift-secrets -n shift-festival -o json \
+                | jq 'del(.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.annotations) | .metadata.namespace="shift-festival-dev"' \
+                | kubectl apply -f -
             fi
 
             if ! kubectl get secret rabbitmq-definitions -n shift-festival-dev &>/dev/null; then
@@ -80,12 +74,30 @@ jobs:
                 | kubectl apply -f -
             fi
 
+            DEV_VHOST=$(echo -n 'shift-festival-dev' | base64)
+            EMPTY=$(echo -n '' | base64)
             kubectl patch secret shift-secrets -n shift-festival-dev \
               --type=json \
               -p='[
-                {"op":"replace","path":"/data/RABBITMQ_VHOST","value":"'"$(echo -n 'shift-festival-dev' | base64)"'"},
-                {"op":"replace","path":"/data/RABBIT_VHOST","value":"'"$(echo -n 'shift-festival-dev' | base64)"'"}
-              ]' 2>/dev/null || true
+                {"op":"replace","path":"/data/RABBITMQ_VHOST","value":"'"$DEV_VHOST"'"},
+                {"op":"replace","path":"/data/RABBIT_VHOST","value":"'"$DEV_VHOST"'"},
+                {"op":"replace","path":"/data/SENDGRID_API_KEY","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SMTP_USERNAME","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SMTP_PASSWORD","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SF_CLIENT_ID","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SF_CLIENT_SECRET","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SF_INSTANCE_URL","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/SF_REFRESH_TOKEN","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/NVIDIA_API_KEY","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/BILLING_API_TOKEN","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_CRM","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_FACTURATIE","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_FRONTEND","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_INFRA","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_KASSA","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_MONITORING","value":"'"$EMPTY"'"},
+                {"op":"replace","path":"/data/TEAMS_WEBHOOK_PLANNING","value":"'"$EMPTY"'"}
+              ]'
 
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
