@@ -191,9 +191,16 @@ cd ~/Infra
 # Decrypt the .env file (you need the GPG passphrase from your password manager)
 gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
 
-# Create namespace and Kubernetes secret
+# Create namespace and Kubernetes secrets
 kubectl create namespace shift-festival
 bash scripts/create-secret.sh base/setup/.env shift-festival
+
+# IMPORTANT: cloudflare-tunnel-secret is a separate secret not covered by create-secret.sh
+# It is required for cloudflared to start and provide external access.
+TUNNEL_TOKEN=$(grep '^CLOUDFLARE_TUNNEL_TOKEN=' base/setup/.env | cut -d= -f2-)
+kubectl create secret generic cloudflare-tunnel-secret \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" \
+  -n shift-festival
 
 # Install ArgoCD
 kubectl create namespace argocd
@@ -312,11 +319,12 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
 □ Restore Infra repo from ~/git-mirrors/infra.git
 □ Install k3s (curl -sfL https://get.k3s.io | sh -)
 □ Decrypt .env: gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
-□ Apply secrets: bash scripts/create-secret.sh base/setup/.env shift-festival
+□ Apply shift-secrets: bash scripts/create-secret.sh base/setup/.env shift-festival
+□ Apply cloudflare-tunnel-secret (see Step 3.5 — separate secret!)
 □ Install ArgoCD + apply argocd/ manifests
 □ Wait for *-db pods to be Running
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
-□ Update Cloudflare tunnel token if VM IP changed
+□ Verify tunnel: kubectl logs -n shift-festival -l app=cloudflared --tail=20
 □ Verify: kubectl get pods -n shift-festival
 ```

@@ -15,6 +15,7 @@
 #   BACKUP_VM_USER    - Backup VM SSH user
 #   BACKUP_SSH_KEY    - SSH private key that has access to the backup VM
 #                       (contents of ~/.ssh/backup_key on the primary VM)
+#   GPG_PASSPHRASE    - Passphrase used to encrypt the .env backup
 # =============================================================================
 
 name: Backup Databases & Sync Git Mirror
@@ -54,6 +55,40 @@ jobs:
             fi
 
             bash "$SCRIPT"
+
+  sync-env-secrets:
+    name: Sync .env to backup VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-encrypt .env and transfer to backup VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+            ENV_FILE="$HOME/shiftfestival/base/setup/.env"
+
+            if [[ ! -f "$ENV_FILE" ]]; then
+              echo "WARNING: .env not found at $ENV_FILE — skipping secrets backup"
+              exit 0
+            fi
+
+            gpg --batch --yes \
+              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+              --symmetric --cipher-algo AES256 \
+              --output /tmp/env.gpg \
+              "$ENV_FILE"
+
+            scp -i "$HOME/.ssh/backup_key" \
+              -o StrictHostKeyChecking=no \
+              /tmp/env.gpg \
+              "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/shift-festival.env.gpg"
+
+            rm /tmp/env.gpg
+            echo "Secrets synced to backup VM"
 
   sync-git-mirror:
     name: Update Git mirror on backup VM
