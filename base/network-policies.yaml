@@ -193,31 +193,10 @@ spec:
               app: monitoring-agent
         - podSelector:
             matchLabels:
-              app: crm-heartbeat
-        - podSelector:
-            matchLabels:
-              app: facturatie-heartbeat
-        - podSelector:
-            matchLabels:
-              app: frontend-heartbeat
-        - podSelector:
-            matchLabels:
-              app: identity-heartbeat
-        - podSelector:
-            matchLabels:
-              app: kassa-heartbeat
-        - podSelector:
-            matchLabels:
-              app: planning-heartbeat
-        - podSelector:
-            matchLabels:
-              app: monitoring-heartbeat
+              app: heartbeat-monitor
         - podSelector:
             matchLabels:
               app: chatbot
-        - podSelector:
-            matchLabels:
-              app: chatbot-heartbeat
       ports:
         - port: 5672
         - port: 15672
