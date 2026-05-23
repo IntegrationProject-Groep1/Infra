@@ -8,7 +8,7 @@ metadata:
     project: shift-festival
     managed-by: Team-Infra
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     canary:
       steps:
