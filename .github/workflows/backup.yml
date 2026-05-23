@@ -22,7 +22,7 @@ name: Backup Databases & Sync Git Mirror
 
 on:
   schedule:
-    - cron: "0 2 * * *"   # Every day at 02:00 UTC
+    - cron: "0 2,14 * * *"   # Every day at 02:00 and 14:00 UTC
   workflow_dispatch:        # Manual trigger from GitHub Actions UI
 
 jobs:
