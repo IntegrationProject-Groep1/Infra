@@ -37,7 +37,7 @@ images:
   digest: sha256:fcf29b90feb7f05475423ea0f5d0764946e6bbe517be8944509cab6e3015f9ba
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
-  digest: sha256:7732f1e470f43a78adc1267c4fdea97e160d72505a4d10ad33159daf4bf412e0
+  digest: sha256:c9bdecb31931191fe5ae6218ee12b6bfcb2d649519bbe793cef43ebfe656f64c
 patches:
 - target:
     kind: Rollout
