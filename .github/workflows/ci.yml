@@ -20,6 +20,10 @@ on:
     branches: ["main", "dev", "prod", "fix/ci"]
     tags: ["v*"]
     paths-ignore:
+      # ArgoCD Image Updater commits new image digests to kustomization.yaml on
+      # every image update. Excluding this file prevents CI from triggering on
+      # those automated commits — they contain no logic changes and would only
+      # add noise without any useful validation.
       - 'kustomization.yaml'
   pull_request:
     branches: ["main", "dev", "prod", "fix/ci"]
@@ -59,8 +63,9 @@ jobs:
           # Install yamllint
           pip install yamllint --quiet
           
-          # Lint all YAML files, excluding auto-generated ArgoCD files
-          # Using -not -path to exclude unwanted files, and ignoring find permission errors
+          # argocd/install.yaml and .argocd-source-*.yaml are auto-generated
+          # upstream files — linting them produces hundreds of false positives
+          # that have nothing to do with our own configuration quality.
           find . \
             -type f \
             \( -name "*.yml" -o -name "*.yaml" \) \
@@ -71,10 +76,23 @@ jobs:
             yamllint -d "{
               extends: relaxed,
               rules: {
+                # Kubernetes manifests regularly exceed 120 chars in annotation
+                # values and image references. The default of 80 would fire on
+                # virtually every file without improving anything.
                 line-length: {max: 300},
+                # Kubernetes uses bare 'true'/'false' booleans as well as the
+                # YAML 1.1 truthy aliases 'yes'/'no' (e.g. in some Helm-generated
+                # manifests). Disabling avoids false positives on valid YAML.
                 truthy: disable,
+                # Comment style rules are purely cosmetic and inconsistent across
+                # the auto-generated vendor files we include (ArgoCD Image Updater,
+                # metrics-server). Disabling keeps the signal-to-noise ratio high.
                 comments: disable,
                 comments-indentation: disable,
+                # Kubernetes indentation is conventionally 2 spaces, but nested
+                # multiline values and some kubectl output deviate. The relaxed
+                # preset already handles the common cases; this prevents the
+                # remainder from failing the pipeline on style-only issues.
                 indentation: disable,
                 braces: disable,
                 brackets: disable,
@@ -94,6 +112,13 @@ jobs:
       - name: Run shellcheck on scripts
         shell: bash
         run: |
+          # SC2034: "variable appears unused" — fires on variables that are exported
+          #         for use by child processes or are conditionally referenced. These
+          #         are false positives in scripts that set up environments.
+          # SC1091: "not following source" — shellcheck cannot follow dynamic source
+          #         paths like `source .env` at CI time because the file does not
+          #         exist in the runner. Suppressing prevents false "undefined variable"
+          #         errors for every variable loaded from .env.
           while IFS= read -r script; do
             shellcheck --exclude=SC2034,SC1091 --severity=warning "${script}"
           done < <(find scripts -name "*.sh" -type f)
@@ -106,6 +131,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
+          # fetch-depth: 0 fetches the complete git history. Gitleaks must scan
+          # every commit, not just the latest — a secret committed and later
+          # deleted is still in the history and must be caught.
           fetch-depth: 0
 
       - name: Scan for secrets with Gitleaks
@@ -121,6 +149,11 @@ jobs:
           exit-code: 1
           severity: HIGH,CRITICAL
           format: table
+          # argocd/ contains the upstream ArgoCD install.yaml — a vendored
+          # manifest maintained by the ArgoCD project. It intentionally runs
+          # privileged init containers and mounts host paths as part of its
+          # own design. Scanning it produces HIGH findings that are not
+          # actionable by us. Our own manifests (base/) are fully scanned.
           skip-dirs: argocd
 
       - name: Verify sensitive files are not committed
