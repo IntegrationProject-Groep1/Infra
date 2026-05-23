@@ -156,3 +156,56 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: RABBITMQ_PASS_PLANNING
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: mailing-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: mailing-heartbeat
+  template:
+    metadata:
+      labels:
+        app: mailing-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "mailing"
+        - name: TARGETS
+          value: "mailing-service:8080"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMAILING_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMAILING_PASS
