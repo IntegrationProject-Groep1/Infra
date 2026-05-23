@@ -140,105 +140,105 @@ Preferred approach: revert the Git commit and push — ArgoCD auto-syncs within 
 
 ---
 
-### Argo Rollouts — geautomatiseerde canary deployments
+### Argo Rollouts — automated canary deployments
 
 **Last updated: 2026-05-15**
 
-#### Wat het is
+#### What it is
 
-Argo Rollouts is een Kubernetes controller die naast ArgoCD draait in de `argo-rollouts` namespace. Het vervangt het standaard `Deployment` resource voor alle services die draaien op eigen GHCR-images. In plaats van een gewone rolling update voert het een **canary deployment** uit.
+Argo Rollouts is a Kubernetes controller that runs alongside ArgoCD in the `argo-rollouts` namespace. It replaces the standard `Deployment` resource for all services running custom GHCR images, executing a **canary deployment** instead of a plain rolling update.
 
-#### Onze strategie
+#### Deployment strategy
 
-Elke `Rollout` in dit repo gebruikt dezelfde canary configuratie:
+Every `Rollout` in this repository uses the same canary configuration:
 
 ```yaml
 strategy:
   canary:
     steps:
-    - setWeight: 100   # stuur 100% verkeer naar de nieuwe versie
-    - pause: {duration: 5m}  # wacht 5 minuten voor promotie naar stable
+    - setWeight: 100        # send 100% of traffic to the new version immediately
+    - pause: {duration: 5m} # observe for 5 minutes before promoting to stable
 ```
 
-Dit betekent:
-1. Nieuwe pods starten op (100% van het verkeer gaat er meteen naartoe)
-2. Argo Rollouts wacht 5 minuten
-3. Als de pods na 5 minuten nog gezond zijn → de revisie wordt **stable** (vorige versie wordt opgeruimd)
-4. Als pods crashen of je aborteert → rollback naar de vorige **stable** revisie
+What this means in practice:
+1. New pods start up and receive 100% of traffic immediately
+2. Argo Rollouts waits 5 minutes
+3. If pods are still healthy after 5 minutes → the revision is promoted to **stable** (previous version is cleaned up)
+4. If pods crash or you manually abort → Argo Rollouts reverts to the previous **stable** revision
 
-#### Welke services zijn Rollouts
+#### Which services use Rollouts
 
-Alle services die draaien op een GHCR-image (`ghcr.io/integrationproject-groep1/...`). Databases, proxies, RabbitMQ en andere third-party images blijven gewone `Deployments`.
+All services running a custom GHCR image (`ghcr.io/integrationproject-groep1/...`). Databases, proxies, RabbitMQ, and other third-party images remain standard `Deployments`.
 
-#### Status bekijken
+#### Checking rollout status
 
 ```bash
-# Overzicht van alle Rollouts
+# List all Rollouts and their current status
 kubectl get rollouts -n shift-festival
 
-# Detail van één Rollout (toont canary stap, stable/canary revision, events)
-kubectl describe rollout <naam> -n shift-festival
+# Detailed view of a single Rollout (shows canary step, stable/canary revision, events)
+kubectl describe rollout <name> -n shift-festival
 
-# Pods bekijken met Rollout-labels
-kubectl get pods -n shift-festival -l app=<naam>
+# View pods with Rollout labels
+kubectl get pods -n shift-festival -l app=<name>
 ```
 
-#### Rollout handmatig beheren
+#### Managing a rollout manually
 
 ```bash
-# Aborteer een rollout → valt terug naar de vorige stable revisie
-kubectl patch rollout <naam> -n shift-festival \
+# Abort a rollout → reverts to the previous stable revision
+kubectl patch rollout <name> -n shift-festival \
   --type=merge -p '{"spec":{"abort":true}}'
 
-# Herstart een geaborteerde rollout (na een fix)
-kubectl patch rollout <naam> -n shift-festival \
+# Retry an aborted rollout (after a fix has been deployed)
+kubectl patch rollout <name> -n shift-festival \
   --type=merge -p '{"spec":{"abort":false}}'
 
-# Pauzeer een lopende rollout (stopt de 5-minuten timer)
-kubectl patch rollout <naam> -n shift-festival \
+# Pause a running rollout (pauses the 5-minute observation timer)
+kubectl patch rollout <name> -n shift-festival \
   --type=merge -p '{"spec":{"paused":true}}'
 
-# Hervatten na pauze
-kubectl patch rollout <naam> -n shift-festival \
+# Resume a paused rollout
+kubectl patch rollout <name> -n shift-festival \
   --type=merge -p '{"spec":{"paused":false}}'
 ```
 
-Als `kubectl argo rollouts` plugin geïnstalleerd is:
+With the `kubectl argo rollouts` plugin installed:
 ```bash
-kubectl argo rollouts abort   <naam> -n shift-festival
-kubectl argo rollouts retry   <naam> -n shift-festival
-kubectl argo rollouts promote <naam> -n shift-festival
-kubectl argo rollouts status  <naam> -n shift-festival
+kubectl argo rollouts abort   <name> -n shift-festival
+kubectl argo rollouts retry   <name> -n shift-festival
+kubectl argo rollouts promote <name> -n shift-festival
+kubectl argo rollouts status  <name> -n shift-festival
 ```
 
-#### Eerste deployment — geen stable revisie
+#### First deployment — no stable revision yet
 
-Bij de allereerste keer dat een `Rollout` uitgerold wordt (bv. bij conversie van `Deployment` naar `Rollout`, of een volledig nieuwe service) **bestaat er geen vorige stable revisie**. Als de pods dan crashen, heeft Argo Rollouts niets om naar terug te keren. De Rollout gaat naar `Degraded` en blijft daar.
+The first time a `Rollout` is deployed (e.g. when converting from `Deployment` to `Rollout`, or adding a new service), **there is no previous stable revision**. If the pods crash at this point, Argo Rollouts has nothing to roll back to. The Rollout enters `Degraded` state and stays there.
 
-In dat geval is de enige oplossing dat de applicatie zelf gefixt wordt (nieuw image pushen). Zodra één deployment succesvol de 5-minuten pause doorkomt, wordt die revisie de nieuwe stable baseline en werkt rollback bij volgende deploys normaal.
+The only resolution in this case is to fix the application itself and push a new image. Once a single deployment successfully completes the 5-minute pause window, that revision becomes the stable baseline and future rollbacks will work normally.
 
-#### Automatische rollback — huidige beperking
+#### Automatic rollback — current limitation
 
-Argo Rollouts aborteert een rollout **niet** automatisch bij CrashLoopBackOff tenzij er een `AnalysisTemplate` geconfigureerd is. Zonder analysis:
+Argo Rollouts does **not** automatically abort a rollout on CrashLoopBackOff unless an `AnalysisTemplate` is configured. Without an analysis template:
 
-- De Rollout detecteert ongezonde pods en zet de status op `Degraded`
-- De 5-minuten pause loopt gewoon verder
-- **Er is geen automatische abort** — een mens moet ingrijpen via de commando's hierboven
+- The Rollout detects unhealthy pods and sets the status to `Degraded`
+- The 5-minute pause timer continues running
+- **No automatic abort occurs** — a human must intervene using the commands above
 
-Automatische rollback bij crashes vereist een AnalysisTemplate die pod-gezondheid monitort. Dit is nog niet geconfigureerd (zie ook de sectie "Automatic rollback plan" verderop in dit document).
+Automatic rollback on crashes requires an AnalysisTemplate that monitors pod health against a metrics source (e.g. Prometheus). This is not yet configured. See the "Automatic rollback plan" section below for the full design.
 
-#### Verband met ArgoCD self-heal
+#### Relationship between ArgoCD and Argo Rollouts
 
-ArgoCD en Argo Rollouts werken samen maar hebben elk hun eigen taak:
+ArgoCD and Argo Rollouts work together but have distinct responsibilities:
 
 | | ArgoCD | Argo Rollouts |
 |---|---|---|
-| **Taak** | Houdt cluster in sync met Git | Beheert hoe een nieuw image uitgerold wordt |
-| **Reageert op** | Wijzigingen in Git | Wijzigingen in het image digest |
-| **Self-heal** | Reverts handmatige kubectl-wijzigingen | N.v.t. |
-| **Rollback** | Via Git revert of `argocd app rollback` | Via abort → valt terug op stable revisie |
+| **Responsibility** | Keeps the cluster in sync with Git | Controls how a new image version is rolled out |
+| **Reacts to** | Changes in the Git repository | Changes in the image digest |
+| **Self-heal** | Reverts manual `kubectl` changes | Not applicable |
+| **Rollback** | Via Git revert or `argocd app rollback` | Via abort → falls back to stable revision |
 
-ArgoCD's `selfHeal: true` zal een gepauzeerde of geaborteerde Rollout **niet** overschrijven zolang de Rollout-spec in Git niet verandert. Pas als je een nieuw image pusht (wat een nieuwe Image Updater commit triggert) start ArgoCD een nieuwe sync en herstart Argo Rollouts het canary-process.
+ArgoCD's `selfHeal: true` will **not** overwrite a paused or aborted Rollout as long as the Rollout spec in Git has not changed. Only when a new image is pushed (triggering a new Image Updater commit) will ArgoCD start a new sync and Argo Rollouts restart the canary process.
 
 ---
 
