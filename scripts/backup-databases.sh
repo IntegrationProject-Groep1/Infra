@@ -14,7 +14,7 @@ KEEP_DAYS="${KEEP_DAYS:-14}"
 
 TODAY=$(date +%Y-%m-%d)
 LOCAL_DIR="/tmp/sf-backup-$TODAY"
-REMOTE_DIR="~/backups/databases/$TODAY"
+REMOTE_DIR="$HOME/backups/databases/$TODAY"
 SSH_OPTS="-i $BACKUP_VM_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
 
 log()  { echo "[$(date +%T)] $*"; }
