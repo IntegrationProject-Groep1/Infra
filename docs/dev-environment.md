@@ -117,7 +117,7 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 | **CRM** | No UI — publish test message to `crm.*` queue via RabbitMQ management UI | Salesforce credentials zeroed out in dev — no real Salesforce sync |
 | **Planning** | No UI — publish test message to `planning.*` queue via RabbitMQ management UI | Office 365 credentials zeroed out in dev — no real O365 sync |
 | **Identity** | Called internally via HTTP — other services trigger it automatically | No direct test needed |
-| **Chatbot** | Via frontend or direct RabbitMQ message | |
+| **Chatbot** | Open `dev-chatbot.desiderius.me` or via frontend / direct RabbitMQ message | |
 
 ### What can and cannot be tested in dev
 
@@ -142,6 +142,7 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 | Facturatie | [dev-facturatie.desiderius.me](https://dev-facturatie.desiderius.me) |
 | Planning | [dev-planning.desiderius.me](https://dev-planning.desiderius.me) |
 | RabbitMQ | [dev-rabbitmq.desiderius.me](https://dev-rabbitmq.desiderius.me) |
+| Chatbot | [dev-chatbot.desiderius.me](https://dev-chatbot.desiderius.me) |
 
 ---
 
