@@ -71,7 +71,7 @@ SSH into the backup VM and run:
 ssh groep1@integration.switzerlandnorth.cloudapp.azure.com
 
 # On the backup VM:
-git clone --mirror https://github.com/EHB-TI/integration-project-groep-1.git ~/git-mirrors/infra.git
+git clone --mirror https://tombomeke-ehb:<GITHUB_PAT>@github.com/IntegrationProject-Groep1/Infra.git ~/git-mirrors/infra.git
 exit
 ```
 
@@ -158,6 +158,7 @@ cd ~/git-mirrors/infra.git
 git remote add new-origin https://gitlab.com/<your-namespace>/Infra.git
 git push new-origin --mirror
 git clone https://gitlab.com/<your-namespace>/Infra.git ~/Infra
+# Original repo: https://github.com/IntegrationProject-Groep1/Infra
 
 # Option B: use the mirror directly (no Git remote needed)
 git clone ~/git-mirrors/infra.git ~/Infra
