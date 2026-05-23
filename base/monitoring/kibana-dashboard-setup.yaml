@@ -308,11 +308,11 @@ data:
     create_logs_dashboard()
 
     print(f"""
-Done. Dashboards created:
-  All Services Heartbeats : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_HEARTBEATS}
-  MCP Servers (dedicated) : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_MCP}
-  Service Logs            : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_LOGS}
-""", flush=True)
+    Done. Dashboards created:
+      All Services Heartbeats : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_HEARTBEATS}
+      MCP Servers (dedicated) : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_MCP}
+      Service Logs            : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_LOGS}
+    """, flush=True)
 ---
 apiVersion: batch/v1
 kind: Job

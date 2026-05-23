@@ -12,3 +12,4 @@ resources:
   - elastic-agent-rbac.yaml
   - elastic-agent.yaml
   - mcp.yaml
+  - kibana-dashboard-setup.yaml
