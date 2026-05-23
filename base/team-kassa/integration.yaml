@@ -3,6 +3,7 @@ kind: Rollout
 metadata:
   name: kassa-integration
 spec:
+  progressDeadlineSeconds: 120
   replicas: 1
   strategy:
     canary:
