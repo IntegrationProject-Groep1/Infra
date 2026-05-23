@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: frontend-db
 spec:
-  replicas: 0
+  replicas: 1
   strategy:
     type: Recreate
   selector:
