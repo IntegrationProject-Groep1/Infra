@@ -55,15 +55,23 @@ dump_postgres() {
 
 # ──────────────────────────────────────────────
 # MariaDB / MySQL dump
-# Reads MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE from the pod's env.
+# MariaDB containers clear MYSQL_USER/MYSQL_PASSWORD after init for security.
+# Read credentials directly from the Kubernetes secret instead.
+# Args: app  out_name  secret-key-for-user  secret-key-for-pass  secret-key-for-db
 # ──────────────────────────────────────────────
 dump_mysql() {
-  local app="$1" out_name="$2"
-  local pod
+  local app="$1" out_name="$2" user_key="$3" pass_key="$4" db_key="$5"
+  local pod db_user db_pass db_name
   pod=$(get_pod "$app")
+  db_user=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$user_key}" | base64 -d)
+  db_pass=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$pass_key}" | base64 -d)
+  db_name=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$db_key}" | base64 -d)
   log "  mysqldump: $app ($pod) → $out_name"
-  kubectl exec -n "$NAMESPACE" "$pod" -- sh -c \
-    'mysqldump -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" --single-transaction --routines' \
+  kubectl exec -n "$NAMESPACE" "$pod" -- \
+    mysqldump -u "$db_user" -p"$db_pass" "$db_name" --single-transaction --routines \
     | gzip > "$LOCAL_DIR/$out_name" \
     || fail "mysqldump failed for $app"
 }
@@ -77,9 +85,10 @@ dump_postgres "kassa-db"     "kassa-postgres.sql.gz"
 dump_postgres "planning-db"  "planning-postgres.sql.gz"
 
 log "=== MariaDB / MySQL databases ==="
-dump_mysql "frontend-db"    "frontend-mariadb.sql.gz"
-dump_mysql "facturatie-db"  "facturatie-mariadb.sql.gz"
-dump_mysql "crm-db"         "crm-mysql.sql.gz"
+# Secret keys match the keys in base/setup/.env.example
+dump_mysql "frontend-db"   "frontend-mariadb.sql.gz"   "DRUPAL_DB_USER"      "DRUPAL_DB_PASS"      "DRUPAL_DB_NAME"
+dump_mysql "facturatie-db" "facturatie-mariadb.sql.gz"  "FOSSBILLING_DB_USER" "FOSSBILLING_DB_PASS" "FOSSBILLING_DB_NAME"
+dump_mysql "crm-db"        "crm-mysql.sql.gz"           "MYSQL_USER"          "MYSQL_PASSWORD"      "MYSQL_DATABASE"
 
 # ──────────────────────────────────────────────
 # Transfer to backup VM
