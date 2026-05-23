@@ -97,7 +97,7 @@ jobs:
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_KASSA","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_MONITORING","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_PLANNING","value":"'"$EMPTY"'"}
-              ]' 2>/dev/null || true
+              ]'
 
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
