@@ -30,7 +30,7 @@ data:
         deadline = time.time() + max_wait
         while time.time() < deadline:
             try:
-                r = requests.get(f"{KIBANA_URL}/api/status", auth=AUTH, timeout=5, verify=False)
+                r = requests.get(f"{KIBANA_URL}/api/status", auth=AUTH, timeout=5)
                 if r.status_code == 200:
                     lvl = r.json().get("status", {}).get("overall", {}).get("level", "")
                     if lvl in ("available", "green"):
@@ -42,14 +42,16 @@ data:
             time.sleep(10)
         sys.exit("Kibana did not become ready in time.")
 
-    def upsert(obj_type, obj_id, attributes):
+    def upsert(obj_type, obj_id, attributes, references=None):
         url  = f"{KIBANA_URL}/api/saved_objects/{obj_type}/{obj_id}"
         body = {"attributes": attributes}
-        r = requests.post(url, json=body, headers=HEADERS, auth=AUTH, verify=False)
+        if references:
+            body["references"] = references
+        r = requests.post(url, json=body, headers=HEADERS, auth=AUTH)
         if r.status_code in (200, 201):
             print(f"  + {obj_type}/{obj_id}", flush=True)
         elif r.status_code == 409:
-            r2 = requests.put(url, json=body, headers=HEADERS, auth=AUTH, verify=False)
+            r2 = requests.put(url, json=body, headers=HEADERS, auth=AUTH)
             if r2.status_code in (200, 201):
                 print(f"  ~ {obj_type}/{obj_id} (updated)", flush=True)
             else:
@@ -62,11 +64,13 @@ data:
                            "indexRefName": "kibanaSavedObjectMeta.searchSourceJSON.index"})
 
     def _vis(vis_id, title, vis_state, dv_id, kql=""):
+        refs = [{"type": "index-pattern", "id": dv_id,
+                 "name": "kibanaSavedObjectMeta.searchSourceJSON.index"}]
         upsert("visualization", vis_id, {
             "title": title, "visState": json.dumps(vis_state),
             "uiStateJSON": "{}", "description": "", "savedSearchRefName": None,
             "kibanaSavedObjectMeta": {"searchSourceJSON": _ssj(dv_id, kql)},
-        })
+        }, references=refs)
 
     def _panel(vis_id, col, row, w, h, pid):
         return {"panelIndex": pid,
@@ -87,7 +91,7 @@ data:
                 "searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""},
                                                 "filter": []})
             },
-        })
+        }, references=refs)
 
     # ── vis-state helpers ──────────────────────────────────────────
 
@@ -297,9 +301,6 @@ data:
                    panels, refs, DV_LOGS, refresh_ms=30000)
 
     # ── main ───────────────────────────────────────────────────────
-
-    import urllib3
-    urllib3.disable_warnings()
 
     wait_for_kibana()
     create_data_views()
