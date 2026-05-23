@@ -34,10 +34,10 @@ images:
   digest: sha256:d8a5354b8db14c753719c55630db2cd853411abd987de621f6ef775f26596219
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:7c6a8dc8f6eb0d5c04e71d9345560785707c78400eb790c4088cb39900a27c7c
+  digest: sha256:6279e644ea62b47af64d618450c442bfea758c6df7171c044dd5bfcc975c1dce
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
-  digest: sha256:312ae38619c0c5e5299fcff7e8f93ec8ccb7f80e129e1ca679fe8de28c2b9ebd
+  digest: sha256:9ce5a6b57c153a292dbd954ce1380ee6852bad284e91428fc8e895e6f4b6f624
 patches:
 - target:
     kind: Rollout
