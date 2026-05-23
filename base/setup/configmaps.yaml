@@ -1,12 +1,29 @@
+# =============================================================================
+# configmaps.yaml
+# ShiftFestival — Infra Team
+#
+# Contains all ConfigMaps for the shift-festival namespace:
+#   - rabbitmq-config          — RabbitMQ broker settings
+#   - kassa-nginx-config       — Nginx reverse proxy for Odoo (blocks DB manager)
+#   - frontend-nginx-config    — Nginx reverse proxy for Drupal
+#   - frontend-drupal-settings — Drupal settings.php (DB + trusted hosts + proxy)
+#   - facturatie-nginx-config  — Nginx reverse proxy for FossBilling
+#   - frontend-rabbitmq-sender-services — Drupal service definitions for RabbitMQ
+# =============================================================================
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: rabbitmq-config
 data:
   rabbitmq.conf: |
+    # Allow the default 'guest' user to connect from non-loopback addresses.
+    # Required because RabbitMQ clients connect from other pods (not localhost).
     loopback_users.guest = false
     listeners.tcp.default = 5672
     management.tcp.port = 15672
+    # Load vhosts, users, permissions, and queue bindings from the
+    # rabbitmq-definitions secret on startup. This replaces manual setup
+    # through the management UI and makes the configuration reproducible.
     load_definitions = /etc/rabbitmq/definitions.json
 ---
 apiVersion: v1
@@ -79,6 +96,9 @@ data:
       'autoload'  => 'core/modules/mysql/src/Driver/Database/mysql/',
     ];
 
+    // Secondary connection used by Drupal modules that read planning data.
+    // Reuses the same credentials and host as the default connection but
+    // targets a different database (PLANNING_DB_NAME).
     $databases['planning']['default'] = [
       'driver'    => 'mysql',
       'database'  => getenv('PLANNING_DB_NAME') ?: 'planning',
@@ -109,7 +129,10 @@ data:
     if (getenv('DRUPAL_REVERSE_PROXY') === 'true') {
       $settings['reverse_proxy'] = TRUE;
       $settings['reverse_proxy_addresses'] = [$_SERVER['REMOTE_ADDR']];
-      // Only trust proto and host, explicitly ignore port headers
+      // Trust X-Forwarded-For, X-Forwarded-Host, and X-Forwarded-Proto from the
+      // Cloudflare/Nginx proxy chain. X-Forwarded-Port is intentionally excluded
+      // — trusting it causes Drupal to generate absolute URLs with :443 appended,
+      // breaking links and form actions on the public site.
       $settings['reverse_proxy_trusted_headers'] = \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_FOR | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_HOST | \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_PROTO;
       $settings['reverse_proxy_proto_header'] = 'X-Forwarded-Proto';
       $settings['reverse_proxy_host_header'] = 'X-Forwarded-Host';
@@ -140,6 +163,9 @@ data:
             proxy_set_header   Host $http_host;
             proxy_set_header   X-Real-IP $remote_addr;
             proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+            # FossBilling emits absolute HTTPS redirects internally. This rule
+            # rewrites them back to HTTP so the proxy can forward them without
+            # creating a redirect loop between the app and the Cloudflare edge.
             proxy_redirect     https:// http://;
         }
     }

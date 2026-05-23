@@ -1,9 +1,18 @@
 #!/bin/bash
 # =============================================================================
-# DEPRECATED: This script is no longer used and is replaced by Argo Rollouts.
-# ArgoCD self-healing and Argo Rollouts handle recovery and rollbacks.
-# For manual rollbacks use: kubectl argo rollouts rollback <name> -n shift-festival
-# Kept for historical reference only — do not run this script.
+# DEPRECATED — DO NOT RUN
+#
+# This script was a systemd-based health-monitor that polled containers every
+# 30 seconds and triggered rollbacks by restarting Docker containers directly.
+# It pre-dates the current Kubernetes/Argo Rollouts architecture and is
+# incompatible with it.
+#
+# Replacement: Argo Rollouts handles automatic rollback via progressDeadlineSeconds.
+# For manual rollbacks use:
+#   kubectl argo rollouts undo <rollout-name> -n shift-festival
+#
+# See CLAUDE.md → "Rollback and Recovery" for the full rollback runbook.
+# Kept for historical reference only.
 # =============================================================================
 # runtime-rollback.sh
 # ShiftFestival – Infra Team
