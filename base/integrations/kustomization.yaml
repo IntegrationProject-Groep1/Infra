@@ -9,3 +9,4 @@ resources:
   - planning-ingress.yaml
   - mailing.yaml
   - crm-mcp.yaml
+  - mcp-heartbeats.yaml

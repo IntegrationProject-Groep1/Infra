@@ -1,0 +1,264 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: frontend-mcp-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: frontend-mcp-heartbeat
+  template:
+    metadata:
+      labels:
+        app: frontend-mcp-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "frontend-mcp"
+        - name: TARGETS
+          value: "frontend-mcp-service:8006"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFRONTEND_PASS
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: kassa-mcp-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: kassa-mcp-heartbeat
+  template:
+    metadata:
+      labels:
+        app: kassa-mcp-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "kassa-mcp"
+        - name: TARGETS
+          value: "kassa-mcp-service:8004"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQKASSA_PASS
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: facturatie-mcp-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: facturatie-mcp-heartbeat
+  template:
+    metadata:
+      labels:
+        app: facturatie-mcp-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "facturatie-mcp"
+        - name: TARGETS
+          value: "facturatie-mcp-service:8007"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFACTURATIE_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQFACTURATIE_PASS
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: crm-mcp-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: crm-mcp-heartbeat
+  template:
+    metadata:
+      labels:
+        app: crm-mcp-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "crm-mcp"
+        - name: TARGETS
+          value: "crm-mcp-service:8008"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQCRM_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQCRM_PASSRAW
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: monitoring-mcp-heartbeat
+spec:
+  replicas: 1
+  strategy:
+    canary:
+      steps:
+      - setWeight: 100
+      - pause: {duration: 3m}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: monitoring-mcp-heartbeat
+  template:
+    metadata:
+      labels:
+        app: monitoring-mcp-heartbeat
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: heartbeat
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        env:
+        - name: SYSTEM_NAME
+          value: "monitoring-mcp"
+        - name: TARGETS
+          value: "monitoring-mcp-service:8005"
+        - name: RABBITMQ_HOST
+          value: "rabbitmq-service"
+        - name: RABBITMQ_PORT
+          value: "5672"
+        - name: RABBITMQ_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMONITORING_USER
+        - name: RABBITMQ_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: RABBITMQMONITORING_PASS
