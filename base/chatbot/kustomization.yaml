@@ -5,3 +5,4 @@ resources:
   - hpa.yaml
   - proxy.yaml
   - heartbeat.yaml
+  - pvc.yaml
