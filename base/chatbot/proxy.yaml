@@ -92,10 +92,9 @@ kind: Service
 metadata:
   name: chatbot-proxy-service
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: chatbot-proxy
   ports:
     - port: 80
       targetPort: 80
-      nodePort: 30071

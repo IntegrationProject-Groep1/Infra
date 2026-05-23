@@ -3,5 +3,6 @@ kind: Kustomization
 resources:
   - chatbot.yaml
   - hpa.yaml
+  - ingress.yaml
   - proxy.yaml
   - pvc.yaml
