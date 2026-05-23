@@ -8,7 +8,6 @@ resources:
   - kibana.yaml
   - kibana-ingress.yaml
   - monitoring-agent.yaml
-  - heartbeat.yaml
   - elastic-agent-config.yaml
   - elastic-agent-rbac.yaml
   - elastic-agent.yaml

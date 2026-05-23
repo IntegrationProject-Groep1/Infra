@@ -4,5 +4,4 @@ resources:
   - chatbot.yaml
   - hpa.yaml
   - proxy.yaml
-  - heartbeat.yaml
   - pvc.yaml
