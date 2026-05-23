@@ -220,17 +220,11 @@ patches:
       kind: Rollout
       name: fossbilling-app
     patch: |-
-      apiVersion: argoproj.io/v1alpha1
-      kind: Rollout
-      metadata:
-        name: fossbilling-app
-      spec:
-        template:
-          spec:
-            volumes:
-            - name: foss-html
-              $patch: replace
-              emptyDir: {}
+      - op: replace
+        path: /spec/template/spec/volumes/0
+        value:
+          name: foss-html
+          emptyDir: {}
 
   # ── Ephemeral volumes — test data, no persistence needed ────────────────
   - target:
