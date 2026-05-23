@@ -14,7 +14,7 @@ KEEP_DAYS="${KEEP_DAYS:-14}"
 
 TODAY=$(date +%Y-%m-%d)
 LOCAL_DIR="/tmp/sf-backup-$TODAY"
-REMOTE_DIR="$HOME/backups/databases/$TODAY"
+REMOTE_DIR="backups/databases/$TODAY"   # relative — expanded to $HOME by the remote shell
 SSH_OPTS="-i $BACKUP_VM_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
 
 log()  { echo "[$(date +%T)] $*"; }
@@ -71,7 +71,7 @@ dump_mysql() {
     -o jsonpath="{.data.$db_key}" | base64 -d)
   log "  mysqldump: $app ($pod) → $out_name"
   kubectl exec -n "$NAMESPACE" "$pod" -- \
-    mysqldump -u "$db_user" -p"$db_pass" "$db_name" --single-transaction --routines \
+    mysqldump -u "$db_user" -p"$db_pass" "$db_name" --single-transaction --routines --no-tablespaces \
     | gzip > "$LOCAL_DIR/$out_name" \
     || fail "mysqldump failed for $app"
 }
@@ -95,14 +95,14 @@ dump_mysql "crm-db"        "crm-mysql.sql.gz"           "MYSQL_USER"          "M
 # ──────────────────────────────────────────────
 log "=== Transferring to backup VM ==="
 # shellcheck disable=SC2029
-ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" "mkdir -p $REMOTE_DIR"
+ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" "mkdir -p \$HOME/$REMOTE_DIR"
 rsync -az --progress -e "ssh $SSH_OPTS" \
   "$LOCAL_DIR/" "$BACKUP_VM_USER@$BACKUP_VM_HOST:$REMOTE_DIR/"
 
 log "=== Cleaning up backup VM (keeping last $KEEP_DAYS days) ==="
 # shellcheck disable=SC2029
 ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" \
-  "find ~/backups/databases -maxdepth 1 -mindepth 1 -type d -mtime +$KEEP_DAYS -exec rm -rf {} +"
+  "find \$HOME/backups/databases -maxdepth 1 -mindepth 1 -type d -mtime +$KEEP_DAYS -exec rm -rf {} +"
 
 log "=== Cleaning up local temp dir ==="
 rm -rf "$LOCAL_DIR"
