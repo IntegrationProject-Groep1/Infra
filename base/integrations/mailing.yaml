@@ -94,6 +94,11 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: SENDGRID_TEMPLATE_GENERAL_ANNOUNCEMENT
+        - name: SENDGRID_TEMPLATE_DAILY_REPORT
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_DAILY_REPORT
         ports:
         - containerPort: 8080
           name: health

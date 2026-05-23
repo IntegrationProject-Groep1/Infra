@@ -100,27 +100,6 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-planning-db
-spec:
-  podSelector:
-    matchLabels:
-      app: planning-db
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: planning
-        - podSelector:
-            matchLabels:
-              app: planning-pgadmin
-      ports:
-        - port: 5432
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
   name: allow-elasticsearch
 spec:
   podSelector:
