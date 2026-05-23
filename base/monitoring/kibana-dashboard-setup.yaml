@@ -1,0 +1,360 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kibana-dashboard-script
+data:
+  setup_dashboards.py: |
+    """
+    Create / update Kibana dashboards for the Shift Festival monitoring stack.
+    Runs automatically as a Kubernetes Job after every ArgoCD sync.
+    Keep in sync with: monitoring/kibana/setup_dashboards.py
+    """
+    import json, os, sys, time
+    import requests
+
+    KIBANA_URL  = os.getenv("KIBANA_URL",  "http://kibana-service:5601")
+    KIBANA_USER = os.getenv("KIBANA_USER", "elastic")
+    KIBANA_PASS = os.getenv("KIBANA_PASS", "")
+
+    HEADERS = {"kbn-xsrf": "true", "Content-Type": "application/json"}
+    AUTH    = (KIBANA_USER, KIBANA_PASS)
+
+    DASH_ID_HEARTBEATS = "shift-mcp-heartbeats-dashboard"
+    DASH_ID_LOGS       = "shift-service-logs-dashboard"
+    DASH_ID_MCP        = "shift-mcp-servers-dashboard"
+    DV_HEARTBEATS      = "shift-heartbeats-dv"
+    DV_LOGS            = "shift-logs-dv"
+
+    def wait_for_kibana(max_wait=600):
+        print(f"Waiting for Kibana at {KIBANA_URL} ...", flush=True)
+        deadline = time.time() + max_wait
+        while time.time() < deadline:
+            try:
+                r = requests.get(f"{KIBANA_URL}/api/status", auth=AUTH, timeout=5, verify=False)
+                if r.status_code == 200:
+                    lvl = r.json().get("status", {}).get("overall", {}).get("level", "")
+                    if lvl in ("available", "green"):
+                        print("Kibana is ready.", flush=True)
+                        return
+            except Exception:
+                pass
+            print("  still waiting...", flush=True)
+            time.sleep(10)
+        sys.exit("Kibana did not become ready in time.")
+
+    def upsert(obj_type, obj_id, attributes):
+        url  = f"{KIBANA_URL}/api/saved_objects/{obj_type}/{obj_id}"
+        body = {"attributes": attributes}
+        r = requests.post(url, json=body, headers=HEADERS, auth=AUTH, verify=False)
+        if r.status_code in (200, 201):
+            print(f"  + {obj_type}/{obj_id}", flush=True)
+        elif r.status_code == 409:
+            r2 = requests.put(url, json=body, headers=HEADERS, auth=AUTH, verify=False)
+            if r2.status_code in (200, 201):
+                print(f"  ~ {obj_type}/{obj_id} (updated)", flush=True)
+            else:
+                print(f"  ! {obj_type}/{obj_id}: {r2.status_code} {r2.text[:120]}", flush=True)
+        else:
+            print(f"  ! {obj_type}/{obj_id}: {r.status_code} {r.text[:120]}", flush=True)
+
+    def _ssj(dv_id, kql=""):
+        return json.dumps({"query": {"language": "kuery", "query": kql}, "filter": [],
+                           "indexRefName": "kibanaSavedObjectMeta.searchSourceJSON.index"})
+
+    def _vis(vis_id, title, vis_state, dv_id, kql=""):
+        upsert("visualization", vis_id, {
+            "title": title, "visState": json.dumps(vis_state),
+            "uiStateJSON": "{}", "description": "", "savedSearchRefName": None,
+            "kibanaSavedObjectMeta": {"searchSourceJSON": _ssj(dv_id, kql)},
+        })
+
+    def _panel(vis_id, col, row, w, h, pid):
+        return {"panelIndex": pid,
+                "gridData": {"x": col, "y": row, "w": w, "h": h, "i": pid},
+                "type": "visualization", "version": "8.17.0",
+                "panelRefName": f"panel_{pid}"}
+
+    def _dashboard(dash_id, title, desc, panels, refs_extra, dv_id, refresh_ms=10000):
+        refs = [{"type": "index-pattern", "id": dv_id,
+                 "name": "kibanaSavedObjectMeta.searchSourceJSON.index"}] + refs_extra
+        upsert("dashboard", dash_id, {
+            "title": title, "description": desc,
+            "panelsJSON": json.dumps(panels),
+            "optionsJSON": json.dumps({"hidePanelTitles": False, "useMargins": True}),
+            "timeFrom": "now-1h", "timeTo": "now",
+            "refreshInterval": {"pause": False, "value": refresh_ms},
+            "kibanaSavedObjectMeta": {
+                "searchSourceJSON": json.dumps({"query": {"language": "kuery", "query": ""},
+                                                "filter": []})
+            },
+        })
+
+    # ── vis-state helpers ──────────────────────────────────────────
+
+    def vs_timeseries(title, index, split_size=20):
+        return {"title": title, "type": "metrics", "aggs": [], "params": {
+            "type": "timeseries", "index_pattern": index,
+            "time_range_mode": "auto", "interval": "1m", "axis_min": "0",
+            "series": [{"id": "s1", "label": "Heartbeats/min",
+                        "metrics": [{"id": "m1", "type": "count"}],
+                        "split_mode": "terms", "terms_field": "system.keyword",
+                        "terms_size": split_size, "line_width": "2",
+                        "point_size": "2", "fill": "0.2", "stacked": "none"}]}}
+
+    def vs_cardinality(title, field):
+        return {"title": title, "type": "metric",
+                "aggs": [{"id": "1", "type": "cardinality", "schema": "metric",
+                          "params": {"field": field}}],
+                "params": {"addLegend": False, "addTooltip": True,
+                           "metric": {"colorSchema": "Green to Red", "useRanges": False}}}
+
+    def vs_count(title):
+        return {"title": title, "type": "metric",
+                "aggs": [{"id": "1", "type": "count", "schema": "metric", "params": {}}],
+                "params": {"addLegend": False, "addTooltip": True,
+                           "metric": {"colorSchema": "Green to Red", "useRanges": False}}}
+
+    def vs_pie(title):
+        return {"title": title, "type": "pie",
+                "aggs": [{"id": "1", "type": "count", "schema": "metric", "params": {}},
+                         {"id": "2", "type": "terms", "schema": "segment",
+                          "params": {"field": "status.keyword", "size": 5, "order": "desc"}}],
+                "params": {"addLegend": True, "addTooltip": True,
+                           "isDonut": True, "legendPosition": "right"}}
+
+    def vs_status_table(title, include=None):
+        bp = {"field": "system.keyword", "size": 30, "order": "asc"}
+        if include:
+            bp["include"] = include
+        return {"title": title, "type": "table",
+                "aggs": [{"id": "1", "type": "terms",  "schema": "bucket",  "params": bp},
+                         {"id": "2", "type": "terms",  "schema": "metric",
+                          "params": {"field": "status.keyword", "size": 1, "order": "desc"}},
+                         {"id": "3", "type": "max",   "schema": "metric",
+                          "params": {"field": "@timestamp"}},
+                         {"id": "4", "type": "max",   "schema": "metric",
+                          "params": {"field": "uptime_seconds"}}],
+                "params": {"showTotal": False,
+                           "sort": {"columnIndex": None, "direction": None},
+                           "totalFunc": "sum"}}
+
+    def vs_uptime_bar(title):
+        return {"title": title, "type": "horizontal_bar",
+                "aggs": [{"id": "1", "type": "max",   "schema": "metric",
+                          "params": {"field": "uptime_seconds"}},
+                         {"id": "2", "type": "terms", "schema": "group",
+                          "params": {"field": "system.keyword", "size": 10, "order": "desc"}}],
+                "params": {"addLegend": True, "addTooltip": True, "addTimeMarker": False,
+                           "categoryAxes": [{"position": "left",
+                                             "scale": {"type": "linear"}}]}}
+
+    def vs_hb_rate_bar(title):
+        return {"title": title, "type": "histogram",
+                "aggs": [{"id": "1", "type": "count", "schema": "metric", "params": {}},
+                         {"id": "2", "type": "terms", "schema": "segment",
+                          "params": {"field": "system.keyword", "size": 10, "order": "desc"}}],
+                "params": {"addLegend": True, "addTooltip": True, "addTimeMarker": True,
+                           "mode": "stacked", "scale": "linear",
+                           "categoryAxes": [{"position": "bottom",
+                                             "scale": {"type": "linear"}}]}}
+
+    def vs_log_bar(title):
+        return {"title": title, "type": "histogram",
+                "aggs": [{"id": "1", "type": "count",  "schema": "metric",  "params": {}},
+                         {"id": "2", "type": "terms",  "schema": "segment",
+                          "params": {"field": "system.keyword", "size": 20, "order": "desc"}},
+                         {"id": "3", "type": "terms",  "schema": "group",
+                          "params": {"field": "level.keyword", "size": 3}}],
+                "params": {"addLegend": True, "addTimeMarker": False, "addTooltip": True,
+                           "mode": "stacked", "scale": "linear",
+                           "categoryAxes": [{"position": "bottom",
+                                             "scale": {"type": "linear"}}]}}
+
+    def vs_log_table(title):
+        return {"title": title, "type": "table",
+                "aggs": [{"id": "1", "type": "count", "schema": "metric",  "params": {}},
+                         {"id": "2", "type": "terms", "schema": "bucket",
+                          "params": {"field": "system.keyword", "size": 20}},
+                         {"id": "3", "type": "terms", "schema": "bucket",
+                          "params": {"field": "level.keyword", "size": 3}},
+                         {"id": "4", "type": "terms", "schema": "bucket",
+                          "params": {"field": "action.keyword", "size": 10}}],
+                "params": {"showTotal": False}}
+
+    # ── data views ─────────────────────────────────────────────────
+
+    def create_data_views():
+        print("\n-- Data views", flush=True)
+        upsert("index-pattern", DV_HEARTBEATS,
+               {"title": "heartbeats-*", "timeFieldName": "@timestamp", "fields": "[]"})
+        upsert("index-pattern", DV_LOGS,
+               {"title": "logs-*",       "timeFieldName": "@timestamp", "fields": "[]"})
+
+    # ── dashboard 1: all services heartbeats ───────────────────────
+
+    def create_heartbeat_dashboard():
+        print("\n-- All-services heartbeat dashboard", flush=True)
+        _vis("vis-hb-active",        "Active services",
+             vs_cardinality("Active services", "system.keyword"), DV_HEARTBEATS)
+        _vis("vis-hb-timeseries",    "Heartbeats/min by service",
+             vs_timeseries("Heartbeats/min by service", DV_HEARTBEATS), DV_HEARTBEATS)
+        _vis("vis-hb-status-table",  "Latest status per service",
+             vs_status_table("Latest status per service"), DV_HEARTBEATS)
+        _vis("vis-hb-mcp-table",     "MCP server status",
+             vs_status_table("MCP server status", ".*-mcp"), DV_HEARTBEATS)
+
+        panels = [
+            _panel("vis-hb-active",       0,  0, 10,  8, "p1"),
+            _panel("vis-hb-timeseries",   10, 0, 38, 16, "p2"),
+            _panel("vis-hb-status-table", 0,  8, 24, 20, "p3"),
+            _panel("vis-hb-mcp-table",    24, 8, 24, 20, "p4"),
+        ]
+        refs = [
+            {"type": "visualization", "id": "vis-hb-active",       "name": "panel_p1"},
+            {"type": "visualization", "id": "vis-hb-timeseries",   "name": "panel_p2"},
+            {"type": "visualization", "id": "vis-hb-status-table", "name": "panel_p3"},
+            {"type": "visualization", "id": "vis-hb-mcp-table",    "name": "panel_p4"},
+        ]
+        _dashboard(DASH_ID_HEARTBEATS, "All Services - Heartbeat Monitor",
+                   "Live heartbeat status for all services and MCP servers",
+                   panels, refs, DV_HEARTBEATS, refresh_ms=10000)
+
+    # ── dashboard 2: dedicated MCP servers ─────────────────────────
+
+    def create_mcp_dashboard():
+        print("\n-- Dedicated MCP servers dashboard", flush=True)
+        MCP = "system.keyword: *-mcp"
+        MCP_ERR = f"({MCP}) AND level.keyword: error"
+
+        _vis("vis-mcp-active",       "Active MCP servers",
+             vs_cardinality("Active MCP servers", "system.keyword"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-hb-total",     "Total MCP heartbeats",
+             vs_count("Total MCP heartbeats"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-hb-pie",       "MCP status split",
+             vs_pie("MCP status split"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-timeseries",   "MCP heartbeats/min per server",
+             vs_timeseries("MCP heartbeats/min per server", DV_HEARTBEATS, 10), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-status-table", "MCP server status & uptime",
+             vs_status_table("MCP server status & uptime", ".*-mcp"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-uptime-bar",   "MCP server uptime (seconds)",
+             vs_uptime_bar("MCP server uptime (seconds)"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-hb-rate",      "MCP heartbeat volume per server",
+             vs_hb_rate_bar("MCP heartbeat volume per server"), DV_HEARTBEATS, MCP)
+        _vis("vis-mcp-log-count",    "MCP log count by server & level",
+             vs_log_bar("MCP log count by server & level"), DV_LOGS, MCP)
+        _vis("vis-mcp-log-errors",   "MCP error count",
+             vs_count("MCP error count"), DV_LOGS, MCP_ERR)
+        _vis("vis-mcp-log-table",    "MCP recent log entries",
+             vs_log_table("MCP recent log entries"), DV_LOGS, MCP)
+
+        panels = [
+            _panel("vis-mcp-active",       0,  0,  8,  8, "m1"),
+            _panel("vis-mcp-hb-total",     8,  0,  8,  8, "m2"),
+            _panel("vis-mcp-log-errors",   16, 0,  8,  8, "m3"),
+            _panel("vis-mcp-hb-pie",       24, 0, 24,  8, "m4"),
+            _panel("vis-mcp-timeseries",   0,  8, 48, 16, "m5"),
+            _panel("vis-mcp-status-table", 0,  24, 24, 18, "m6"),
+            _panel("vis-mcp-uptime-bar",   24, 24, 24, 18, "m7"),
+            _panel("vis-mcp-hb-rate",      0,  42, 24, 16, "m8"),
+            _panel("vis-mcp-log-count",    24, 42, 24, 16, "m9"),
+            _panel("vis-mcp-log-table",    0,  58, 48, 18, "m10"),
+        ]
+        refs = [
+            {"type": "visualization", "id": "vis-mcp-active",       "name": "panel_m1"},
+            {"type": "visualization", "id": "vis-mcp-hb-total",     "name": "panel_m2"},
+            {"type": "visualization", "id": "vis-mcp-log-errors",   "name": "panel_m3"},
+            {"type": "visualization", "id": "vis-mcp-hb-pie",       "name": "panel_m4"},
+            {"type": "visualization", "id": "vis-mcp-timeseries",   "name": "panel_m5"},
+            {"type": "visualization", "id": "vis-mcp-status-table", "name": "panel_m6"},
+            {"type": "visualization", "id": "vis-mcp-uptime-bar",   "name": "panel_m7"},
+            {"type": "visualization", "id": "vis-mcp-hb-rate",      "name": "panel_m8"},
+            {"type": "visualization", "id": "vis-mcp-log-count",    "name": "panel_m9"},
+            {"type": "visualization", "id": "vis-mcp-log-table",    "name": "panel_m10"},
+        ]
+        _dashboard(DASH_ID_MCP, "MCP Servers - Live Monitor",
+                   "Dedicated: heartbeat health, uptime and logs for all 5 MCP servers",
+                   panels, refs, DV_HEARTBEATS, refresh_ms=10000)
+
+    # ── dashboard 3: service logs ───────────────────────────────────
+
+    def create_logs_dashboard():
+        print("\n-- Service logs dashboard", flush=True)
+        _vis("vis-log-count", "Log count by service & level",
+             vs_log_bar("Log count by service & level"), DV_LOGS)
+        _vis("vis-log-table", "Recent log entries",
+             vs_log_table("Recent log entries"), DV_LOGS)
+
+        panels = [
+            _panel("vis-log-count", 0,  0, 48, 20, "q1"),
+            _panel("vis-log-table", 0, 20, 48, 20, "q2"),
+        ]
+        refs = [
+            {"type": "visualization", "id": "vis-log-count", "name": "panel_q1"},
+            {"type": "visualization", "id": "vis-log-table", "name": "panel_q2"},
+        ]
+        _dashboard(DASH_ID_LOGS, "Service Logs",
+                   "Log volume and recent entries per service",
+                   panels, refs, DV_LOGS, refresh_ms=30000)
+
+    # ── main ───────────────────────────────────────────────────────
+
+    import urllib3
+    urllib3.disable_warnings()
+
+    wait_for_kibana()
+    create_data_views()
+    create_heartbeat_dashboard()
+    create_mcp_dashboard()
+    create_logs_dashboard()
+
+    print(f"""
+Done. Dashboards created:
+  All Services Heartbeats : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_HEARTBEATS}
+  MCP Servers (dedicated) : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_MCP}
+  Service Logs            : {KIBANA_URL}/app/dashboards#/view/{DASH_ID_LOGS}
+""", flush=True)
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kibana-dashboard-setup
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  ttlSecondsAfterFinished: 600
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: setup
+        image: python:3.11-slim
+        command:
+        - sh
+        - -c
+        - pip install requests --quiet --no-cache-dir && python /scripts/setup_dashboards.py
+        env:
+        - name: KIBANA_URL
+          value: "http://kibana-service:5601"
+        - name: KIBANA_USER
+          value: "elastic"
+        - name: KIBANA_PASS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ELASTIC_PASSWORD
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: scripts
+          mountPath: /scripts
+      volumes:
+      - name: scripts
+        configMap:
+          name: kibana-dashboard-script
