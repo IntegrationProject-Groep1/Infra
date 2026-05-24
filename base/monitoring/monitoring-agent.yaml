@@ -48,11 +48,11 @@ spec:
               key: RABBITMQMONITORING_PASS
         - name: RABBITMQ_VHOST
           value: "/"
-        - name: ELASTICSEARCH_HOST
+        - name: ES_HOST
           value: "http://elasticsearch-service:9200"
-        - name: ELASTICSEARCH_USER
+        - name: ES_ADMIN_USER
           value: "elastic"
-        - name: ELASTICSEARCH_PASSWORD
+        - name: ES_ADMIN_PASS
           valueFrom:
             secretKeyRef:
               name: shift-secrets
