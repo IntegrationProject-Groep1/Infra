@@ -48,7 +48,7 @@ The stack runs on Kubernetes and is composed of:
 
 **Core Infrastructure:**
 - **RabbitMQ** — Central async message broker; team services communicate through team-prefixed queues (for example `kassa.orders` and `crm.customer.created`).
-- **PostgreSQL** — Shared database for the identity service and other shared workloads.
+- **PostgreSQL** — Shared database for the identity service (`postgredb-service`). The chatbot has its own dedicated PostgreSQL instance (`chatbot-db-service`).
 - **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging and observability.
 - **Cloudflared** — Secure external access tunnel for selected services. Routes are managed in the Cloudflare Zero Trust dashboard (token-based, no local config file).
 - **ArgoCD** — GitOps controller installed in the `argocd` namespace. Watches the Git repo and auto-syncs changes to the cluster. Exposed at `argocd.desiderius.me` via Cloudflare Tunnel.

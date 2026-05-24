@@ -77,24 +77,24 @@ spec:
         - name: SESSION_TTL_SECONDS
           value: "604800"
         - name: DB_HOST
-          value: "postgredb-service"
+          value: "chatbot-db-service"
         - name: DB_PORT
           value: "5432"
         - name: DB_USER
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: DB_USER
+              key: CHATBOT_DB_USER
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: DB_PASSWORD
+              key: CHATBOT_DB_PASSWORD
         - name: DB_NAME
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: DB_NAME
+              key: CHATBOT_DB_NAME
         - name: ADMIN_SECRET
           valueFrom:
             secretKeyRef:
