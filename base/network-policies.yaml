@@ -13,6 +13,9 @@ spec:
         - podSelector:
             matchLabels:
               app: frontend-drupal
+        - podSelector:
+            matchLabels:
+              app: frontend-phpmyadmin
       ports:
         - port: 3306
 ---
