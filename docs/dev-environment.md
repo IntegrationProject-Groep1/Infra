@@ -43,7 +43,8 @@ On every `dev-on` run, `shift-secrets` is always re-copied in full from the prod
 
 - `shift-secrets` — always re-copied from `shift-festival`, then sanitized:
   - `RABBITMQ_VHOST` and `RABBIT_VHOST` → overridden to `shift-festival-dev`
-  - External service credentials zeroed out: `SENDGRID_API_KEY`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET`, `SF_INSTANCE_URL`, `SF_REFRESH_TOKEN`, `NVIDIA_API_KEY`, `BILLING_API_TOKEN`, all `TEAMS_WEBHOOK_*`
+  - External service credentials zeroed out: `SENDGRID_API_KEY`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET`, `SF_INSTANCE_URL`, `SF_REFRESH_TOKEN`, all `TEAMS_WEBHOOK_*`
+  - `NVIDIA_API_KEY` and `BILLING_API_TOKEN` kept from prod — shared with dev for testing (usage is negligible)
   - Internal credentials kept: DB passwords, RabbitMQ user passwords
 - `rabbitmq-definitions` — copied from `shift-festival` if not yet present (contains RabbitMQ user definitions)
 - `cloudflare-tunnel-secret` — copied from `shift-festival` if not yet present
