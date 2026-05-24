@@ -75,13 +75,20 @@ spec:
         factor: 2
         maxDuration: 10m
   ignoreDifferences:
+    # shift-secrets is managed outside ArgoCD (kubectl patch) — ignore data drift
     - group: ""
       kind: Secret
       name: shift-secrets
       jsonPointers:
         - /data
+    # storageClassName and volumeName are set by the cluster provisioner — immutable after creation
     - group: ""
       kind: PersistentVolumeClaim
       jsonPointers:
         - /spec/storageClassName
         - /spec/volumeName
+    # HPA exclusively owns spec.replicas on HPA-managed Rollouts
+    - group: argoproj.io
+      kind: Rollout
+      jsonPointers:
+        - /spec/replicas
