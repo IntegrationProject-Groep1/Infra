@@ -7,7 +7,7 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:b7055ab61b256527b58c529658c1688a6e689cb291c1d408435846f4316dd1a2
+  digest: sha256:289ee817ba30237b9bee415bae9c6377ebb811c39cffb6782cc294012c99d3f5
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:47e82bc87d6afd17ac764265b3df7fbbf0df4cc93d52a7a25fb0dc81c0b5343a
@@ -22,7 +22,7 @@ images:
   digest: sha256:65633bf4314b60c50ab672ec5f36d180ca08fcaa45c2b2b954517a7ac697cdcb
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
-  digest: sha256:66a16a7f7d84631b50c930c16852570d07d8e9f4afceb8e89f3fd5c867e603dd
+  digest: sha256:4438d14dd229bb781c99eaeca4100bc671cd8fa024c2aa282d44bf92456eb576
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
   digest: sha256:e57aef8f9a046e8eb9b12e4027a282144604f5c27e7dc6db1bb04047463a5aca
