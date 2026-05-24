@@ -60,6 +60,11 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: DRUPAL_DB_NAME
+        - name: PLANNING_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_DB_NAME
         - name: DRUPAL_DB_USER
           valueFrom:
             secretKeyRef:

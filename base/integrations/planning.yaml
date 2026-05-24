@@ -83,6 +83,11 @@ spec:
           value: frontend-db-service
         - name: DRUPAL_DB_PORT
           value: '3306'
+        - name: PLANNING_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              key: PLANNING_DB_NAME
+              name: shift-secrets
         - name: DRUPAL_DB_NAME
           valueFrom:
             secretKeyRef:
