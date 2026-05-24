@@ -91,6 +91,8 @@ jobs:
                 --type=merge -p '{"spec":{"replicas":0}}' 2>/dev/null || true
             done
 
+            kubectl delete configmap dev-last-active -n shift-festival-dev 2>/dev/null || true
+
             echo ""
             echo "✅ Dev environment is DOWN"
 
