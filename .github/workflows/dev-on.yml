@@ -104,6 +104,10 @@ jobs:
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_PLANNING","value":"'"$EMPTY"'"}
               ]'
 
+            kubectl create configmap dev-last-active -n shift-festival-dev \
+              --from-literal=timestamp=$(date +%s) \
+              --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
         with:

@@ -10,7 +10,7 @@
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
-#   - Every hour (schedule) — checks 4h inactivity on dev branch
+#   - Every 2 hours (schedule) — checks 4h inactivity since last dev-on
 # =============================================================================
 
 name: Dev Environment — OFF
@@ -28,33 +28,40 @@ jobs:
       actions: write
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check inactivity (skip if manual or push to main)
+      - name: Check inactivity
         if: github.event_name == 'schedule'
         id: inactivity
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          # Get last commit timestamp on dev branch
-          LAST_PUSH=$(git log origin/main -1 --format="%ct" -- overlays/dev/kustomization.yaml 2>/dev/null || echo "0")
+          echo "$SSH_KEY" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
 
-          if [[ "$LAST_PUSH" == "0" ]]; then
-            echo "No commits found on overlays/dev/kustomization.yaml — skipping"
+          LAST_ACTIVE=$(ssh -i /tmp/ssh_key \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -p 60022 \
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} \
+            "kubectl get configmap dev-last-active -n shift-festival-dev \
+             -o jsonpath='{.data.timestamp}' 2>/dev/null || echo 0")
+
+          rm -f /tmp/ssh_key
+
+          if [[ "$LAST_ACTIVE" == "0" ]]; then
+            echo "No dev-last-active ConfigMap found — dev env is already down"
             echo "skip=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
           NOW=$(date +%s)
-          DIFF=$(( (NOW - LAST_PUSH) / 3600 ))
-          echo "Hours since last push: $DIFF"
+          DIFF=$(( (NOW - LAST_ACTIVE) / 3600 ))
+          echo "Hours since last dev-on: $DIFF"
 
           if [[ $DIFF -lt 4 ]]; then
-            echo "Last push was $DIFF hour(s) ago — dev env stays up"
+            echo "Dev env activated $DIFF hour(s) ago — stays up"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            echo "Last push was $DIFF hour(s) ago — shutting down"
+            echo "Dev env has been up for $DIFF hour(s) — shutting down"
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
