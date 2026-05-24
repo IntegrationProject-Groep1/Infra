@@ -125,6 +125,15 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_FRONTEND
+        - name: AZURE_CLIENT_ID
+          value: "c28b3a31-2840-4212-aed3-5f3da8bdf1a1"
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: AZURE_CLIENT_SECRET
+        - name: AZURE_REDIRECT_URI
+          value: "https://desiderius.me/auth/microsoft/callback"
         livenessProbe:
           tcpSocket:
             port: 80
