@@ -16,7 +16,7 @@ images:
   digest: sha256:e1831ddf9664ce9d8767d0d8ce663b120aec4c64f22972a39482565e54b03d84
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
-  digest: sha256:3a74971b48dee5e229899ac14ab721a72899b1b8a0f5df8ce2635cd65b6ab91f
+  digest: sha256:bbcd5af37d8c112de6d230bb9e263c7899c9b33d058c3a49c3e77f65af7dfc7f
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
   digest: sha256:da6c20543b83a0dfff7aefcdbf7842c2b9110a0313af2a6baa0bd02c7072c3ec
