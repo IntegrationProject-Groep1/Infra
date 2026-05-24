@@ -3,9 +3,11 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Starts the dev environment by applying the overlay directly and starting
-#   services in phases to avoid CPU spikes on the single-node VM.
-#   ArgoCD does NOT manage the dev namespace — we apply manually.
+#   Starts OR updates the dev environment.
+#   - If dev is already running (active in last 4h): resets the inactivity
+#     timer so the environment stays up. ArgoCD handles the image update.
+#   - If dev is off: pauses ArgoCD, starts services in phases to avoid CPU
+#     spikes on the single-node VM, then re-enables ArgoCD sync.
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
@@ -39,7 +41,50 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check if dev is already running
+        id: dev_status
+        env:
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          echo "$SSH_KEY" > /tmp/ssh_key_dev
+          chmod 600 /tmp/ssh_key_dev
+
+          LAST_ACTIVE=$(ssh -i /tmp/ssh_key_dev \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -p 60022 \
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} \
+            "kubectl get configmap dev-last-active -n shift-festival-dev \
+             -o jsonpath='{.data.timestamp}' 2>/dev/null || echo 0")
+
+          rm -f /tmp/ssh_key_dev
+
+          NOW=$(date +%s)
+          if [[ "$LAST_ACTIVE" != "0" && $(( NOW - LAST_ACTIVE )) -lt 14400 ]]; then
+            echo "Dev is already running — will skip phased startup"
+            echo "running=true" >> $GITHUB_OUTPUT
+          else
+            echo "Dev is not running — will do full phased startup"
+            echo "running=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Already running — reset inactivity timer
+        if: steps.dev_status.outputs.running == 'true'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            echo "Dev is already running — resetting inactivity timer"
+            kubectl create configmap dev-last-active -n shift-festival-dev \
+              --from-literal=timestamp=$(date +%s) \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "✅ Timer reset — ArgoCD handles the image update"
+
       - name: Copy overlay to VM
+        if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VM_HOST }}
@@ -51,6 +96,7 @@ jobs:
           strip_components: 2
 
       - name: Ensure namespace and secrets exist
+        if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -107,6 +153,7 @@ jobs:
               --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply overlay and scale to zero
+        if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -117,12 +164,17 @@ jobs:
             set -euo pipefail
             cd /home/ehbstudent/shiftfestival
 
+            echo "Pausing ArgoCD sync during phased startup..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}' 2>/dev/null || true
+
             kubectl apply -k overlays/dev --prune=false 2>/dev/null || true
 
             kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
             kubectl scale statefulset --all -n shift-festival-dev --replicas=0 2>/dev/null || true
 
       - name: Phase 1 — Core (RabbitMQ + databases)
+        if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -162,6 +214,7 @@ jobs:
             echo "✅ Phase 1 done"
 
       - name: Phase 2 — Applications
+        if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VM_HOST }}
@@ -181,6 +234,10 @@ jobs:
             done
 
             kubectl scale deployment frontend-proxy kassa-proxy facturatie-proxy chatbot-proxy -n shift-festival-dev --replicas=1
+
+            echo "Re-enabling ArgoCD sync..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}' 2>/dev/null || true
 
             echo ""
             echo "✅ Dev environment is UP"

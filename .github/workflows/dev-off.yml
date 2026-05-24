@@ -65,7 +65,7 @@ jobs:
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Suspend ArgoCD Application
+      - name: Scale down workloads
         if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -81,10 +81,6 @@ jobs:
               exit 0
             fi
 
-            echo "Suspending ArgoCD app..."
-            kubectl patch application shift-festival-dev -n argocd \
-              --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
-
             echo "Scaling down all workloads..."
             kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
             kubectl scale statefulset --all -n shift-festival-dev --replicas=0 2>/dev/null || true
@@ -96,7 +92,7 @@ jobs:
             done
 
             echo ""
-            echo "✅ Dev environment is DOWN — ArgoCD app suspended"
+            echo "✅ Dev environment is DOWN"
 
       - name: Disable dev-off schedule until next dev-on
         if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
