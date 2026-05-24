@@ -239,6 +239,23 @@ patches:
           name: foss-html
           emptyDir: {}
 
+  # ── Persistent volumes — dev-specific PVCs ──────────────────────────────
+  - target:
+      kind: Deployment
+      name: kassa-db
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: kassa-db
+      spec:
+        template:
+          spec:
+            volumes:
+            - name: data
+              persistentVolumeClaim:
+                claimName: kassa-db-data-pvc-dev
+
   # ── Ephemeral volumes — test data, no persistence needed ────────────────
   - target:
       kind: Deployment
@@ -271,16 +288,6 @@ patches:
             volumeMounts:
               - name: data
                 mountPath: /var/lib/postgresql/data
-  - target:
-      kind: Deployment
-      name: kassa-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          persistentVolumeClaim:
-            claimName: kassa-db-data-pvc-dev
   - target:
       kind: Deployment
       name: crm-db
