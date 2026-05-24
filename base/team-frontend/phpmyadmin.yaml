@@ -8,6 +8,8 @@ data:
     $cfg['blowfish_secret'] = 'ShiftFestival-pma-32char-secret!';
     $cfg['ForceSSL'] = false;
     $cfg['Servers'][1]['AllowNoPassword'] = false;
+    ini_set('session.cookie_secure', '0');
+    ini_set('session.cookie_samesite', 'Lax');
 ---
 apiVersion: apps/v1
 kind: Deployment
