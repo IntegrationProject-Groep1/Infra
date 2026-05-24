@@ -119,7 +119,17 @@ spec:
               name: shift-secrets
               key: RABBITMQFRONTEND_PREFIX
         - name: REGISTRATION_REQUIRE_RABBITMQ_SYNC
-          value: "1"
+          value: "0"
+        - name: PLANNING_API_TOKEN_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_API_TOKEN_SECRET
+        - name: PLANNING_SERVICE_URL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_SERVICE_URL
         - name: TEAMS_WEBHOOK_FRONTEND
           valueFrom:
             secretKeyRef:
