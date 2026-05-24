@@ -18,12 +18,14 @@ name: Dev Environment — OFF
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */2 * * *'
 
 jobs:
   dev-off:
     name: Stop shift-festival-dev
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
 
     steps:
       - name: Checkout code
@@ -88,3 +90,9 @@ jobs:
 
             echo ""
             echo "✅ Dev environment is DOWN — ArgoCD app suspended"
+
+      - name: Disable dev-off schedule until next dev-on
+        if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow disable dev-off.yml --repo ${{ github.repository }}

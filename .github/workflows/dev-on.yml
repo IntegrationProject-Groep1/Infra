@@ -27,8 +27,15 @@ jobs:
   dev-on:
     name: Start shift-festival-dev
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
 
     steps:
+      - name: Enable dev-off schedule
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow enable dev-off.yml --repo ${{ github.repository }}
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -160,10 +167,11 @@ jobs:
               sleep 5
             done
 
-            kubectl scale deployment frontend-proxy kassa-proxy facturatie-proxy -n shift-festival-dev --replicas=1
+            kubectl scale deployment frontend-proxy kassa-proxy facturatie-proxy chatbot-proxy -n shift-festival-dev --replicas=1
 
             echo ""
             echo "✅ Dev environment is UP"
-            echo "Frontend: https://dev.desiderius.me"
-            echo "Kassa:    https://dev-kassa.desiderius.me"
+            echo "Frontend:   https://dev.desiderius.me"
+            echo "Kassa:      https://dev-kassa.desiderius.me"
             echo "Facturatie: https://dev-facturatie.desiderius.me"
+            echo "Chatbot:    https://dev-chatbot.desiderius.me"
