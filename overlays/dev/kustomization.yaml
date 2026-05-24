@@ -12,6 +12,7 @@ labels:
 
 resources:
   - ../../base
+  - kassa-db-pvc.yaml
 
 images:
   - name: ghcr.io/integrationproject-groep1/kassa-odoo
@@ -278,7 +279,8 @@ patches:
         path: /spec/template/spec/volumes/0
         value:
           name: data
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: kassa-db-data-pvc-dev
   - target:
       kind: Deployment
       name: crm-db
