@@ -32,7 +32,7 @@ The VM runs production and dev on the same node. ArgoCD auto-sync would start al
 | Trigger | Action |
 |---|---|
 | Push to `dev` branch (any team repo) | `:latest-dev` image built → Image Updater updates `overlays/dev/kustomization.yaml` on `main` → `dev-on` triggers automatically → phased startup |
-| 4 hours of inactivity on `overlays/dev/kustomization.yaml` | GitHub Actions cron (runs every hour) → automatic `dev-off` |
+| 4 hours since last `dev-on` (tracked via ConfigMap on cluster) | GitHub Actions cron (runs every 2 hours) → automatic `dev-off` |
 | Manual trigger via GitHub Actions UI | `dev-on` or `dev-off` workflow dispatch |
 
 ---
@@ -55,9 +55,9 @@ On every `dev-on` run, `shift-secrets` is always re-copied in full from the prod
 
 ## RabbitMQ vhost
 
-The `shift-festival-dev` vhost is created automatically during Phase 1 of `dev-on` via `rabbitmqctl`. All 9 RabbitMQ users receive full permissions on this vhost:
+The `shift-festival-dev` vhost is created automatically during Phase 1 of `dev-on` via `rabbitmqctl`. All 10 RabbitMQ users receive full permissions on this vhost:
 
-`crm_rabbitmq`, `facturatie_rabbitmq`, `frontend_rabbitmq`, `guest`, `identity_user`, `infra_admin`, `kassa_rabbitmq`, `monitoring_rabbitmq`, `planning_rabbitmq`
+`chatbot_rabbitmq`, `crm_rabbitmq`, `facturatie_rabbitmq`, `frontend_rabbitmq`, `guest`, `identity_user`, `infra_admin`, `kassa_rabbitmq`, `monitoring_rabbitmq`, `planning_rabbitmq`
 
 **Queue cleanup:** On every `dev-on`, all queues on the default `/` vhost are deleted before services start. This prevents AMQP 406 PRECONDITION_FAILED errors caused by the `rabbitmq-definitions` secret pre-creating queues with different arguments than what the service code expects.
 
@@ -162,7 +162,6 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 | Kassa | [dev-kassa.desiderius.me](https://dev-kassa.desiderius.me) |
 | Facturatie | [dev-facturatie.desiderius.me](https://dev-facturatie.desiderius.me) |
 | RabbitMQ | [dev-rabbitmq.desiderius.me](https://dev-rabbitmq.desiderius.me) |
-| Kibana | [dev-kibana.desiderius.me](https://dev-kibana.desiderius.me) |
 | Chatbot | [dev-chatbot.desiderius.me](https://dev-chatbot.desiderius.me) |
 
 ---

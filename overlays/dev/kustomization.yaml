@@ -347,6 +347,15 @@ patches:
           name: token-data
           emptyDir: {}
 
+  # ── Kassa — override hardcoded / vhost so it uses the dev vhost ─────────
+  - target:
+      kind: Rollout
+      name: kassa-web
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/13/value
+        value: "shift-festival-dev"
+
   # ── Reduce CPU requests in dev to free scheduling headroom ───────────────
   - target:
       kind: Rollout
