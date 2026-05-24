@@ -356,6 +356,15 @@ patches:
         path: /spec/template/spec/containers/0/env/13/value
         value: "shift-festival-dev"
 
+  # ── Chatbot — override hardcoded / vhost so it uses the dev vhost ────────
+  - target:
+      kind: Rollout
+      name: chatbot
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/2/value
+        value: "shift-festival-dev"
+
   # ── Reduce CPU requests in dev to free scheduling headroom ───────────────
   - target:
       kind: Rollout
