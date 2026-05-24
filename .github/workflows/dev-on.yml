@@ -93,8 +93,6 @@ jobs:
                 {"op":"replace","path":"/data/SF_CLIENT_SECRET","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/SF_INSTANCE_URL","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/SF_REFRESH_TOKEN","value":"'"$EMPTY"'"},
-                {"op":"replace","path":"/data/NVIDIA_API_KEY","value":"'"$EMPTY"'"},
-                {"op":"replace","path":"/data/BILLING_API_TOKEN","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_CRM","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_FACTURATIE","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_FRONTEND","value":"'"$EMPTY"'"},
@@ -103,6 +101,10 @@ jobs:
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_MONITORING","value":"'"$EMPTY"'"},
                 {"op":"replace","path":"/data/TEAMS_WEBHOOK_PLANNING","value":"'"$EMPTY"'"}
               ]'
+
+            kubectl create configmap dev-last-active -n shift-festival-dev \
+              --from-literal=timestamp=$(date +%s) \
+              --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Apply overlay and scale to zero
         uses: appleboy/ssh-action@v1.0.3
@@ -141,9 +143,15 @@ jobs:
             echo "Creating dev vhost in RabbitMQ..."
             RABBITMQ_POD=$(kubectl get pod -n shift-festival-dev -l app=rabbitmq -o jsonpath='{.items[0].metadata.name}')
             kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl add_vhost shift-festival-dev 2>/dev/null || true
-            for user in crm_rabbitmq facturatie_rabbitmq frontend_rabbitmq guest identity_user infra_admin kassa_rabbitmq monitoring_rabbitmq planning_rabbitmq; do
+            for user in crm_rabbitmq facturatie_rabbitmq frontend_rabbitmq guest identity_user infra_admin kassa_rabbitmq monitoring_rabbitmq planning_rabbitmq chatbot_rabbitmq; do
               kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl set_permissions -p shift-festival-dev "$user" ".*" ".*" ".*" 2>/dev/null || true
             done
+
+            echo "Ensuring chatbot_rabbitmq user exists with correct credentials..."
+            CHATBOT_PASS=$(kubectl get secret shift-secrets -n shift-festival-dev -o jsonpath='{.data.RABBITMQCHATBOT_PASS}' | base64 -d)
+            kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl add_user chatbot_rabbitmq "$CHATBOT_PASS" 2>/dev/null || \
+              kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl change_password chatbot_rabbitmq "$CHATBOT_PASS"
+            kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- rabbitmqctl set_permissions -p shift-festival-dev chatbot_rabbitmq ".*" ".*" ".*"
 
             echo "Clearing default vhost queues to avoid definition conflicts..."
             for queue in $(kubectl exec "$RABBITMQ_POD" -n shift-festival-dev -- \
