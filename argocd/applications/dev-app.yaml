@@ -13,7 +13,8 @@ metadata:
       identity=ghcr.io/integrationproject-groep1/identity-service:latest-dev,
       heartbeat=ghcr.io/integrationproject-groep1/heartbeat:latest-dev,
       mailing=ghcr.io/integrationproject-groep1/mailing:latest-dev,
-      chatbot=ghcr.io/integrationproject-groep1/chatbot:latest-dev
+      chatbot=ghcr.io/integrationproject-groep1/chatbot:latest-dev,
+      kassa-odoo=ghcr.io/integrationproject-groep1/kassa:odoo-latest
     argocd-image-updater.argoproj.io/frontend.update-strategy: digest
     argocd-image-updater.argoproj.io/frontend.allow-tags: regexp:^latest-dev$
     argocd-image-updater.argoproj.io/frontend.kustomize.image-name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
@@ -41,6 +42,9 @@ metadata:
     argocd-image-updater.argoproj.io/chatbot.update-strategy: digest
     argocd-image-updater.argoproj.io/chatbot.allow-tags: regexp:^latest-dev$
     argocd-image-updater.argoproj.io/chatbot.kustomize.image-name: ghcr.io/integrationproject-groep1/chatbot
+    argocd-image-updater.argoproj.io/kassa-odoo.update-strategy: digest
+    argocd-image-updater.argoproj.io/kassa-odoo.allow-tags: regexp:^odoo-latest$
+    argocd-image-updater.argoproj.io/kassa-odoo.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa-odoo
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
     argocd-image-updater.argoproj.io/write-back-target: kustomization:overlays/dev
     argocd-image-updater.argoproj.io/git-branch: main

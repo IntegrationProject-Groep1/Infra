@@ -13,6 +13,11 @@ labels:
 resources:
   - ../../base
 
+images:
+  - name: ghcr.io/integrationproject-groep1/kassa-odoo
+    newName: ghcr.io/integrationproject-groep1/kassa
+    digest: sha256:e1831ddf9664ce9d8767d0d8ce663b120aec4c64f22972a39482565e54b03d84
+
 patches:
   # ── Dev subdomains ────────────────────────────────────────────────────────
   - target:
