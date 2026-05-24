@@ -79,6 +79,25 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_PLANNING
+        - name: DRUPAL_DB_HOST
+          value: frontend-db-service
+        - name: DRUPAL_DB_PORT
+          value: '3306'
+        - name: DRUPAL_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              key: DRUPAL_DB_NAME
+              name: shift-secrets
+        - name: DRUPAL_DB_USER
+          valueFrom:
+            secretKeyRef:
+              key: DRUPAL_DB_USER
+              name: shift-secrets
+        - name: DRUPAL_DB_PASS
+          valueFrom:
+            secretKeyRef:
+              key: DRUPAL_DB_PASS
+              name: shift-secrets
         resources:
           requests:
             memory: "128Mi"
