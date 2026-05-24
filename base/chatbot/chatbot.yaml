@@ -76,8 +76,25 @@ spec:
           value: "10.0"
         - name: SESSION_TTL_SECONDS
           value: "604800"
-        - name: SESSION_DB
-          value: /data/sessions.db
+        - name: DB_HOST
+          value: "postgredb-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DB_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: DB_NAME
         - name: ADMIN_SECRET
           valueFrom:
             secretKeyRef:
@@ -110,15 +127,10 @@ spec:
         volumeMounts:
         - name: tmp
           mountPath: /tmp
-        - name: data
-          mountPath: /data
 
       volumes:
       - name: tmp
         emptyDir: {}
-      - name: data
-        persistentVolumeClaim:
-          claimName: chatbot-data-pvc
 ---
 apiVersion: v1
 kind: Service

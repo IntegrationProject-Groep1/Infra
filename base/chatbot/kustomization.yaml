@@ -5,4 +5,3 @@ resources:
   - hpa.yaml
   - ingress.yaml
   - proxy.yaml
-  - pvc.yaml
