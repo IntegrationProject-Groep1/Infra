@@ -1,3 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: phpmyadmin-config
+data:
+  config.user.inc.php: |
+    <?php
+    $cfg['blowfish_secret'] = 'ShiftFestival-pma-32char-secret!';
+    $cfg['ForceSSL'] = false;
+    $cfg['Servers'][1]['AllowNoPassword'] = false;
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,6 +41,8 @@ spec:
           value: "3306"
         - name: UPLOAD_LIMIT
           value: "64M"
+        - name: PMA_BLOWFISH_SECRET
+          value: "ShiftFestival-pma-32char-secret!"
         resources:
           requests:
             memory: "64Mi"
@@ -49,6 +62,14 @@ spec:
             port: 80
           initialDelaySeconds: 10
           periodSeconds: 10
+        volumeMounts:
+        - name: pma-config
+          mountPath: /etc/phpmyadmin/config.user.inc.php
+          subPath: config.user.inc.php
+      volumes:
+      - name: pma-config
+        configMap:
+          name: phpmyadmin-config
 ---
 apiVersion: v1
 kind: Service
