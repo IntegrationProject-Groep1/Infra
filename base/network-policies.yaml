@@ -76,6 +76,9 @@ spec:
         - podSelector:
             matchLabels:
               app: pgadmin
+        - podSelector:
+            matchLabels:
+              app: chatbot
       ports:
         - port: 5432
 ---
