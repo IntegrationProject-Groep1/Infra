@@ -10,7 +10,7 @@ images:
   digest: sha256:72251080713746619aff70ee90003a439607be7375840880f8c2734557bcf4c4
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:47e82bc87d6afd17ac764265b3df7fbbf0df4cc93d52a7a25fb0dc81c0b5343a
+  digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
 - name: ghcr.io/integrationproject-groep1/kassa-odoo
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:e1831ddf9664ce9d8767d0d8ce663b120aec4c64f22972a39482565e54b03d84
@@ -34,7 +34,7 @@ images:
   digest: sha256:433e792a3a72cbc852bc5cd9a1cb69666e74393943b7962b676f46e7c4a32a3d
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:bc2e602d4fd4297886bf76e68c4e8f9b92df2daafae93e0361be164471789f74
+  digest: sha256:73c2de935ee6bbb16ed2723c80ab6578d08b012be5576cacc14fdedc3987387e
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
   digest: sha256:1d29a640ec152027c5a7567c1172c554e689a326e5bf79c44c8ce1f30a1f56fb
