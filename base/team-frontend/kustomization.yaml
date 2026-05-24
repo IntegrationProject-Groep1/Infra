@@ -4,6 +4,7 @@ resources:
   - configmap.yaml
   - mariadb.yaml
   - drupal.yaml
+  - phpmyadmin.yaml
   - hpa.yaml
   - ingress.yaml
   - mcp.yaml
