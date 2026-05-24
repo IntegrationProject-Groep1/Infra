@@ -177,6 +177,15 @@ metadata:
 data:
   rabbitmq_sender.services.yml: |
     services:
+      rabbitmq_sender.session_created_sender:
+        class: Drupal\rabbitmq_sender\SessionCreatedSender
+
+      rabbitmq_sender.session_updated_sender:
+        class: Drupal\rabbitmq_sender\SessionUpdatedSender
+
+      rabbitmq_sender.session_deleted_sender:
+        class: Drupal\rabbitmq_sender\SessionDeletedSender
+
       rabbitmq_sender.session_create_request_sender:
         class: Drupal\rabbitmq_sender\SessionCreateRequestSender
 
@@ -195,9 +204,6 @@ data:
       rabbitmq_sender.new_registration_sender:
         class: Drupal\rabbitmq_sender\NewRegistrationSender
 
-      rabbitmq_sender.company_registration_sender:
-        class: Drupal\rabbitmq_sender\CompanyRegistrationSender
-
       rabbitmq_sender.calendar_invite_sender:
         class: Drupal\rabbitmq_sender\CalendarInviteSender
 
@@ -215,3 +221,39 @@ data:
 
       rabbitmq_sender.user_unregistered_sender:
         class: Drupal\rabbitmq_sender\UserUnregisteredSender
+
+      rabbitmq_sender.company_member_removed_sender:
+        class: Drupal\rabbitmq_sender\CompanyMemberRemovedSender
+
+      rabbitmq_sender.company_registration_sender:
+        class: Drupal\rabbitmq_sender\CompanyRegistrationSender
+
+      rabbitmq_sender.monitoring_log_sender:
+        class: Drupal\rabbitmq_sender\MonitoringLogSender
+
+      rabbitmq_sender.user_sessions_request_sender:
+        class: Drupal\rabbitmq_sender\UserSessionsRequestSender
+
+      rabbitmq_sender.cancel_registration_sender:
+        class: Drupal\rabbitmq_sender\CancelRegistrationSender
+
+      rabbitmq_sender.user_deleted_sender:
+        class: Drupal\rabbitmq_sender\UserDeletedSender
+
+      rabbitmq_sender.company_update_sender:
+        class: Drupal\rabbitmq_sender\CompanyUpdateSender
+
+      rabbitmq_sender.company_delete_sender:
+        class: Drupal\rabbitmq_sender\CompanyDeleteSender
+
+      rabbitmq_sender.wallet_topup_request_sender:
+        class: Drupal\rabbitmq_sender\WalletTopupRequestSender
+
+      rabbitmq_sender.company_invite_sender:
+        class: Drupal\rabbitmq_sender\CompanyInviteSender
+
+      rabbitmq_sender.logger:
+        class: Drupal\rabbitmq_sender\Logger\RabbitMQLogger
+        arguments: ['@rabbitmq_sender.monitoring_log_sender']
+        tags:
+          - { name: logger }

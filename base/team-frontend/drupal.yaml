@@ -17,6 +17,8 @@ spec:
     metadata:
       labels:
         app: frontend-drupal
+      annotations:
+        configmap-revision: "2"  # Increment to force pod restart when ConfigMap changes
     spec:
       securityContext:
         runAsNonRoot: true
