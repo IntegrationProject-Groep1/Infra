@@ -75,7 +75,36 @@ spec:
         - name: RPC_TIMEOUT
           value: "10.0"
         - name: SESSION_TTL_SECONDS
-          value: "3600"
+          value: "604800"
+        - name: DB_HOST
+          value: "chatbot-db-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_NAME
+        - name: ADMIN_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ADMIN_SECRET
+        - name: ADMIN_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ADMIN_CREDENTIALS
         - name: MCP_SERVERS
           value: "kassa@http://kassa-mcp-service:8004/mcp,crm@http://crm-mcp-service:8008/mcp,monitoring@http://monitoring-mcp-service:8005/mcp,frontend@http://frontend-mcp-service:8006/mcp,facturatie@http://facturatie-mcp-service:8007/mcp"
         livenessProbe:

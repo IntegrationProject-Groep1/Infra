@@ -773,6 +773,22 @@ graph TD
 
 ---
 
+## Backup & Disaster Recovery
+
+All 6 databases are backed up daily to a separate backup VM via the `backup.yml` GitHub Actions workflow (runs at 02:00 UTC). The Infra Git repo is mirrored there as well.
+
+| What | Frequency | Location |
+|---|---|---|
+| 6 databases (pg_dump / mysqldump) | Daily 02:00 UTC | `integration.switzerlandnorth.cloudapp.azure.com:~/backups/databases/` |
+| Git mirror | Daily 03:00 UTC | `~/git-mirrors/infra.git` |
+| Secrets (`.env`, GPG-encrypted) | Manual, on every change | `~/secrets/shift-festival.env.gpg` |
+
+**Estimated recovery time after full VM loss: 30–60 minutes.**
+
+See [BACKUP.md](BACKUP.md) for quick commands and [docs/disaster-recovery.md](docs/disaster-recovery.md) for the full step-by-step recovery guide.
+
+---
+
 ## Technology Stack
 
 | Category | Technology | Version |

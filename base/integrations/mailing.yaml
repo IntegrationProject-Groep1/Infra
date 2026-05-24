@@ -8,7 +8,8 @@ metadata:
     project: shift-festival
     managed-by: Team-Infra
 spec:
-  replicas: 0
+  progressDeadlineSeconds: 120
+  replicas: 1
   strategy:
     canary:
       steps:
@@ -93,6 +94,14 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: SENDGRID_TEMPLATE_GENERAL_ANNOUNCEMENT
+        - name: SENDGRID_TEMPLATE_DAILY_REPORT
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: SENDGRID_TEMPLATE_DAILY_REPORT
+        ports:
+        - containerPort: 8080
+          name: health
         resources:
           requests:
             memory: "64Mi"
@@ -122,3 +131,19 @@ spec:
       volumes:
       - name: tmp
         emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailing-service
+  namespace: shift-festival
+  labels:
+    app: mailing
+spec:
+  selector:
+    app: mailing
+  ports:
+  - name: health
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

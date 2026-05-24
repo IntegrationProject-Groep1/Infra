@@ -7,8 +7,18 @@ labels:
   - pairs:
       project: shift-festival
       managed-by: Team-Infra
+    # includeSelectors: false prevents Kustomize from injecting these labels into
+    # label selectors (spec.selector.matchLabels) on Deployments and Services.
+    # Selector fields are immutable after creation — adding a label there would
+    # make every re-apply fail with an "immutable field" error.
     includeSelectors: false
 
+# Resource ordering matters: Kustomize applies resources in list order.
+# namespace.yaml must be first so the namespace exists before anything is placed
+# into it. setup/ (ConfigMaps, Secrets template, PVCs) must come before the
+# workloads in the subsequent directories that reference them. network-policies.yaml
+# is last because NetworkPolicies reference pod labels that must already exist on
+# the resources they select.
 resources:
   - namespace.yaml
   - setup/

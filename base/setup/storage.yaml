@@ -81,16 +81,6 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: planning-db-data-pvc
-spec:
-  accessModes: ["ReadWriteOnce"]
-  resources:
-    requests:
-      storage: 5Gi
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
   name: planning-token-pvc
 spec:
   accessModes: ["ReadWriteOnce"]
@@ -157,3 +147,13 @@ spec:
   resources:
     requests:
       storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chatbot-db-data-pvc
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 2Gi

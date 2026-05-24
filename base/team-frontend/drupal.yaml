@@ -17,6 +17,8 @@ spec:
     metadata:
       labels:
         app: frontend-drupal
+      annotations:
+        configmap-revision: "2"  # Increment to force pod restart when ConfigMap changes
     spec:
       securityContext:
         runAsNonRoot: true
@@ -35,7 +37,7 @@ spec:
             (sleep 15
             && timeout 90 /opt/drupal/vendor/bin/drush --root=/var/www/html en
             rabbitmq_sender rabbitmq_receiver registration_form session_enrollment
-            session_management company_invite qr_code --yes
+            session_management company_invite qr_code jsonapi basic_auth --yes
             && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html updb --yes
             && timeout 60 /opt/drupal/vendor/bin/drush --root=/var/www/html cr
             || true) & exec apache2-foreground
@@ -58,6 +60,11 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: DRUPAL_DB_NAME
+        - name: PLANNING_DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_DB_NAME
         - name: DRUPAL_DB_USER
           valueFrom:
             secretKeyRef:
@@ -68,7 +75,7 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: DRUPAL_DB_PASS
-        - name: DRUPAL_DB_PASSWORD 
+        - name: DRUPAL_DB_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
@@ -119,12 +126,31 @@ spec:
               name: shift-secrets
               key: RABBITMQFRONTEND_PREFIX
         - name: REGISTRATION_REQUIRE_RABBITMQ_SYNC
-          value: "1"
+          value: "0"
+        - name: PLANNING_API_TOKEN_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_API_TOKEN_SECRET
+        - name: PLANNING_SERVICE_URL
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: PLANNING_SERVICE_URL
         - name: TEAMS_WEBHOOK_FRONTEND
           valueFrom:
             secretKeyRef:
               name: shift-secrets
               key: TEAMS_WEBHOOK_FRONTEND
+        - name: AZURE_CLIENT_ID
+          value: "c28b3a31-2840-4212-aed3-5f3da8bdf1a1"
+        - name: AZURE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: AZURE_CLIENT_SECRET
+        - name: AZURE_REDIRECT_URI
+          value: "https://desiderius.me/auth/microsoft/callback"
         livenessProbe:
           tcpSocket:
             port: 80
@@ -151,6 +177,9 @@ spec:
         - name: rabbitmq-sender-services
           mountPath: /var/www/html/modules/custom/rabbitmq_sender/rabbitmq_sender.services.yml
           subPath: rabbitmq_sender.services.yml
+        - name: session-management-services
+          mountPath: /opt/drupal/web/modules/custom/session_management/session_management.services.yml
+          subPath: session_management.services.yml
         - name: apache-run
           mountPath: /var/run/apache2
         - name: apache-log
@@ -169,6 +198,9 @@ spec:
       - name: rabbitmq-sender-services
         configMap:
           name: frontend-rabbitmq-sender-services
+      - name: session-management-services
+        configMap:
+          name: frontend-session-management-services
       - name: apache-run
         emptyDir: {}
       - name: apache-log

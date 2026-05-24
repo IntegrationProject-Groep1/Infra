@@ -48,7 +48,7 @@ The stack runs on Kubernetes and is composed of:
 
 **Core Infrastructure:**
 - **RabbitMQ** — Central async message broker; team services communicate through team-prefixed queues (for example `kassa.orders` and `crm.customer.created`).
-- **PostgreSQL** — Shared database for the identity service and other shared workloads.
+- **PostgreSQL** — Shared database for the identity service (`postgredb-service`). The chatbot has its own dedicated PostgreSQL instance (`chatbot-db-service`).
 - **ELK Stack** (Elasticsearch + Logstash + Kibana) — Centralized logging and observability.
 - **Cloudflared** — Secure external access tunnel for selected services. Routes are managed in the Cloudflare Zero Trust dashboard (token-based, no local config file).
 - **ArgoCD** — GitOps controller installed in the `argocd` namespace. Watches the Git repo and auto-syncs changes to the cluster. Exposed at `argocd.desiderius.me` via Cloudflare Tunnel.
@@ -177,6 +177,23 @@ When HPA manages a Rollout's replica count, a rollback only restores the previou
 ### Automated analysis (future improvement)
 
 Argo Rollouts supports AnalysisTemplates that query Prometheus metrics (e.g. HTTP error rate) to automatically gate or abort the canary window. This would cover Scenario C automatically. Not currently configured — requires a Prometheus instance, which adds memory overhead on the single-VM cluster and is out of scope for now.
+
+## Backup and Disaster Recovery
+
+All 6 databases (3× PostgreSQL, 2× MariaDB, 1× MySQL) are backed up daily to a separate backup VM. The Infra repo is mirrored there as well for GitHub resilience. Full recovery procedure is documented in `docs/disaster-recovery.md`.
+
+**Key scripts:**
+- `scripts/backup-databases.sh` — dumps all databases and rsyncs to the backup VM (cron job, runs 02:00 daily)
+- `scripts/restore-databases.sh` — restores a specific date's backup to the running cluster
+
+**When `.env` changes:** re-encrypt and transfer to backup VM:
+```bash
+gpg --symmetric --cipher-algo AES256 --output /tmp/env.gpg base/setup/.env
+scp -i ~/.ssh/backup_key /tmp/env.gpg groep1@integration.switzerlandnorth.cloudapp.azure.com:~/secrets/shift-festival.env.gpg
+rm /tmp/env.gpg
+```
+
+**Estimated RTO (Recovery Time Objective):** 30–60 minutes for a full VM loss.
 
 ## Key Constraints
 

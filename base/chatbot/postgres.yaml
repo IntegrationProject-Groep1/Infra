@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot-db
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: chatbot-db
+  template:
+    metadata:
+      labels:
+        app: chatbot-db
+    spec:
+      securityContext:
+        fsGroup: 70
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 5432
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: CHATBOT_DB_NAME
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+        - name: tmp
+          mountPath: /tmp
+        - name: run-postgres
+          mountPath: /var/run/postgresql
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -h localhost -U $POSTGRES_USER -d postgres
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: chatbot-db-data-pvc
+      - name: tmp
+        emptyDir: {}
+      - name: run-postgres
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot-db-service
+spec:
+  selector:
+    app: chatbot-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP

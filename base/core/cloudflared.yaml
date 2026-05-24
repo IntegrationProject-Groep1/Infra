@@ -1,9 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
-# ArgoCD sync test
 metadata:
   name: cloudflared
 spec:
+  # Two replicas so one tunnel process remains active during pod restarts.
+  # Cloudflare load-balances across all active tunnel connections automatically.
   replicas: 2
   selector:
     matchLabels:
@@ -18,6 +19,9 @@ spec:
         runAsUser: 65532
       affinity:
         podAntiAffinity:
+          # Preferred (not required) so the second pod still schedules on a
+          # single-node cluster. On a multi-node cluster the two replicas will
+          # land on different nodes, surviving a node failure without downtime.
           preferredDuringSchedulingIgnoredDuringExecution:
           - weight: 100
             podAffinityTerm:
@@ -28,7 +32,19 @@ spec:
       containers:
       - name: cloudflared
         image: cloudflare/cloudflared:2024.12.2
-        args: ["tunnel", "--metrics", "0.0.0.0:2000", "--no-autoupdate", "run", "--protocol", "http2"]
+        args:
+          - tunnel
+          - --metrics
+          - "0.0.0.0:2000"
+          # Disable cloudflared's built-in self-updater. In Kubernetes, image
+          # versions are managed by ArgoCD Image Updater — in-process self-updates
+          # would bypass version control and be unpredictable.
+          - --no-autoupdate
+          - run
+          # Force HTTP/2 transport to Cloudflare's edge. The default "auto" mode
+          # may negotiate QUIC (UDP), which Azure's network ACLs can silently drop.
+          - --protocol
+          - http2
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -36,6 +52,11 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
         env:
+          # cloudflare-tunnel-secret is intentionally separate from shift-secrets.
+          # It must be created manually before ArgoCD first syncs the cluster:
+          #   kubectl create secret generic cloudflare-tunnel-secret \
+          #     --from-literal=CLOUDFLARE_TUNNEL_TOKEN=<token> -n shift-festival
+          # See docs/disaster-recovery.md and scripts/create-secret.sh.
         - name: TUNNEL_TOKEN
           valueFrom:
             secretKeyRef:
@@ -55,6 +76,9 @@ spec:
       - name: tmp
         emptyDir: {}
 ---
+# Prevent the cluster from evicting both cloudflared pods simultaneously during
+# node drain or maintenance. Without this, kubectl drain could take both pods
+# offline at once, severing all external access via the Cloudflare Tunnel.
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

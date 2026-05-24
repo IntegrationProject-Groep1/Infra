@@ -62,6 +62,13 @@ patches:
       - op: replace
         path: /spec/rules/0/host
         value: dev-kibana.desiderius.me
+  - target:
+      kind: Ingress
+      name: chatbot-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev-chatbot.desiderius.me
 
   # ── Scale non-essential services to zero ─────────────────────────────────
   - target:

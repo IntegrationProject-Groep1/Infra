@@ -157,6 +157,7 @@ kind: Rollout
 metadata:
   name: facturatie-connector
 spec:
+  progressDeadlineSeconds: 120
   replicas: 1
   strategy:
     canary:

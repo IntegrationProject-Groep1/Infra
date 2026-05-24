@@ -69,6 +69,23 @@ spec:
             secretKeyRef:
               name: shift-secrets
               key: ELASTIC_PASSWORD
+        - name: SERVER_PUBLICBASEURL
+          value: "https://kibana.desiderius.me"
+        - name: XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY
+        - name: XPACK_SECURITY_ENCRYPTIONKEY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: XPACK_SECURITY_ENCRYPTIONKEY
+        - name: XPACK_REPORTING_ENCRYPTIONKEY
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: XPACK_REPORTING_ENCRYPTIONKEY
         livenessProbe:
           httpGet:
             path: /api/status

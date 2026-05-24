@@ -13,6 +13,15 @@ spec:
         - podSelector:
             matchLabels:
               app: frontend-drupal
+        - podSelector:
+            matchLabels:
+              app: frontend-phpmyadmin
+        - podSelector:
+            matchLabels:
+              app: planning
+        - podSelector:
+            matchLabels:
+              app: frontend-mcp
       ports:
         - port: 3306
 ---
@@ -76,6 +85,9 @@ spec:
         - podSelector:
             matchLabels:
               app: pgadmin
+        - podSelector:
+            matchLabels:
+              app: chatbot
       ports:
         - port: 5432
 ---
@@ -96,27 +108,6 @@ spec:
               app: crm
       ports:
         - port: 3306
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-planning-db
-spec:
-  podSelector:
-    matchLabels:
-      app: planning-db
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - podSelector:
-            matchLabels:
-              app: planning
-        - podSelector:
-            matchLabels:
-              app: planning-pgadmin
-      ports:
-        - port: 5432
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -145,6 +136,9 @@ spec:
         - podSelector:
             matchLabels:
               app: monitoring-mcp
+        - podSelector:
+            matchLabels:
+              app: heartbeat-monitor
       ports:
         - port: 9200
         - port: 9300
@@ -193,31 +187,10 @@ spec:
               app: monitoring-agent
         - podSelector:
             matchLabels:
-              app: crm-heartbeat
-        - podSelector:
-            matchLabels:
-              app: facturatie-heartbeat
-        - podSelector:
-            matchLabels:
-              app: frontend-heartbeat
-        - podSelector:
-            matchLabels:
-              app: identity-heartbeat
-        - podSelector:
-            matchLabels:
-              app: kassa-heartbeat
-        - podSelector:
-            matchLabels:
-              app: planning-heartbeat
-        - podSelector:
-            matchLabels:
-              app: monitoring-heartbeat
+              app: heartbeat-monitor
         - podSelector:
             matchLabels:
               app: chatbot
-        - podSelector:
-            matchLabels:
-              app: chatbot-heartbeat
       ports:
         - port: 5672
         - port: 15672

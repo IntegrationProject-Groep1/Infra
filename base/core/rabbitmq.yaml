@@ -5,6 +5,10 @@ metadata:
 spec:
   replicas: 1
   strategy:
+    # Recreate is required because the data PVC uses ReadWriteOnce. A rolling
+    # update would leave the old pod holding the volume lock while the new pod
+    # tries to mount it, causing a Multi-Attach error. Recreate stops the old
+    # pod first, guaranteeing the volume is released before the new pod starts.
     type: Recreate
   selector:
     matchLabels:
@@ -14,11 +18,24 @@ spec:
       labels:
         app: rabbitmq
     spec:
+      # RabbitMQ node name is rabbit@<hostname>. A stable hostname ensures the
+      # node name is deterministic (rabbit@my-rabbit) across pod restarts.
+      # Without this, the name changes on each restart and RabbitMQ cannot
+      # locate its own persisted Mnesia database on the PVC.
       hostname: my-rabbit
       securityContext:
         runAsNonRoot: true
+        # fsGroup: 999 makes all files in mounted volumes owned by GID 999
+        # (the rabbitmq group) on pod startup. This lets the non-root container
+        # write to the PVC without needing an init container chown.
         fsGroup: 999
       initContainers:
+        # Erlang requires the .erlang.cookie to be readable only by its owner
+        # (mode 0600). The PVC provisioner may create the file with wider
+        # permissions (0644). RabbitMQ refuses to start if the cookie is
+        # world-readable, so this init container corrects it before the main
+        # container starts. The conditional check avoids failure on first boot
+        # when the file does not exist yet.
       - name: fix-cookie-permissions
         image: busybox
         command: ["sh", "-c", "if [ -f /var/lib/rabbitmq/.erlang.cookie ]; then chmod 600 /var/lib/rabbitmq/.erlang.cookie; fi"]
@@ -87,6 +104,9 @@ spec:
         livenessProbe:
           tcpSocket:
             port: 5672
+          # RabbitMQ takes 1–2 minutes to fully initialise on first boot while
+          # it sets up the Mnesia database and loads definitions.json. Without
+          # a long initial delay the probe kills the pod before it finishes.
           initialDelaySeconds: 120
           periodSeconds: 20
         readinessProbe:
@@ -104,6 +124,10 @@ spec:
       - name: rabbit-definitions
         secret:
           secretName: rabbitmq-definitions
+      # readOnlyRootFilesystem: true prevents writes to the container filesystem.
+      # RabbitMQ still needs writable /tmp and /var/run/rabbitmq for temp files
+      # and the AMQP socket. These emptyDir volumes satisfy that requirement
+      # without relaxing the root filesystem restriction.
       - name: tmp
         emptyDir: {}
       - name: run-rabbitmq

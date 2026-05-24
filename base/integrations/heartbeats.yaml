@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Rollout
 metadata:
-  name: crm-heartbeat
+  name: heartbeat-monitor
 spec:
   replicas: 1
   strategy:
@@ -12,147 +12,240 @@ spec:
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: crm-heartbeat
+      app: heartbeat-monitor
   template:
     metadata:
       labels:
-        app: crm-heartbeat
+        app: heartbeat-monitor
     spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+        fsGroup: 1000
       containers:
-      - name: heartbeat
+      # ── Core services ────────────────────────────────────────────────────────
+      - name: chatbot
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+          capabilities: {drop: [ALL]}
           readOnlyRootFilesystem: true
         env:
-        - name: SYSTEM_NAME
-          value: "crm"
-        - name: TARGETS
-          value: "crm-receiver-service:3000"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
+        - {name: SYSTEM_NAME, value: "chatbot"}
+        - {name: TARGETS,     value: "chatbot-service:8000"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
         - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQCRM_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCHATBOT_USER}}
         - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQCRM_PASSRAW
----
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: identity-heartbeat
-spec:
-  replicas: 1
-  strategy:
-    canary:
-      steps:
-      - setWeight: 100
-      - pause: {duration: 3m}
-  revisionHistoryLimit: 3
-  selector:
-    matchLabels:
-      app: identity-heartbeat
-  template:
-    metadata:
-      labels:
-        app: identity-heartbeat
-    spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-      - name: heartbeat
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCHATBOT_PASS}}
+      - name: frontend
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+          capabilities: {drop: [ALL]}
           readOnlyRootFilesystem: true
         env:
-        - name: SYSTEM_NAME
-          value: "identity-service"
-        - name: TARGETS
-          value: "identity-service:8000"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
+        - {name: SYSTEM_NAME, value: "frontend"}
+        - {name: TARGETS,     value: "frontend-drupal-service:80"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
         - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_DEFAULT_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFRONTEND_USER}}
         - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_DEFAULT_PASS
----
-apiVersion: argoproj.io/v1alpha1
-kind: Rollout
-metadata:
-  name: planning-heartbeat
-spec:
-  replicas: 1
-  strategy:
-    canary:
-      steps:
-      - setWeight: 100
-      - pause: {duration: 3m}
-  revisionHistoryLimit: 3
-  selector:
-    matchLabels:
-      app: planning-heartbeat
-  template:
-    metadata:
-      labels:
-        app: planning-heartbeat
-    spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-      containers:
-      - name: heartbeat
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFRONTEND_PASS}}
+      - name: kassa
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
+          capabilities: {drop: [ALL]}
           readOnlyRootFilesystem: true
         env:
-        - name: SYSTEM_NAME
-          value: "planning"
-        - name: TARGETS
-          value: "planning-service:30050"
-        - name: RABBITMQ_HOST
-          value: "rabbitmq-service"
-        - name: RABBITMQ_PORT
-          value: "5672"
+        - {name: SYSTEM_NAME, value: "kassa"}
+        - {name: TARGETS,     value: "kassa-web-service:8069"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
         - name: RABBITMQ_USER
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_USER_PLANNING
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQKASSA_USER}}
         - name: RABBITMQ_PASS
-          valueFrom:
-            secretKeyRef:
-              name: shift-secrets
-              key: RABBITMQ_PASS_PLANNING
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQKASSA_PASS}}
+      - name: facturatie
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "facturatie"}
+        - {name: TARGETS,     value: "facturatie-app-service:80"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFACTURATIE_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFACTURATIE_PASS}}
+      - name: crm
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "crm"}
+        - {name: TARGETS,     value: "crm-receiver-service:3000"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCRM_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCRM_PASSRAW}}
+      - name: planning
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "planning"}
+        - {name: TARGETS,     value: "planning-service:30050"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQ_USER_PLANNING}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQ_PASS_PLANNING}}
+      - name: mailing
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "mailing"}
+        - {name: TARGETS,     value: "mailing-service:8080"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMAILING_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMAILING_PASS}}
+      - name: identity-service
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "identity-service"}
+        - {name: TARGETS,     value: "identity-service:8000"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQ_DEFAULT_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQ_DEFAULT_PASS}}
+      - name: monitoring
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "monitoring"}
+        - {name: TARGETS,     value: "elasticsearch-service:9200"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_PASS}}
+      # ── MCP servers ──────────────────────────────────────────────────────────
+      - name: frontend-mcp
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "frontend-mcp"}
+        - {name: TARGETS,     value: "frontend-mcp-service:8006"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFRONTEND_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFRONTEND_PASS}}
+      - name: kassa-mcp
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "kassa-mcp"}
+        - {name: TARGETS,     value: "kassa-mcp-service:8004"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQKASSA_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQKASSA_PASS}}
+      - name: facturatie-mcp
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "facturatie-mcp"}
+        - {name: TARGETS,     value: "facturatie-mcp-service:8007"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFACTURATIE_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQFACTURATIE_PASS}}
+      - name: crm-mcp
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "crm-mcp"}
+        - {name: TARGETS,     value: "crm-mcp-service:8008"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCRM_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQCRM_PASSRAW}}
+      - name: monitoring-mcp
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "monitoring-mcp"}
+        - {name: TARGETS,     value: "monitoring-mcp-service:8005"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_PASS}}

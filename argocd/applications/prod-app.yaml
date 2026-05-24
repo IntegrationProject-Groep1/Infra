@@ -4,6 +4,22 @@ metadata:
   name: shift-festival-prod
   namespace: argocd
   annotations:
+    # ---------------------------------------------------------------------------
+    # ArgoCD Image Updater — image tracking configuration
+    #
+    # Each team service is tracked by its :latest tag using the "digest" strategy.
+    # "digest" means: watch for a new SHA digest pushed to the same tag name.
+    # This is necessary because teams push new builds to :latest rather than
+    # versioned tags — the tag name never changes but the underlying image does.
+    #
+    # allow-tags: regexp:^latest$ restricts tracking to exactly the :latest tag.
+    # This prevents accidental deployment of :dev or any other tag that teams
+    # may push to the same registry.
+    #
+    # When Image Updater detects a new digest it commits the updated image
+    # reference to this repo (write-back-method: git) which then triggers an
+    # ArgoCD sync. The commit is written to the main branch.
+    # ---------------------------------------------------------------------------
     argocd-image-updater.argoproj.io/image-list: >-
       frontend=ghcr.io/integrationproject-groep1/ip-groep1-frontend:latest,
       kassa=ghcr.io/integrationproject-groep1/kassa:latest,
@@ -69,9 +85,14 @@ metadata:
     argocd-image-updater.argoproj.io/kassa-odoo.update-strategy: digest
     argocd-image-updater.argoproj.io/kassa-odoo.allow-tags: regexp:^odoo-latest$
     argocd-image-updater.argoproj.io/kassa-odoo.kustomize.image-name: ghcr.io/integrationproject-groep1/kassa-odoo
+    # write-back-method: git commits updated image digests back to this repo so
+    # ArgoCD can detect the change and trigger a sync. The git-creds secret holds
+    # a GitHub PAT with repo write access (created in the argocd namespace).
     argocd-image-updater.argoproj.io/write-back-method: git:secret:argocd/git-creds
     argocd-image-updater.argoproj.io/write-back-target: kustomization
     argocd-image-updater.argoproj.io/git-branch: main
+  # The resources-finalizer ensures ArgoCD removes all managed resources from the
+  # cluster when this Application object is deleted, preventing orphaned resources.
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -79,18 +100,30 @@ spec:
   source:
     repoURL: https://github.com/integrationproject-groep1/Infra.git
     targetRevision: main
+    # path: . means ArgoCD runs kustomize build at the repo root, which produces
+    # the full production manifest set via the root kustomization.yaml.
     path: .
     kustomize:
+      # images: [] is intentionally empty here — ArgoCD Image Updater manages
+      # image overrides by committing them directly to kustomization.yaml in Git.
+      # ArgoCD then reads those committed overrides on the next sync.
       images: []
   destination:
     server: https://kubernetes.default.svc
     namespace: shift-festival
   syncPolicy:
     automated:
+      # prune: true removes cluster resources that no longer exist in Git.
+      # Required for proper GitOps hygiene — without this, deleted manifests
+      # leave orphaned Deployments, Services, etc. running in the cluster.
       prune: true
+      # selfHeal: true reverts any manual kubectl changes back to the Git state.
+      # Git is the single source of truth; direct cluster edits are not allowed.
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      # ServerSideApply is required to avoid "field is owned by another manager"
+      # conflicts when HPA and ArgoCD both manage fields on the same resource.
       - ServerSideApply=true
     retry:
       limit: 5
@@ -99,11 +132,20 @@ spec:
         factor: 2
         maxDuration: 10m
   ignoreDifferences:
+    # shift-secrets is bootstrapped manually via scripts/create-secret.sh from
+    # the .env file on the VM. ArgoCD does not manage secret values — they are
+    # never committed to Git. Without this entry, ArgoCD would continuously
+    # report OutOfSync and attempt to reset the Secret data to its Git state
+    # (which is empty), effectively wiping all credentials on every sync.
     - group: ""
       kind: Secret
       name: shift-secrets
       jsonPointers:
         - /data
+    # HPA exclusively owns spec.replicas on HPA-managed Rollouts. If ArgoCD
+    # tracked this field, selfHeal would overwrite HPA's scaling decisions with
+    # whatever value (or absence of value) is in Git on every sync cycle,
+    # causing a continuous conflict between ArgoCD and the HPA controller.
     - group: argoproj.io
       kind: Rollout
       jsonPointers:
