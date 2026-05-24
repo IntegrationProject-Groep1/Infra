@@ -34,7 +34,7 @@ images:
   digest: sha256:958c4e934698c59d0f204819abdb94bda5e1d2182be2723e0af534bcd0aea7bf
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:fcf29b90feb7f05475423ea0f5d0764946e6bbe517be8944509cab6e3015f9ba
+  digest: sha256:f6258b34fd553210c8469eff8737f34a56df8929d3f28e348b1760c1b25c01db
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
   digest: sha256:51cfc01665a12f810bc6afcb6ddd78af40877877f77c6b6be50d523714a0fbb6
