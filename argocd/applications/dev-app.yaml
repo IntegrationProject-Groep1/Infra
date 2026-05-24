@@ -80,3 +80,8 @@ spec:
       name: shift-secrets
       jsonPointers:
         - /data
+    - group: ""
+      kind: PersistentVolumeClaim
+      jsonPointers:
+        - /spec/storageClassName
+        - /spec/volumeName
