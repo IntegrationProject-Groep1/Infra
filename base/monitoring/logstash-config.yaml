@@ -132,7 +132,7 @@ stringData:
             }
           }
         } else if "logs" in [tags] {
-          if [system] not in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service"] {
+          if [system] not in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service", "chatbot", "monitoring"] {
             mutate {
               add_field => { "parse_error" => "unknown_system" }
               add_tag   => ["quarantine", "unknown_system"]
