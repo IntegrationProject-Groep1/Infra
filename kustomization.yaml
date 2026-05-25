@@ -40,7 +40,7 @@ images:
   digest: sha256:ed8bbd2b4889879267d66bac544f177079a515af77ff6f56a7e5e1f8d65c4c44
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
-  digest: sha256:0a6da3f78673a1be99ecb576a4ec05b0a14fec5bb1b331a82eb11aba7762a03a
+  digest: sha256:2c159f22cd15e4071df0c6c8f4f88c09c593bca7533fafea5397088bf1645d0b
 - name: ghcr.io/integrationproject-groep1/monitoring-mcp
   newName: ghcr.io/integrationproject-groep1/monitoring-mcp
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
@@ -52,7 +52,7 @@ images:
   digest: sha256:bc5e5ef9fe00e7c54934380312d935657210634349d0c01223c14c7d424360cf
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:7766d1e086cfca7027156f80572c5d21ca63416d5b73cf077130514ab475706e
+  digest: sha256:47533bbe72d2617e20fd21c7cec83e5b4a400ec59cfecc1ef79634f11dd89a9b
 patches:
 - target:
     kind: Rollout
