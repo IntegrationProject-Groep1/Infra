@@ -46,13 +46,13 @@ images:
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
 - name: ghcr.io/integrationproject-groep1/facturatie-mcp
   newName: ghcr.io/integrationproject-groep1/facturatie-mcp
-  digest: sha256:6a20a41d999ba598e3d9f5464836d5a33752e8306fb5eaa961d571be24e83a16
+  digest: sha256:4a581ca713bd8afe37bbdc4d7bc5cfd0208ba064a8210f8709e1dfcb4c86a413
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
-  digest: sha256:1a08c54e741e0e83fe08c6658f51cc5b1ea6727e9867f767fdc67b18c21dba1c
+  digest: sha256:3d63fd04ff95fe32bf24b61a81b28b27173df41a4d82f2605cb8ef7a97c70ebf
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:4da1cbd79349f99b9081bc217cdfc5e2d89a3cd91e5c047df87723ea9d283ca3
+  digest: sha256:f166039ead16dafaba712d2c0cdd0545e61c82ff48a4ae4523f52702251b3fb5
 patches:
 - target:
     kind: Rollout
