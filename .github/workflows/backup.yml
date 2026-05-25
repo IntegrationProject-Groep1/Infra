@@ -102,6 +102,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           request_pty: true
+          command_timeout: 90m
           script: |
             set -euo pipefail
 
