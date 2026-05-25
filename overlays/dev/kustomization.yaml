@@ -1,438 +1,447 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 namespace: shift-festival-dev
-
 labels:
-  - pairs:
-      project: shift-festival
-      env: dev
-      managed-by: Team-Infra
-    includeSelectors: false
-
+- pairs:
+    project: shift-festival
+    env: dev
+    managed-by: Team-Infra
+  includeSelectors: false
 resources:
-  - ../../base
-  - kassa-db-pvc.yaml
-
+- ../../base
+- kassa-db-pvc.yaml
 images:
-  - name: ghcr.io/integrationproject-groep1/kassa-odoo
-    newName: ghcr.io/integrationproject-groep1/kassa
-    digest: sha256:e1831ddf9664ce9d8767d0d8ce663b120aec4c64f22972a39482565e54b03d84
-
+- name: ghcr.io/integrationproject-groep1/kassa-odoo
+  newName: ghcr.io/integrationproject-groep1/kassa
+  digest: sha256:fc9ec0756d69bf680e1887d04ee0b70143c6a5e14172eabcb112c7d2c8983ed4
+- name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+  newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
+  newTag: latest
+  digest: dummy
+- name: ghcr.io/integrationproject-groep1/crm
+  newName: ghcr.io/integrationproject-groep1/crm
+  newTag: latest
+  digest: dummy
+- name: ghcr.io/integrationproject-groep1/planning
+  newName: ghcr.io/integrationproject-groep1/planning
+  digest: sha256:0b6a277917e62a638ec7d3ed06c0c86e94ae27705790c1635cf2010e3bf7df61
+- name: ghcr.io/integrationproject-groep1/identity-service
+  newName: ghcr.io/integrationproject-groep1/identity-service
+  newTag: latest
+  digest: dummy
+- name: ghcr.io/integrationproject-groep1/heartbeat
+  newName: ghcr.io/integrationproject-groep1/heartbeat
+  newTag: latest
+  digest: dummy
+- name: ghcr.io/integrationproject-groep1/chatbot
+  newName: ghcr.io/integrationproject-groep1/chatbot
+  digest: sha256:b1d410121691bd9408b4ca2381d78000071af8730b26d064e01d0da159966ef6
 patches:
-  # ── Dev subdomains ────────────────────────────────────────────────────────
-  - target:
-      kind: Ingress
-      name: frontend-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev.desiderius.me
-  - target:
-      kind: Ingress
-      name: kassa-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-kassa.desiderius.me
-  - target:
-      kind: Ingress
-      name: facturatie-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-facturatie.desiderius.me
-  - target:
-      kind: Ingress
-      name: planning-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-planning.desiderius.me
-  - target:
-      kind: Ingress
-      name: rabbitmq-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-rabbitmq.desiderius.me
-  - target:
-      kind: Ingress
-      name: kibana-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-kibana.desiderius.me
-  - target:
-      kind: Ingress
-      name: chatbot-ingress
-    patch: |-
-      - op: replace
-        path: /spec/rules/0/host
-        value: dev-chatbot.desiderius.me
-
-  # ── Scale non-essential services to zero ─────────────────────────────────
-  - target:
-      kind: Rollout
-      name: frontend-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: kassa-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: facturatie-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: crm-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: planning-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: identity-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: monitoring-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: chatbot-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: frontend-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: kassa-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: facturatie-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: crm-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: monitoring-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: mailing-service
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: monitoring-agent
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Deployment
-      name: pgadmin
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Deployment
-      name: planning-pgadmin
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-
-  # ── Scale monitoring to zero (no ELK stack in dev) ──────────────────────
-  - target:
-      kind: StatefulSet
-      name: elasticsearch
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: es-data
-          emptyDir: {}
-  - target:
-      kind: Deployment
-      name: kibana
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Deployment
-      name: logstash
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: DaemonSet
-      name: elastic-agent
-    patch: |-
-      - op: add
-        path: /spec/template/spec/nodeSelector
-        value:
-          non-existing-node: "true"
-
-  # ── FOSSBilling — html files fresh from image, config/uploads persistent ─
-  - target:
-      kind: Rollout
-      name: fossbilling-app
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: foss-html
-          emptyDir: {}
-
-  # ── Persistent volumes — dev-specific PVCs ──────────────────────────────
-  - target:
-      kind: Deployment
+# ── Dev subdomains ────────────────────────────────────────────────────────
+- target:
+    kind: Ingress
+    name: frontend-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev.desiderius.me
+- target:
+    kind: Ingress
+    name: kassa-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-kassa.desiderius.me
+- target:
+    kind: Ingress
+    name: facturatie-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-facturatie.desiderius.me
+- target:
+    kind: Ingress
+    name: planning-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-planning.desiderius.me
+- target:
+    kind: Ingress
+    name: rabbitmq-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-rabbitmq.desiderius.me
+- target:
+    kind: Ingress
+    name: kibana-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-kibana.desiderius.me
+- target:
+    kind: Ingress
+    name: chatbot-ingress
+  patch: |-
+    - op: replace
+      path: /spec/rules/0/host
+      value: dev-chatbot.desiderius.me
+# ── Scale non-essential services to zero ─────────────────────────────────
+- target:
+    kind: Rollout
+    name: frontend-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: kassa-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: facturatie-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: crm-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: planning-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: identity-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: monitoring-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: chatbot-heartbeat
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: frontend-mcp
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: kassa-mcp
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: facturatie-mcp
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: crm-mcp
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: monitoring-mcp
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: mailing-service
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Rollout
+    name: monitoring-agent
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Deployment
+    name: pgadmin
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Deployment
+    name: planning-pgadmin
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+# ── Scale monitoring to zero (no ELK stack in dev) ──────────────────────
+- target:
+    kind: StatefulSet
+    name: elasticsearch
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: es-data
+        emptyDir: {}
+- target:
+    kind: Deployment
+    name: kibana
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: Deployment
+    name: logstash
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+- target:
+    kind: DaemonSet
+    name: elastic-agent
+  patch: |-
+    - op: add
+      path: /spec/template/spec/nodeSelector
+      value:
+        non-existing-node: "true"
+# ── FOSSBilling — html files fresh from image, config/uploads persistent ─
+- target:
+    kind: Rollout
+    name: fossbilling-app
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: foss-html
+        emptyDir: {}
+# ── Persistent volumes — dev-specific PVCs ──────────────────────────────
+- target:
+    kind: Deployment
+    name: kassa-db
+  patch: |-
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
       name: kassa-db
-    patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: kassa-db
-      spec:
-        template:
-          spec:
-            volumes:
+    spec:
+      template:
+        spec:
+          volumes:
+          - name: data
+            persistentVolumeClaim:
+              claimName: kassa-db-data-pvc-dev
+# ── Ephemeral volumes — test data, no persistence needed ────────────────
+- target:
+    kind: Deployment
+    name: rabbitmq-broker
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: rabbit-data
+        emptyDir: {}
+- target:
+    kind: Deployment
+    name: postgredb
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: data
+        emptyDir: {}
+    - op: add
+      path: /spec/template/spec/initContainers
+      value:
+        - name: fix-permissions
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
             - name: data
-              persistentVolumeClaim:
-                claimName: kassa-db-data-pvc-dev
-
-  # ── Ephemeral volumes — test data, no persistence needed ────────────────
-  - target:
-      kind: Deployment
-      name: rabbitmq-broker
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: rabbit-data
-          emptyDir: {}
-  - target:
-      kind: Deployment
-      name: postgredb
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          emptyDir: {}
-      - op: add
-        path: /spec/template/spec/initContainers
-        value:
-          - name: fix-permissions
-            image: busybox:1.36
-            command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
-            securityContext:
-              runAsUser: 0
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-            volumeMounts:
-              - name: data
-                mountPath: /var/lib/postgresql/data
-  - target:
-      kind: Deployment
-      name: crm-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          emptyDir: {}
-  - target:
-      kind: Deployment
-      name: planning-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: data
-          emptyDir: {}
-      - op: add
-        path: /spec/template/spec/initContainers
-        value:
-          - name: fix-permissions
-            image: busybox:1.36
-            command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
-            securityContext:
-              runAsUser: 0
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-            volumeMounts:
-              - name: data
-                mountPath: /var/lib/postgresql/data
-  - target:
-      kind: Deployment
-      name: pgadmin
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: pgadmin-data
-          emptyDir: {}
-  - target:
-      kind: Rollout
-      name: kassa-integration
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: outbox-data
-          emptyDir: {}
-  - target:
-      kind: Rollout
-      name: integration-planning
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/volumes/0
-        value:
-          name: token-data
-          emptyDir: {}
-
-  # ── Kassa — override hardcoded / vhost so it uses the dev vhost ─────────
-  - target:
-      kind: Rollout
-      name: kassa-web
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/13/value
-        value: "shift-festival-dev"
-
-  # ── Chatbot — override hardcoded / vhost so it uses the dev vhost ────────
-  - target:
-      kind: Rollout
-      name: chatbot
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/env/2/value
-        value: "shift-festival-dev"
-
-  # ── Reduce CPU requests in dev to free scheduling headroom ───────────────
-  - target:
-      kind: Rollout
-      name: frontend-drupal
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Rollout
-      name: kassa-web
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Rollout
-      name: fossbilling-app
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Rollout
-      name: chatbot
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: frontend-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: crm-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: facturatie-db
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: postgredb
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: rabbitmq-broker
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
-  - target:
-      kind: Deployment
-      name: planning-pgadmin
-    patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/cpu
-        value: "50m"
+              mountPath: /var/lib/postgresql/data
+- target:
+    kind: Deployment
+    name: crm-db
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: data
+        emptyDir: {}
+- target:
+    kind: Deployment
+    name: planning-db
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: data
+        emptyDir: {}
+    - op: add
+      path: /spec/template/spec/initContainers
+      value:
+        - name: fix-permissions
+          image: busybox:1.36
+          command: ["sh", "-c", "chown -R 70:70 /var/lib/postgresql/data"]
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+- target:
+    kind: Deployment
+    name: pgadmin
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: pgadmin-data
+        emptyDir: {}
+- target:
+    kind: Rollout
+    name: kassa-integration
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: outbox-data
+        emptyDir: {}
+- target:
+    kind: Rollout
+    name: integration-planning
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/volumes/0
+      value:
+        name: token-data
+        emptyDir: {}
+# ── Kassa — override hardcoded / vhost so it uses the dev vhost ─────────
+- target:
+    kind: Rollout
+    name: kassa-web
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/13/value
+      value: "shift-festival-dev"
+# ── Chatbot — override hardcoded / vhost so it uses the dev vhost ────────
+- target:
+    kind: Rollout
+    name: chatbot
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/env/2/value
+      value: "shift-festival-dev"
+# ── Reduce CPU requests in dev to free scheduling headroom ───────────────
+- target:
+    kind: Rollout
+    name: frontend-drupal
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Rollout
+    name: kassa-web
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Rollout
+    name: fossbilling-app
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Rollout
+    name: chatbot
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: frontend-db
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: crm-db
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: facturatie-db
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: postgredb
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: rabbitmq-broker
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
+- target:
+    kind: Deployment
+    name: planning-pgadmin
+  patch: |-
+    - op: replace
+      path: /spec/template/spec/containers/0/resources/requests/cpu
+      value: "50m"
