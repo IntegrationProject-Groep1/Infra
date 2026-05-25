@@ -104,9 +104,9 @@ restore_mysql() {
 # Run all restores
 # ──────────────────────────────────────────────
 log "=== Restoring PostgreSQL databases ==="
-restore_postgres "postgredb"    "central-postgres.sql.gz"
-restore_postgres "kassa-db"     "kassa-postgres.sql.gz"
-restore_postgres "planning-db"  "planning-postgres.sql.gz"
+restore_postgres "postgredb"  "central-postgres.sql.gz"
+restore_postgres "kassa-db"   "kassa-postgres.sql.gz"
+restore_postgres "chatbot-db" "chatbot-postgres.sql.gz"
 
 log "=== Restoring MariaDB / MySQL databases ==="
 # Secret keys match the keys in base/setup/.env.example
