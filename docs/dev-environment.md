@@ -1,6 +1,6 @@
 # Dev Environment — Setup and Operations Guide
 
-**Last updated:** 2026-05-24
+**Last updated:** 2026-05-25
 
 ---
 
@@ -14,16 +14,35 @@
 | RabbitMQ | Separate vhost `shift-festival-dev`, created automatically on `dev-on` |
 | Scaling | Manual via GitHub Actions + automatic shutdown after 4 hours of inactivity |
 | Images | `:latest-dev` tags via ArgoCD Image Updater |
-| Management | Manual `kubectl apply -k` — no ArgoCD auto-sync for dev |
+| Management | ArgoCD auto-sync enabled (`prune: false`, `selfHeal: false`) — Image Updater commits trigger syncs, manual scaling via GitHub Actions |
 | Monitoring | ArgoCD UI (`argocd.desiderius.me`) for read-only pod status, Kibana for logs |
 
 ---
 
-## Why ArgoCD auto-sync is disabled for dev
+## ArgoCD sync behaviour for dev
 
-The VM runs production and dev on the same node. ArgoCD auto-sync would start all dev pods simultaneously, causing CPU spikes that affect production workloads. Dev is therefore managed manually through GitHub Actions workflows with a phased startup sequence.
+ArgoCD auto-sync is enabled with `prune: false` and `selfHeal: false`. This means:
+- ArgoCD **will** sync when Image Updater commits a new image digest to `overlays/dev/kustomization.yaml` (required for image updates to reach the cluster)
+- ArgoCD **will not** delete resources (`prune: false`) — pods scaled to 0 stay scaled to 0
+- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden
 
-> **ArgoCD OutOfSync is expected for dev.** After `dev-off` shuts the environment down, ArgoCD will show the dev app as OutOfSync. This is by design — the app is suspended, not broken. Use ArgoCD only to check pod status, not sync state.
+The phased startup in `dev-on` temporarily pauses ArgoCD sync to prevent all pods starting simultaneously (CPU spike risk on single-node VM), then re-enables it after the phases complete.
+
+> **ArgoCD OutOfSync after dev-off is expected.** When `dev-off` scales all pods to 0, ArgoCD shows the app as OutOfSync because the live state differs from Git. This is by design. Use ArgoCD only to check pod status, not sync state.
+
+### ignoreDifferences
+
+The dev ArgoCD app ignores the following fields to prevent false sync conflicts:
+
+| Resource | Field | Reason |
+|---|---|---|
+| `Secret/shift-secrets` | `/data` | Managed via `kubectl patch` outside ArgoCD |
+| All PVCs | `/spec/storageClassName`, `/spec/volumeName` | Set by cluster provisioner — immutable after creation |
+| All Rollouts | `/spec/replicas` | Owned by HPA — ArgoCD must not reset this |
+
+### Application CRD management (App of Apps)
+
+A root ArgoCD application (`argocd-apps`) manages `argocd/applications/` from Git. Changes to `dev-app.yaml` or `prod-app.yaml` are automatically applied — no manual `kubectl apply` needed.
 
 ---
 
@@ -44,7 +63,7 @@ On every `dev-on` run, `shift-secrets` is always re-copied in full from the prod
 - `shift-secrets` — always re-copied from `shift-festival`, then sanitized:
   - `RABBITMQ_VHOST` and `RABBIT_VHOST` → overridden to `shift-festival-dev`
   - External service credentials zeroed out: `SENDGRID_API_KEY`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SF_CLIENT_ID`, `SF_CLIENT_SECRET`, `SF_INSTANCE_URL`, `SF_REFRESH_TOKEN`, all `TEAMS_WEBHOOK_*`
-  - `NVIDIA_API_KEY` and `BILLING_API_TOKEN` kept from prod — shared with dev for testing (usage is negligible)
+  - `NVIDIA_API_KEY`, `BILLING_API_TOKEN`, and `BILLING_WEB_URL` kept from prod — shared with dev for testing (usage is negligible)
   - Internal credentials kept: DB passwords, RabbitMQ user passwords
 - `rabbitmq-definitions` — copied from `shift-festival` if not yet present (contains RabbitMQ user definitions)
 - `cloudflare-tunnel-secret` — copied from `shift-festival` if not yet present
@@ -184,6 +203,7 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] DNS records created via Cloudflare (`dev-*.desiderius.me`)
 - [x] GitHub Actions `dev-on.yml` workflow (phased startup)
 - [x] GitHub Actions `dev-off.yml` workflow (4-hour inactivity cron)
+- [x] `dev-off` deletes `dev-last-active` ConfigMap — prevents `dev-on` from skipping phased startup after shutdown
 - [x] Selective PVC / emptyDir storage configuration
 - [x] PVC for kassa-db (`kassa-db-data-pvc-dev`) — Odoo DB survives restarts
 - [x] Secret bootstrap in `dev-on` — always re-copy + sanitize `shift-secrets` from prod; copy `rabbitmq-definitions` and `cloudflare-tunnel-secret` if not present
@@ -191,6 +211,13 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] RabbitMQ default vhost queue cleanup — automated in `dev-on` Phase 1 to prevent AMQP 406 conflicts
 - [x] Cloudflare Tunnel route for `dev-rabbitmq.desiderius.me`
 - [x] Kassa image alias (`kassa-odoo`) — separates Odoo image updates from kassa integration image updates in Image Updater
+- [x] Chatbot RabbitMQ vhost override — JSON patch at env index 2 (`RABBITMQ_VHOST: shift-festival-dev`)
+- [x] Kassa RabbitMQ vhost override — JSON patch at env index 13 (`RABBIT_VHOST: shift-festival-dev`)
+- [x] ArgoCD `ignoreDifferences` for PVC storageClassName/volumeName, shift-secrets data, and Rollout replicas
+- [x] `RespectIgnoreDifferences: true` in syncOptions — prevents ArgoCD from patching ignored fields during sync
+- [x] `prune: false` + `selfHeal: false` — ArgoCD only syncs image updates, never deletes or overrides manual scaling
+- [x] App of Apps (`argocd-apps`) — root ArgoCD app manages `argocd/applications/` so changes to Application CRDs are auto-applied from Git
+- [x] Image Updater `allow-tags` corrected to `latest-dev` — was incorrectly set to `dev`, causing all dev images to be skipped
 
 ### Pending (other teams)
 - [ ] All teams — initialize app on first `dev-on` (Drupal, FossBilling, Odoo DB)
@@ -213,4 +240,8 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] Secret sync → full re-copy from prod on every dev-on (no missing keys)
 - [x] RabbitMQ queue cleanup → default vhost queues cleared on dev-on
 - [x] 4-hour inactivity → auto-shutdown confirmed working
+- [x] Chatbot RabbitMQ 403 error fixed — vhost override in overlay
+- [x] ArgoCD PVC sync errors fixed — `ignoreDifferences` + `RespectIgnoreDifferences`
+- [x] Image Updater `allow-tags` fixed — was `^dev$`, now `^latest-dev$`
+- [ ] End-to-end Image Updater test — team pushes to dev → `dev-on` auto-triggers
 - [ ] End-to-end integration test across all services via RabbitMQ
