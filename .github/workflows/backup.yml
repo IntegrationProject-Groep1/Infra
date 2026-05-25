@@ -101,8 +101,6 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
-          request_pty: true
-          command_timeout: 90m
           script: |
             set -euo pipefail
 
@@ -117,7 +115,11 @@ jobs:
               exit 1
             fi
 
-            bash "$SCRIPT"
+            # Run in background so the SSH session can exit before the script finishes.
+            # Exporting 16 images takes 20-30 min — longer than any SSH action timeout.
+            LOG="/tmp/backup-images.log"
+            nohup bash "$SCRIPT" > "$LOG" 2>&1 &
+            echo "Image backup started in background (PID: $!). Check $LOG on the VM for status."
 
   sync-git-mirror:
     name: Update Git mirror on backup VM
