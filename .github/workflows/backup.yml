@@ -115,11 +115,48 @@ jobs:
               exit 1
             fi
 
-            # Run in background so the SSH session can exit before the script finishes.
+            # Run in background so the SSH session can close and reopen to check status.
             # Exporting 16 images takes 20-30 min — longer than any SSH action timeout.
             LOG="/tmp/backup-images.log"
+            PIDFILE="/tmp/backup-images.pid"
             nohup bash "$SCRIPT" > "$LOG" 2>&1 &
+            echo $! > "$PIDFILE"
             echo "Image backup started in background (PID: $!). Check $LOG on the VM for status."
+
+      - name: Wait for image backup to complete
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          command_timeout: 60m
+          script: |
+            PIDFILE="/tmp/backup-images.pid"
+            LOG="/tmp/backup-images.log"
+
+            if [[ ! -f "$PIDFILE" ]]; then
+              echo "PID file not found — backup may not have started"
+              exit 1
+            fi
+
+            PID=$(cat "$PIDFILE")
+            echo "Waiting for backup process (PID: $PID) to finish..."
+
+            while kill -0 "$PID" 2>/dev/null; do
+              sleep 30
+            done
+
+            echo "=== backup-images.log ==="
+            cat "$LOG"
+
+            # Check if the log ends with success marker
+            if grep -q "=== Image backup complete ===" "$LOG"; then
+              echo "Image backup completed successfully."
+            else
+              echo "Image backup appears to have failed — see log above."
+              exit 1
+            fi
 
   sync-git-mirror:
     name: Update Git mirror on backup VM
