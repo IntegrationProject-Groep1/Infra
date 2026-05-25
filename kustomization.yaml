@@ -46,7 +46,7 @@ images:
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
 - name: ghcr.io/integrationproject-groep1/facturatie-mcp
   newName: ghcr.io/integrationproject-groep1/facturatie-mcp
-  digest: sha256:f51e101dd3f4722408371ecad7e0400186df38f7ab51d6e82a9161e4aff9d0a0
+  digest: sha256:97ac414d5e69ac6bce6fc2eeff4616ea94aaef49200fd3bab3103e8d3f8909c1
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
   digest: sha256:1d5dacb9c2ba9513e7c18e3912d1830858c297a4ad094096c6689c5ddc1e2f38
