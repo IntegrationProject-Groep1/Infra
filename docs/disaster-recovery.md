@@ -54,12 +54,13 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
 Run this **once on the primary VM**:
 
 ```bash
-echo "ehbstudent ALL=(ALL) NOPASSWD: /usr/bin/ctr" \
+echo "ehbstudent ALL=(ALL) NOPASSWD: /usr/bin/ctr, /usr/bin/chown" \
   | sudo tee /etc/sudoers.d/ctr-backup
 sudo chmod 440 /etc/sudoers.d/ctr-backup
 
-# Verify — this must return without a password prompt
-sudo -n ctr version
+# Verify — both must return without a password prompt
+sudo -n /usr/bin/ctr version
+sudo -n /usr/bin/chown --version
 ```
 
 ### Step 1.3 — Encrypt and transfer the secrets file

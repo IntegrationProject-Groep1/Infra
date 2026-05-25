@@ -13,6 +13,8 @@ BACKUP_VM_HOST="${BACKUP_VM_HOST:?Set BACKUP_VM_HOST}"
 BACKUP_VM_KEY="${BACKUP_VM_KEY:-$HOME/.ssh/backup_key}"
 REMOTE_DIR="backups/images"
 SSH_OPTS="-i $BACKUP_VM_KEY -o StrictHostKeyChecking=no -o BatchMode=yes"
+TMPDIR="$HOME/image-backup-tmp"
+mkdir -p "$TMPDIR"
 
 log()  { echo "[$(date +%T)] $*"; }
 fail() { echo "[$(date +%T)] ERROR: $*" >&2; exit 1; }
@@ -36,7 +38,7 @@ echo "$IMAGES" | sed 's/^/  /'
 
 for image in $IMAGES; do
   name=$(echo "$image" | tr '/:@' '_')
-  tmp="/tmp/${name}.tar"
+  tmp="$TMPDIR/${name}.tar"
 
   log "Pulling $image"
   # Use absolute path so the sudoers NOPASSWD rule matches regardless of PATH in the SSH session
@@ -49,8 +51,9 @@ for image in $IMAGES; do
   rsync -az --progress -e "ssh $SSH_OPTS" \
     "$tmp" "$BACKUP_VM_USER@$BACKUP_VM_HOST:$REMOTE_DIR/${name}.tar"
 
-  # Export creates the tar as root — remove with sudo
-  sudo rm -f "$tmp"
+  # ctr export writes as root even to a user-owned dir; fix ownership so we can clean up
+  sudo chown "$USER" "$tmp"
+  rm -f "$tmp"
   log "Done: $image"
 done
 
