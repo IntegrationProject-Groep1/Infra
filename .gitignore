@@ -19,6 +19,7 @@ overlays/prod/.env
 overlays/dev/.env
 base/setup/.env
 base/setup/.env*
+!base/setup/.env.example
 
 # Kubernetes secrets (contain credentials)
 **/secrets.yaml

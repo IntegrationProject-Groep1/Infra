@@ -88,6 +88,30 @@ jobs:
               "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/shift-festival.env.gpg"
 
             rm /tmp/env.gpg
+
+            # Back up the rabbitmq-definitions secret (users, vhosts, permissions).
+            # RabbitMQ cannot start without this secret and it is not in the .env.
+            RABBIT_DEF=$(kubectl get secret rabbitmq-definitions -n shift-festival \
+              -o jsonpath='{.data.definitions\.json}' 2>/dev/null | base64 -d || true)
+
+            if [[ -n "$RABBIT_DEF" ]]; then
+              echo "$RABBIT_DEF" \
+                | gpg --batch --yes \
+                    --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+                    --symmetric --cipher-algo AES256 \
+                    --output /tmp/rabbitmq-definitions.gpg
+
+              scp -i "$HOME/.ssh/backup_key" \
+                -o StrictHostKeyChecking=no \
+                /tmp/rabbitmq-definitions.gpg \
+                "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/rabbitmq-definitions.gpg"
+
+              rm /tmp/rabbitmq-definitions.gpg
+              echo "rabbitmq-definitions synced to backup VM"
+            else
+              echo "WARNING: rabbitmq-definitions secret not found — skipping"
+            fi
+
             echo "Secrets synced to backup VM"
 
   backup-images:

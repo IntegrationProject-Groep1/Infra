@@ -265,6 +265,13 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
+
+# Restore the RabbitMQ definitions secret (users, vhosts, permissions).
+# Without this, RabbitMQ cannot start and all services that depend on it will crash.
+gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
+  | kubectl create secret generic rabbitmq-definitions \
+      --from-file=definitions.json=/dev/stdin \
+      -n shift-festival
 ```
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
@@ -384,6 +391,12 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
+
+# Restore RabbitMQ definitions secret (required for RabbitMQ to start)
+gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
+  | kubectl create secret generic rabbitmq-definitions \
+      --from-file=definitions.json=/dev/stdin \
+      -n shift-festival
 
 # 6. Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
 kubectl get application shift-festival-prod -n argocd
@@ -512,6 +525,7 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ Apply cloudflare-tunnel-secret (see Step 3.5 — separate secret!)
 □ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
 □ Install ArgoCD + apply argocd/ manifests: kubectl apply -k argocd/
+□ Restore rabbitmq-definitions secret: gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg | kubectl create secret generic rabbitmq-definitions --from-file=definitions.json=/dev/stdin -n shift-festival
 □ Wait for *-db pods to be Running
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
@@ -530,6 +544,7 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ Decrypt .env and apply secrets (same as Scenario A)
 □ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
 □ Install ArgoCD + apply argocd/ manifests: kubectl apply -k argocd/
+□ Restore rabbitmq-definitions secret (see Scenario A checklist)
 □ Update ArgoCD repoURL to new repo (kubectl edit application shift-festival-prod -n argocd)
 □ Restore databases: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Verify: kubectl get pods -n shift-festival
