@@ -44,28 +44,28 @@ spec:
         resources:
           requests:
             cpu: 100m
-            memory: 500Mi
+            memory: 400Mi
           limits:
-            cpu: 500m
-            memory: 1.5Gi
+            cpu: 400m
+            memory: 900Mi
         livenessProbe:
           httpGet:
             host: 127.0.0.1
             path: /stats
             port: 6791
-          initialDelaySeconds: 60
+          initialDelaySeconds: 30
           periodSeconds: 30
-          timeoutSeconds: 15
-          failureThreshold: 8
+          timeoutSeconds: 5
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             host: 127.0.0.1
             path: /stats
             port: 6791
-          initialDelaySeconds: 90
-          periodSeconds: 15
-          timeoutSeconds: 10
-          failureThreshold: 6
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
         volumeMounts:
         - name: config
           mountPath: /etc/elastic-agent/elastic-agent.yml
