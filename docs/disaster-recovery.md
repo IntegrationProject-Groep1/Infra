@@ -284,9 +284,14 @@ kubectl apply -k argocd/
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
 
-### Step 3.6 — Wait for ArgoCD to sync, then disable auto-sync and scale down ELK
+### Step 3.6 — Fix kernel limits, wait for ArgoCD sync, disable auto-sync, scale down non-essentials
 
 ```bash
+# IMPORTANT: Raise inotify limits first. k3s with many pods will hit the default
+# limit of 128 inotify instances, causing pods to fail with "too many open files".
+sudo sysctl -w fs.inotify.max_user_instances=512
+sudo sysctl -w fs.inotify.max_user_watches=524288
+
 # Check ArgoCD sync status (target: Synced / Healthy)
 kubectl get application shift-festival-prod -n argocd
 
@@ -298,13 +303,31 @@ kubectl apply -k .
 kubectl patch application shift-festival-prod -n argocd --type=merge \
   -p='{"spec":{"syncPolicy":null}}'
 
-# IMPORTANT: Scale down the ELK stack right away.
-# The backup VM has fewer CPU/RAM resources than the primary VM.
-# Elasticsearch alone needs 1–2 GB of JVM heap. If it stays up, it will
-# starve the application pods and cause Pending / OOMKilled states.
+# Get the ArgoCD initial admin password (username is always "admin"):
+kubectl get secret argocd-initial-admin-secret -n argocd \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+
+# IMPORTANT: Scale down monitoring and MCP services — the backup VM cannot run
+# the full stack. ELK alone needs 1–2 GB JVM heap; all MCPs + heartbeat add up.
+# elastic-agent runs as a DaemonSet — disable it via nodeSelector, not replicas.
+kubectl patch daemonset elastic-agent -n shift-festival \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-existing":"true"}}}}}'
+
+# Scale down Deployments (ELK stack):
 kubectl scale deployment elasticsearch-deployment logstash-deployment \
-  kibana-deployment elastic-agent-deployment heartbeat-deployment \
-  --replicas=0 -n shift-festival
+  kibana-deployment -n shift-festival --replicas=0
+
+# Scale down Rollouts (MCP servers, monitoring, chatbot sidecars — not needed in DR):
+for name in heartbeat-monitor monitoring-agent monitoring-mcp \
+            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy; do
+  kubectl patch rollout "$name" -n shift-festival \
+    --type=merge -p='{"spec":{"replicas":0}}' 2>/dev/null || true
+done
+
+# IMPORTANT: The ingress-nginx-controller starts at 0 replicas on the backup VM.
+# Without it, cloudflared cannot route any traffic — all hostnames return 502.
+kubectl scale deployment ingress-nginx-controller -n shift-festival --replicas=1
+kubectl rollout status deployment ingress-nginx-controller -n shift-festival
 
 # Watch until all *-db pods show Running (3–5 minutes while images pull)
 kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
@@ -322,19 +345,31 @@ ls ~/backups/databases/
 bash scripts/restore-databases.sh 2026-05-22 ~/backups/databases/2026-05-22
 ```
 
-### Step 3.8 — Restart application pods and verify RabbitMQ definitions loaded
+### Step 3.8 — Restart application pods and fix RabbitMQ queue conflicts
 
 ```bash
+# Restart RabbitMQ so it loads the definitions secret (users, vhosts, queues).
+# It may have started before the secret existed and is missing its configuration.
 kubectl rollout restart deployment rabbitmq-broker -n shift-festival
 kubectl rollout status deployment rabbitmq-broker -n shift-festival
 
-# After RabbitMQ is back up, restart the services that connect to it.
-# They may have crashed before RabbitMQ had its definitions loaded.
-kubectl rollout restart deployment \
-  facturatie-connector integration-crm integration-planning mailing-service \
-  -n shift-festival 2>/dev/null || true   # some may be Rollouts — ignore errors
-
+# After RabbitMQ is back up, restart all application deployments.
 kubectl rollout restart deployment -n shift-festival
+
+# FIX: CRM dead-letter queue mismatch after definitions restore.
+# The definitions backup creates crm.dead-letter with x-dead-letter-exchange='',
+# but the CRM service code declares it without that argument — RabbitMQ rejects
+# it with PRECONDITION_FAILED (406). Delete the stale queue so CRM recreates it.
+RABBIT_USER=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQCRM_USER}' | base64 -d)
+RABBIT_PASS=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQCRM_PASSRAW}' | base64 -d)
+kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
+  rabbitmqadmin -u "$RABBIT_USER" -p "$RABBIT_PASS" delete queue name=crm.dead-letter
+unset RABBIT_USER RABBIT_PASS
+
+# Restart CRM so it recreates the queue cleanly
+kubectl delete pod -n shift-festival -l app=integration-crm
 ```
 
 ### Step 3.9 — Update Cloudflare Tunnel
@@ -432,7 +467,11 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
 
-# 6. Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
+# 6. Raise inotify limits (default 128 is too low for k3s with many pods)
+sudo sysctl -w fs.inotify.max_user_instances=512
+sudo sysctl -w fs.inotify.max_user_watches=524288
+
+# Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
 kubectl get application shift-festival-prod -n argocd
 # Target: SYNC STATUS = Synced, HEALTH STATUS = Healthy
 #
@@ -443,10 +482,21 @@ kubectl apply -k .
 kubectl patch application shift-festival-prod -n argocd --type=merge \
   -p='{"spec":{"syncPolicy":null}}'
 
-# 6c. Scale down ELK — the backup VM cannot handle Elasticsearch alongside the app stack
+# 6c. Scale down monitoring and non-essential services (backup VM is undersized)
+kubectl patch daemonset elastic-agent -n shift-festival \
+  -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-existing":"true"}}}}}'
 kubectl scale deployment elasticsearch-deployment logstash-deployment \
-  kibana-deployment elastic-agent-deployment heartbeat-deployment \
-  --replicas=0 -n shift-festival
+  kibana-deployment -n shift-festival --replicas=0
+for name in heartbeat-monitor monitoring-agent monitoring-mcp \
+            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy; do
+  kubectl patch rollout "$name" -n shift-festival \
+    --type=merge -p='{"spec":{"replicas":0}}' 2>/dev/null || true
+done
+
+# 6d. The ingress-nginx-controller starts at 0 replicas — scale it up.
+# Without it, all hostnames return 502 (cloudflared can't reach any service).
+kubectl scale deployment ingress-nginx-controller -n shift-festival --replicas=1
+kubectl rollout status deployment ingress-nginx-controller -n shift-festival
 
 # 7. Watch database pods come up (required before restore)
 kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
