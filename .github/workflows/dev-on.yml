@@ -194,6 +194,11 @@ jobs:
             kubectl patch application shift-festival-dev -n argocd \
               --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}' 2>/dev/null || true
 
+            # Delete NodePort services that share ports with prod — kustomize will recreate them as ClusterIP
+            kubectl delete service crm-mcp-service kassa-mcp-service frontend-mcp-service \
+              facturatie-mcp-service frontend-phpmyadmin-service \
+              -n shift-festival-dev 2>/dev/null || true
+
             kubectl apply -k overlays/dev --prune=false 2>/dev/null || true
 
             kubectl scale deployment --all -n shift-festival-dev --replicas=0 2>/dev/null || true
