@@ -4,5 +4,4 @@ kind: Kustomization
 resources:
   - prod-app.yaml
   - dev/
-  - root-app.yaml
 

@@ -68,7 +68,19 @@ jobs:
             echo "running=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Already running — reset inactivity timer
+      - name: Already running — copy overlay to VM
+        if: steps.dev_status.outputs.running == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          source: "overlays/dev/*"
+          target: "/home/ehbstudent/shiftfestival/overlays/dev"
+          strip_components: 2
+
+      - name: Already running — apply overlay and reset inactivity timer
         if: steps.dev_status.outputs.running == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -77,11 +89,12 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 60022
           script: |
-            echo "Dev is already running — resetting inactivity timer"
+            echo "Dev is already running — applying updated overlay"
+            kubectl apply -k /home/ehbstudent/shiftfestival/overlays/dev --prune=false 2>/dev/null || true
             kubectl create configmap dev-last-active -n shift-festival-dev \
               --from-literal=timestamp=$(date +%s) \
               --dry-run=client -o yaml | kubectl apply -f -
-            echo "✅ Timer reset — ArgoCD handles the image update"
+            echo "✅ Overlay applied and timer reset"
 
       - name: Copy overlay to VM
         if: steps.dev_status.outputs.running == 'false'
@@ -227,7 +240,7 @@ jobs:
 
             kubectl scale deployment cloudflared -n shift-festival-dev --replicas=1
 
-            for rollout in frontend-drupal kassa-web fossbilling-app identity-service integration-crm integration-planning kassa-integration chatbot; do
+            for rollout in frontend-drupal kassa-web fossbilling-app identity-service integration-crm integration-planning kassa-integration chatbot frontend-mcp kassa-mcp facturatie-mcp crm-mcp monitoring-mcp; do
               kubectl patch rollout $rollout -n shift-festival-dev \
                 --type=merge -p '{"spec":{"replicas":1}}' 2>/dev/null || true
               sleep 5
