@@ -39,17 +39,18 @@ for image in $IMAGES; do
   tmp="/tmp/${name}.tar"
 
   log "Pulling $image"
-  # sudo -n fails immediately if a password would be required (catches missing NOPASSWD config early)
-  sudo -n ctr images pull "$image" || fail "Failed to pull $image — ensure NOPASSWD is configured for ctr (see docs/disaster-recovery.md Step 1.2)"
+  # Use absolute path so the sudoers NOPASSWD rule matches regardless of PATH in the SSH session
+  sudo -n /usr/local/bin/ctr images pull "$image" || fail "Failed to pull $image — ensure NOPASSWD is configured for ctr (see docs/disaster-recovery.md Step 1.2)"
 
   log "Exporting → $tmp"
-  sudo -n ctr images export "$tmp" "$image" || fail "Failed to export $image"
+  sudo -n /usr/local/bin/ctr images export "$tmp" "$image" || fail "Failed to export $image"
 
   log "Transferring to backup VM"
   rsync -az --progress -e "ssh $SSH_OPTS" \
     "$tmp" "$BACKUP_VM_USER@$BACKUP_VM_HOST:$REMOTE_DIR/${name}.tar"
 
-  rm -f "$tmp"
+  # Export creates the tar as root — remove with sudo
+  sudo rm -f "$tmp"
   log "Done: $image"
 done
 
