@@ -3,10 +3,11 @@
 # ShiftFestival - Infra Team
 #
 # PURPOSE:
-#   Stops the dev environment by suspending the ArgoCD Application when
-#   no activity has been detected on the Feature-dev-environment branch
-#   for 4 hours. The timer is shared across all teams — as long as any
-#   team pushes, the dev env stays up.
+#   Stops the dev environment and pauses ArgoCD reconciliation via the
+#   skip-reconcile annotation when no activity has been detected for 4 hours.
+#   The Application is kept alive so ArgoCD Image Updater continues watching
+#   for new :dev images — a new image push will trigger dev-on automatically.
+#   The timer is shared across all teams — any push keeps the env up.
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
@@ -94,10 +95,9 @@ jobs:
 
             kubectl delete configmap dev-last-active -n shift-festival-dev 2>/dev/null || true
 
-            echo "Deleting ArgoCD Application to stop reconciliation while dev is off..."
-            kubectl patch application shift-festival-dev -n argocd \
-              --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
-            kubectl delete application shift-festival-dev -n argocd 2>/dev/null || true
+            echo "Pausing ArgoCD reconciliation while dev is off..."
+            kubectl annotate application shift-festival-dev -n argocd \
+              argocd.argoproj.io/skip-reconcile=true --overwrite 2>/dev/null || true
 
             echo ""
             echo "✅ Dev environment is DOWN"

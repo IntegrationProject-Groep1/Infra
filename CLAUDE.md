@@ -96,12 +96,32 @@ Re-run whenever `setup/.env` changes.
 
 **Dev environment lifecycle (`shift-festival-dev`):**
 The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is created and deleted by the GitHub Actions workflows:
-- `dev-on.yml` — SCPs `dev-app.yaml` to the VM and applies it via `kubectl apply -f`. Also SCPs the overlay and runs the phased startup.
-- `dev-off.yml` — Removes the Application finalizer and deletes it so ArgoCD stops all reconciliation for the dev namespace. This is intentional: keeping the Application alive when dev is off causes the ArgoCD controller to reconcile ~100 resources continuously, spiking CPU to 1000m+.
+- `dev-on.yml` — Runs a phased startup in this order:
+  1. SCP overlay + `dev-app.yaml` to the VM
+  2. Create namespace and copy secrets from prod
+  3. Delete the 5 MCP/phpmyadmin NodePort services (they conflict with prod ports — kustomize recreates them as ClusterIP)
+  4. `kubectl apply -k overlays/dev` — apply all resources
+  5. Scale everything to 0
+  6. Phase 1: start RabbitMQ + databases, create dev vhost
+  7. Phase 2: start all application pods
+  8. **After Phase 2:** `kubectl apply -f dev-app.yaml` — register with ArgoCD last, so it sees resources already in correct state → minimal reconciliation work → no CPU spike
+- `dev-off.yml` — Scales all workloads to 0, then removes the Application finalizer and deletes the Application entirely. This is intentional: keeping the Application alive when dev is off causes the ArgoCD controller to reconcile ~100 resources continuously, spiking CPU by 400–500m.
+
+**CPU characteristics of this VM (4-core EPYC):**
+- Dev OFF: ~50% CPU (prod + ArgoCD + ELK)
+- Dev ON startup: ~75–85% peak (temporary, during pod startup)
+- Dev ON stable: ~80–90% CPU
+- Do not leave dev running without active use — the 4h auto-off timer (`dev-off.yml` schedule) enforces this.
+
+**NodePort conflicts between prod and dev:**
+The 5 MCP services and phpmyadmin use NodePorts that are occupied by prod on the same cluster. The dev overlay patches them to ClusterIP. However, `kubectl apply` cannot change an existing Service type in-place — `dev-on` must delete them first so they are recreated correctly.
+
+**ArgoCD `ignoreDifferences` for dev:**
+The dev Application ignores drift on: `Secret/shift-secrets` (managed outside ArgoCD), PVC `storageClassName`/`volumeName` (set by cluster provisioner), `Rollout/spec.replicas` (owned by HPA), `HPA/spec.minReplicas` (live state drifts), and `StatefulSet/elasticsearch/spec.replicas` (patched to 0 by overlay). Without these, the dev app stays permanently OutOfSync and drives ArgoCD CPU high.
 
 Do **not** use `git pull` on the VM. Files are delivered via SCP in the workflows.
 
-When making changes to `dev-app.yaml`, the new version will be applied automatically on the next `dev-on` run (it gets SCPd fresh each time).
+When making changes to `dev-app.yaml`, the new version is applied automatically on the next `dev-on` run (SCPd fresh each time).
 
 ## Rollback and Recovery
 
