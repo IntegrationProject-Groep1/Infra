@@ -356,19 +356,22 @@ kubectl rollout status deployment rabbitmq-broker -n shift-festival
 # After RabbitMQ is back up, restart all application deployments.
 kubectl rollout restart deployment -n shift-festival
 
-# FIX: CRM dead-letter queue mismatch after definitions restore.
-# The definitions backup creates crm.dead-letter with x-dead-letter-exchange='',
-# but the CRM service code declares it without that argument — RabbitMQ rejects
-# it with PRECONDITION_FAILED (406). Delete the stale queue so CRM recreates it.
+# FIX: CRM queue argument mismatch after definitions restore.
+# The definitions backup may have CRM queues (crm.incoming, crm.dead-letter, etc.)
+# with different x-dead-letter-exchange arguments than what the CRM service code
+# declares. RabbitMQ rejects redeclaration with PRECONDITION_FAILED (406).
+# Fix: delete all CRM queues so the service recreates them with correct arguments.
 RABBIT_USER=$(kubectl get secret shift-secrets -n shift-festival \
   -o jsonpath='{.data.RABBITMQCRM_USER}' | base64 -d)
 RABBIT_PASS=$(kubectl get secret shift-secrets -n shift-festival \
   -o jsonpath='{.data.RABBITMQCRM_PASSRAW}' | base64 -d)
-kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
-  rabbitmqadmin -u "$RABBIT_USER" -p "$RABBIT_PASS" delete queue name=crm.dead-letter
+for q in crm.dead-letter crm.incoming crm.dlx crm.outgoing; do
+  kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
+    rabbitmqadmin -u "$RABBIT_USER" -p "$RABBIT_PASS" delete queue name="$q" 2>/dev/null || true
+done
 unset RABBIT_USER RABBIT_PASS
 
-# Restart CRM so it recreates the queue cleanly
+# Restart CRM so it recreates all queues cleanly
 kubectl delete pod -n shift-festival -l app=integration-crm
 ```
 
@@ -581,6 +584,64 @@ bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 
 # 10. Verify everything is running
 kubectl get pods -n shift-festival
+```
+
+---
+
+## Scenario C — Primary VM still running but databases are corrupted
+
+Use this when the primary Kubernetes cluster is healthy but one or more databases contain corrupted or incorrect data and need to be rolled back to a backup point.
+
+> **Warning:** This overwrites live database contents. All data written after the backup date is permanently lost.
+
+```bash
+# SSH into the primary VM
+ssh -p 60022 ehbstudent@<primary-vm-ip>
+
+# Go to the Infra repo (deploy.yml keeps it synced here)
+cd ~/shiftfestival
+
+# 1. Scale down all application pods that write to the databases.
+#    This prevents new writes while the restore is in progress.
+#    Leave the *-db pods running — they need to be up for the restore.
+kubectl scale deployment frontend-drupal fossbilling-app kassa-web \
+  integration-crm integration-planning identity-service chatbot \
+  facturatie-connector mailing-service \
+  -n shift-festival --replicas=0 2>/dev/null || true
+
+# 2. List available backup dates and pick the most recent good one
+ls ~/backups/databases/
+# Example output: 2026-05-23  2026-05-24  2026-05-25
+
+# 3. Restore — the script downloads from the backup VM automatically
+#    if no local directory is given
+export BACKUP_VM_USER=groep1
+export BACKUP_VM_HOST=integration.switzerlandnorth.cloudapp.azure.com
+export BACKUP_VM_KEY=$HOME/.ssh/backup_key
+bash scripts/restore-databases.sh 2026-05-24
+# Or restore from a local copy already on the VM:
+# bash scripts/restore-databases.sh 2026-05-24 ~/backups/databases/2026-05-24
+
+# 4. Restart application pods
+kubectl rollout restart deployment -n shift-festival
+```
+
+**Partial restore** — if only one database is affected, edit `restore-databases.sh` temporarily or restore a single database manually. Example for the CRM MySQL database only:
+
+```bash
+LOCAL_DIR=~/backups/databases/2026-05-24
+
+db_user=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.MYSQL_USER}' | base64 -d)
+db_pass=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.MYSQL_PASSWORD}' | base64 -d)
+db_name=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.MYSQL_DATABASE}' | base64 -d)
+pod=$(kubectl get pod -n shift-festival -l app=crm-db \
+  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+
+gunzip -c "$LOCAL_DIR/crm-mysql.sql.gz" | \
+  kubectl exec -i -n shift-festival "$pod" -- mysql -u "$db_user" -p"$db_pass" "$db_name"
 ```
 
 ---
