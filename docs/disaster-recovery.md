@@ -150,18 +150,29 @@ ssh groep1@integration.switzerlandnorth.cloudapp.azure.com
 
 All remaining steps are run **on the backup VM**.
 
-### Step 3.2 — Restore the Infra repo from local mirror
+### Step 3.2 — Restore the Infra repo
 
+**If the GitHub organisation still exists:**
 ```bash
-# Option A: deploy to a new Git remote first (recommended for full GitOps)
-cd ~/git-mirrors/infra.git
-git remote add new-origin https://gitlab.com/<your-namespace>/Infra.git
-git push new-origin --mirror
-git clone https://gitlab.com/<your-namespace>/Infra.git ~/Infra
-# Original repo: https://github.com/IntegrationProject-Groep1/Infra
+git clone https://github.com/IntegrationProject-Groep1/Infra.git ~/Infra
+```
 
-# Option B: use the mirror directly (no Git remote needed)
-git clone ~/git-mirrors/infra.git ~/Infra
+**If the GitHub organisation is also gone (worst case):**
+```bash
+# 1. Create a new empty repo on GitHub (personal account is fine)
+#    e.g. https://github.com/<your-username>/Infra
+
+# 2. Push the local mirror to it
+cd ~/git-mirrors/infra.git
+git remote add new-origin https://<your-username>:<GITHUB_PAT>@github.com/<your-username>/Infra.git
+git push new-origin --mirror
+
+# 3. Clone from the new repo
+git clone https://github.com/<your-username>/Infra.git ~/Infra
+
+# 4. After ArgoCD is running (Step 3.5), update it to point to the new URL:
+kubectl edit application shift-festival-prod -n argocd
+# Change: spec.source.repoURL to https://github.com/<your-username>/Infra.git
 ```
 
 ### Step 3.3 — Install k3s
@@ -246,37 +257,6 @@ If the backup VM has a different external IP, update the tunnel token in `.env` 
 nano base/setup/.env          # update CLOUDFLARE_TUNNEL_TOKEN
 bash scripts/create-secret.sh base/setup/.env shift-festival
 kubectl rollout restart deployment cloudflared -n shift-festival
-```
-
----
-
-## Part 4 — Recovery if GitHub is unavailable
-
-### Option A — Push mirror to a new host
-
-```bash
-# On the backup VM
-cd ~/git-mirrors/infra.git
-git remote add new-origin https://gitlab.com/<your-namespace>/Infra.git
-git push new-origin --mirror
-```
-
-Then update ArgoCD to point to the new remote:
-
-```bash
-kubectl edit application shift-festival-prod -n argocd
-# Change: spec.source.repoURL
-```
-
-### Option B — Deploy directly without ArgoCD (fastest)
-
-```bash
-cd ~/git-mirrors/infra.git
-git worktree add /tmp/infra-restore HEAD
-cd /tmp/infra-restore
-
-bash scripts/create-secret.sh base/setup/.env shift-festival
-kubectl apply -k .
 ```
 
 ---
