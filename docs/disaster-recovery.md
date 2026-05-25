@@ -245,19 +245,32 @@ sudo mv kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
 ```bash
 cd ~/Infra
 
-# Decrypt the .env file (you need the GPG passphrase from your password manager)
-gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
+# Prompt for the GPG passphrase (this is the GPG_PASSPHRASE GitHub Actions secret).
+# It is used to decrypt all three secret backups below.
+read -s -p "GPG passphrase: " GPG_PASS; echo
 
-# Create namespace and Kubernetes secrets
+# Decrypt the .env file
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
+
+# Create namespace and Kubernetes secrets from .env
 kubectl create namespace shift-festival
 bash scripts/create-secret.sh base/setup/.env shift-festival
 
-# IMPORTANT: cloudflare-tunnel-secret is a separate secret not covered by create-secret.sh
-# It is required for cloudflared to start and provide external access.
-TUNNEL_TOKEN=$(grep '^CLOUDFLARE_TUNNEL_TOKEN=' base/setup/.env | cut -d= -f2-)
+# Restore the RabbitMQ definitions secret (users, vhosts, permissions).
+# Without this, RabbitMQ cannot start and all services that depend on it will crash.
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/rabbitmq-definitions.gpg \
+  | kubectl create secret generic rabbitmq-definitions \
+      --from-file=definitions.json=/dev/stdin \
+      -n shift-festival
+
+# Restore the Cloudflare tunnel secret.
+# The tunnel token is set via CI pipeline and is NOT stored in the .env file.
+# The .env contains a placeholder only — always use the GPG backup here.
+CF_TOKEN=$(gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/cloudflare-tunnel.gpg)
 kubectl create secret generic cloudflare-tunnel-secret \
-  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
   -n shift-festival
+unset CF_TOKEN GPG_PASS
 
 # Install Argo Rollouts controller (must exist before ArgoCD syncs Rollout resources)
 kubectl apply -k argocd/rollouts/
@@ -267,22 +280,6 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
-
-# Restore the RabbitMQ definitions secret (users, vhosts, permissions).
-# Without this, RabbitMQ cannot start and all services that depend on it will crash.
-gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
-  | kubectl create secret generic rabbitmq-definitions \
-      --from-file=definitions.json=/dev/stdin \
-      -n shift-festival
-
-# Restore the Cloudflare tunnel secret.
-# The tunnel token is set via CI pipeline and is NOT stored in the .env file.
-# The .env contains a placeholder only — always use this backup.
-CF_TOKEN=$(gpg --batch --decrypt ~/secrets/cloudflare-tunnel.gpg)
-kubectl create secret generic cloudflare-tunnel-secret \
-  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
-  -n shift-festival
-unset CF_TOKEN
 ```
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
@@ -384,16 +381,26 @@ kubectl get nodes   # should show Ready
 git clone https://github.com/IntegrationProject-Groep1/Infra.git ~/Infra-test
 cd ~/Infra-test
 
-# 4. Decrypt secrets
-gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
+# 4. Decrypt secrets (GPG_PASSPHRASE = the GitHub Actions secret of the same name)
+read -s -p "GPG passphrase: " GPG_PASS; echo
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
 
 # 5. Apply secrets and deploy
 kubectl create namespace shift-festival
 bash scripts/create-secret.sh base/setup/.env shift-festival
-TUNNEL_TOKEN=$(grep '^CLOUDFLARE_TUNNEL_TOKEN=' base/setup/.env | cut -d= -f2-)
+
+# Restore RabbitMQ definitions secret (required for RabbitMQ to start)
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/rabbitmq-definitions.gpg \
+  | kubectl create secret generic rabbitmq-definitions \
+      --from-file=definitions.json=/dev/stdin \
+      -n shift-festival
+
+# Restore Cloudflare tunnel secret (token is set via CI, NOT stored in .env)
+CF_TOKEN=$(gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/cloudflare-tunnel.gpg)
 kubectl create secret generic cloudflare-tunnel-secret \
-  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
   -n shift-festival
+unset CF_TOKEN GPG_PASS
 
 # Install Argo Rollouts controller (must exist before ArgoCD syncs Rollout resources)
 kubectl apply -k argocd/rollouts/
@@ -402,19 +409,6 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
-
-# Restore RabbitMQ definitions secret (required for RabbitMQ to start)
-gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
-  | kubectl create secret generic rabbitmq-definitions \
-      --from-file=definitions.json=/dev/stdin \
-      -n shift-festival
-
-# Restore Cloudflare tunnel secret (token is set via CI, not stored in .env)
-CF_TOKEN=$(gpg --batch --decrypt ~/secrets/cloudflare-tunnel.gpg)
-kubectl create secret generic cloudflare-tunnel-secret \
-  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
-  -n shift-festival
-unset CF_TOKEN
 
 # 6. Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
 kubectl get application shift-festival-prod -n argocd
@@ -476,12 +470,18 @@ git clone https://github.com/<your-username>/Infra.git ~/Infra
 cd ~/Infra
 
 # 7. Decrypt secrets and deploy (same as Scenario A steps 4–7)
-gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
+read -s -p "GPG passphrase: " GPG_PASS; echo
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
 kubectl create namespace shift-festival
 bash scripts/create-secret.sh base/setup/.env shift-festival
-TUNNEL_TOKEN=$(grep '^CLOUDFLARE_TUNNEL_TOKEN=' base/setup/.env | cut -d= -f2-)
+gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/rabbitmq-definitions.gpg \
+  | kubectl create secret generic rabbitmq-definitions \
+      --from-file=definitions.json=/dev/stdin -n shift-festival
+CF_TOKEN=$(gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/cloudflare-tunnel.gpg)
 kubectl create secret generic cloudflare-tunnel-secret \
-  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" -n shift-festival
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" -n shift-festival
+unset CF_TOKEN GPG_PASS
+kubectl apply -k argocd/rollouts/
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
@@ -536,14 +536,15 @@ The backup VM is now a clean standby again — ready for the next test or a real
 **Scenario A — VM gone, GitHub org still available:**
 ```
 □ SSH into backup VM
-□ git clone https://github.com/IntegrationProject-Groep1/Infra.git ~/Infra
-□ Install k3s (curl -sfL https://get.k3s.io | sh -)
-□ Decrypt .env: gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
-□ Apply shift-secrets: bash scripts/create-secret.sh base/setup/.env shift-festival
-□ Apply cloudflare-tunnel-secret (see Step 3.5 — separate secret!)
+□ git clone https://github.com/IntegrationProject-Groep1/Infra.git ~/Infra && cd ~/Infra
+□ Install k3s (curl -sfL https://get.k3s.io | sh -) + sudo chmod 644 /etc/rancher/k3s/k3s.yaml
+□ read -s -p "GPG passphrase: " GPG_PASS; echo
+□ Decrypt .env: gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
+□ Apply shift-secrets: kubectl create namespace shift-festival && bash scripts/create-secret.sh base/setup/.env shift-festival
+□ Restore rabbitmq-definitions: gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/rabbitmq-definitions.gpg | kubectl create secret generic rabbitmq-definitions --from-file=definitions.json=/dev/stdin -n shift-festival
+□ Restore cloudflare-tunnel-secret: CF_TOKEN=$(gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/cloudflare-tunnel.gpg) && kubectl create secret generic cloudflare-tunnel-secret --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" -n shift-festival && unset CF_TOKEN GPG_PASS
 □ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
-□ Install ArgoCD + apply argocd/ manifests: kubectl apply -k argocd/
-□ Restore rabbitmq-definitions secret: gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg | kubectl create secret generic rabbitmq-definitions --from-file=definitions.json=/dev/stdin -n shift-festival
+□ Install ArgoCD + apply argocd/ manifests: kubectl create namespace argocd && kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml && kubectl apply -k argocd/
 □ Wait for *-db pods to be Running
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
