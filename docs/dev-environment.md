@@ -24,25 +24,40 @@
 ArgoCD auto-sync is enabled with `prune: false` and `selfHeal: false`. This means:
 - ArgoCD **will** sync when Image Updater commits a new image digest to `overlays/dev/kustomization.yaml` (required for image updates to reach the cluster)
 - ArgoCD **will not** delete cluster resources that are removed from Git (`prune: false`) — prevents accidental deletion of manually managed resources
-- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden. Pods staying at 0 replicas after `dev-off` is handled by `ignoreDifferences` on `/spec/replicas`, not by `prune`
+- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden
 
-The phased startup in `dev-on` temporarily pauses ArgoCD sync to prevent all pods starting simultaneously (CPU spike risk on single-node VM), then re-enables it after the phases complete.
+**When dev is OFF**, the ArgoCD Application is annotated with `argocd.argoproj.io/skip-reconcile: "true"`. This tells the ArgoCD controller to skip the reconciliation loop for that Application entirely — no sync attempts, no OutOfSync evaluation, no CPU overhead. The Application object stays alive so ArgoCD Image Updater can still read its annotations and watch for new `:latest-dev` image digests. When `dev-on` runs, it removes the annotation and reconciliation resumes.
+
+> **Why not delete the Application when dev is off?** Deleting it stops reconciliation CPU (good) but also removes the Image Updater annotations, so Image Updater no longer knows which images to watch. Team pushes to the dev branch would stop triggering automatic dev-on. The skip-reconcile annotation gives the same CPU benefit without breaking Image Updater.
 
 > **Note:** Scaling pods to 0 via `dev-off` does **not** cause OutOfSync — replica counts are excluded via `ignoreDifferences`. OutOfSync only occurs when Image Updater commits a new image digest to Git and ArgoCD has not yet applied it.
 
 ### ignoreDifferences
 
-The dev ArgoCD app ignores the following fields to prevent false sync conflicts:
+The dev ArgoCD Application ignores the following fields to prevent false sync conflicts:
 
 | Resource | Field | Reason |
 |---|---|---|
 | `Secret/shift-secrets` | `/data` | Managed via `kubectl patch` outside ArgoCD |
 | All PVCs | `/spec/storageClassName`, `/spec/volumeName` | Set by cluster provisioner — immutable after creation |
 | All Rollouts | `/spec/replicas` | Owned by HPA — ArgoCD must not reset this |
+| All HPAs | `/spec/minReplicas` | Live HPA state drifts constantly — prevents permanent OutOfSync |
+| `StatefulSet/elasticsearch` | `/spec/replicas` | Patched to 0 by dev overlay — ArgoCD must not fight this |
 
-### Application CRD management (App of Apps)
+### Application CRD management
 
-A root ArgoCD application (`argocd-apps`) manages `argocd/applications/` from Git. Changes to `dev-app.yaml` or `prod-app.yaml` are automatically applied — no manual `kubectl apply` needed.
+The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is managed entirely by the GitHub Actions workflows:
+- `dev-on` SCPs `dev-app.yaml` to the VM and runs `kubectl apply -f dev-app.yaml` after Phase 2 completes. The `skip-reconcile` annotation is then removed so ArgoCD starts reconciling.
+- `dev-off` adds `argocd.argoproj.io/skip-reconcile: "true"` to pause reconciliation.
+
+When making changes to `dev-app.yaml`, the updated file is SCPd and applied automatically on the next `dev-on` run.
+
+### NodePort conflicts with prod
+
+5 services use NodePorts that are already occupied by prod on the same cluster node:
+`crm-mcp-service`, `kassa-mcp-service`, `frontend-mcp-service`, `facturatie-mcp-service`, `frontend-phpmyadmin-service`
+
+The dev overlay patches these to `ClusterIP` to avoid the conflict. However, `kubectl apply` cannot change a Service type in-place — `dev-on` explicitly deletes these 5 services before applying the overlay so they are recreated as ClusterIP. Without this deletion step, `kubectl apply -k overlays/dev` returns a SyncFailed error for these services and ArgoCD enters a permanent OutOfSync loop.
 
 ---
 
@@ -116,7 +131,7 @@ The installation state for these three services is persisted via PVC and survive
 | Cloudflared | ✅ | |
 | Mailing service | ❌ | Intentionally disabled (no SMTP in dev) |
 | Heartbeat sidecars | ❌ | Disabled — replicas: 0 |
-| MCP services | ❌ | Not required for integration testing |
+| MCP services | ✅ | Started in Phase 2 — ClusterIP only (no NodePort in dev) |
 | ELK stack | ❌ | Too resource-heavy for shared VM |
 | pgAdmin | ❌ | |
 | Monitoring agent | ❌ | |
@@ -189,8 +204,11 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 
 | State | RAM usage | CPU (steady-state) |
 |---|---|---|
-| Dev DOWN | ~55% | ~44% |
-| Dev UP | ~65% | ~50–55% |
+| Dev DOWN | ~55% | ~40–50% |
+| Dev UP (startup) | ~65% | ~75–85% (temporary peak) |
+| Dev UP (stable) | ~65% | ~80–90% |
+
+> **Single-node VM constraint:** The VM has 4 CPU cores (EPYC). At 80–90% utilisation the node is functional but saturated — do not leave dev running without active use. The 4-hour auto-off enforces this. The peak during startup is temporary; ArgoCD registers the Application after Phase 2 completes so it sees resources already in correct state and does minimal reconciliation work.
 
 ---
 
@@ -213,10 +231,13 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] Kassa image alias (`kassa-odoo`) — separates Odoo image updates from kassa integration image updates in Image Updater
 - [x] Chatbot RabbitMQ vhost override — JSON patch at env index 2 (`RABBITMQ_VHOST: shift-festival-dev`). Index-based because Kustomize strategic merge does not work for Argo Rollout CRDs — if env var order changes in the base manifest, this index must be updated accordingly.
 - [x] Kassa RabbitMQ vhost override — JSON patch at env index 13 (`RABBIT_VHOST: shift-festival-dev`). Same caveat as above.
-- [x] ArgoCD `ignoreDifferences` for PVC storageClassName/volumeName, shift-secrets data, and Rollout replicas
+- [x] ArgoCD `ignoreDifferences` for PVC storageClassName/volumeName, shift-secrets data, Rollout replicas, HPA minReplicas, StatefulSet elasticsearch replicas
 - [x] `RespectIgnoreDifferences: true` in syncOptions — prevents ArgoCD from patching ignored fields during sync
 - [x] `prune: false` + `selfHeal: false` — ArgoCD only syncs image updates, never deletes or overrides manual scaling
-- [x] App of Apps (`argocd-apps`) — root ArgoCD app manages `argocd/applications/` so changes to Application CRDs are auto-applied from Git
+- [x] `dev-on` deletes 5 NodePort-conflicting services before overlay apply — prevents SyncFailed and OutOfSync loop
+- [x] `dev-off` uses `skip-reconcile` annotation instead of deleting Application — ArgoCD stops reconciling but Image Updater keeps working
+- [x] `dev-on` removes `skip-reconcile` annotation after Phase 2 + ArgoCD registration
+- [x] `dev-on` registers ArgoCD Application after Phase 2 (not before) — resources already in correct state → no reconciliation burst on startup
 - [x] Image Updater `allow-tags` corrected to `latest-dev` — was incorrectly set to `dev`, causing all dev images to be skipped
 
 ### Pending (other teams)
@@ -242,6 +263,9 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] 4-hour inactivity → auto-shutdown confirmed working
 - [x] Chatbot RabbitMQ 403 error fixed — vhost override in overlay
 - [x] ArgoCD PVC sync errors fixed — `ignoreDifferences` + `RespectIgnoreDifferences`
+- [x] NodePort SyncFailed errors fixed — 5 conflicting services deleted before overlay apply in `dev-on`
+- [x] HPA and Elasticsearch OutOfSync fixed — added to `ignoreDifferences`
+- [x] ArgoCD reconciliation CPU spike fixed — skip-reconcile annotation when dev is off, Application registered after Phase 2
 - [x] Image Updater `allow-tags` fixed — was `^dev$`, now `^latest-dev$`
 - [ ] End-to-end Image Updater test — team pushes to dev → `dev-on` auto-triggers
 - [ ] End-to-end integration test across all services via RabbitMQ

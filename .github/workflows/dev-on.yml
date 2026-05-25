@@ -292,7 +292,9 @@ jobs:
           script: |
             echo "Registering with ArgoCD after startup — resources already in place, minimal reconciliation work..."
             kubectl apply -f /home/ehbstudent/shiftfestival/dev-app.yaml
-            echo "✅ ArgoCD Application created"
+            kubectl annotate application shift-festival-dev -n argocd \
+              argocd.argoproj.io/skip-reconcile- 2>/dev/null || true
+            echo "✅ ArgoCD Application registered and reconciliation active"
 
       - name: Mark deployment active
         if: always() && steps.deployment.outputs.id != ''
