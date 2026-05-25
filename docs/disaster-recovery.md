@@ -89,7 +89,29 @@ Add these three secrets:
 
 Once these secrets are added, the `backup.yml` workflow runs automatically every night at 02:00 UTC and handles database dumps, the Git mirror sync, and image exports. No cron job on the VM is needed.
 
-### Step 1.5 — Test the backup manually
+### Step 1.5 — Run the first image backup (one-time, requires primary VM)
+
+The `backup-images.sh` script runs on the primary VM because it needs access to the running k3s cluster to know which images to export. Run this once manually to populate `~/backups/images/` on the backup VM. After this, the `backup.yml` workflow keeps it up to date automatically.
+
+```bash
+# On the primary VM (cluster must be running)
+export BACKUP_VM_USER=groep1
+export BACKUP_VM_HOST=integration.switzerlandnorth.cloudapp.azure.com
+export BACKUP_VM_KEY=~/.ssh/backup_key
+cd ~/shiftfestival
+
+bash scripts/backup-images.sh
+```
+
+Expected result: `.tar` files on the backup VM under `~/backups/images/` — one per unique GHCR image currently running in the cluster.
+
+Verify on the backup VM:
+```bash
+ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com \
+  "ls -lh ~/backups/images/"
+```
+
+### Step 1.6 — Test the full backup
 
 Either trigger the workflow from GitHub Actions (Actions → Backup Databases & Sync Git Mirror → Run workflow), or run on the primary VM:
 
@@ -105,7 +127,7 @@ bash scripts/backup-images.sh
 
 Expected result:
 - 6 `.sql.gz` files on the backup VM under `~/backups/databases/<today>/`
-- `.tar` files on the backup VM under `~/backups/images/` (one per unique GHCR image)
+- `.tar` files on the backup VM under `~/backups/images/` (refreshed)
 
 ---
 
@@ -405,6 +427,37 @@ bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 # 10. Verify everything is running
 kubectl get pods -n shift-festival
 ```
+
+---
+
+## Resetting the backup VM after a test
+
+After running Scenario A or B, reset the backup VM back to a clean standby state. The actual backups (`~/backups/`, `~/git-mirrors/`, `~/secrets/`) must be kept — only the test deployment is removed.
+
+```bash
+# SSH into the backup VM
+ssh groep1@integration.switzerlandnorth.cloudapp.azure.com
+
+# 1. Uninstall k3s (removes all pods, namespaces, and cluster state)
+/usr/local/bin/k3s-uninstall.sh
+
+# 2. Remove the cloned Infra repo (adjust the name if you used a different one)
+rm -rf ~/Infra
+rm -rf ~/Infra-test
+
+# 3. If you tested Scenario B and added a new-origin remote to the git mirror, clean it up
+cd ~/git-mirrors/infra.git
+git remote remove new-origin 2>/dev/null || true
+cd ~
+
+# 4. Verify backups are still intact
+ls ~/backups/databases/     # should show date folders
+ls ~/backups/images/        # should show .tar files
+ls ~/git-mirrors/infra.git/ # should show a bare git repo
+ls ~/secrets/               # should show shift-festival.env.gpg
+```
+
+The backup VM is now a clean standby again — ready for the next test or a real recovery.
 
 ---
 
