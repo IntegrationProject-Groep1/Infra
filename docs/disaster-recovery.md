@@ -356,23 +356,29 @@ kubectl rollout status deployment rabbitmq-broker -n shift-festival
 # After RabbitMQ is back up, restart all application deployments.
 kubectl rollout restart deployment -n shift-festival
 
-# FIX: CRM queue argument mismatch after definitions restore.
-# The definitions backup may have CRM queues (crm.incoming, crm.dead-letter, etc.)
-# with different x-dead-letter-exchange arguments than what the CRM service code
-# declares. RabbitMQ rejects redeclaration with PRECONDITION_FAILED (406).
-# Fix: delete all CRM queues so the service recreates them with correct arguments.
-RABBIT_USER=$(kubectl get secret shift-secrets -n shift-festival \
-  -o jsonpath='{.data.RABBITMQCRM_USER}' | base64 -d)
-RABBIT_PASS=$(kubectl get secret shift-secrets -n shift-festival \
-  -o jsonpath='{.data.RABBITMQCRM_PASSRAW}' | base64 -d)
-for q in crm.dead-letter crm.incoming crm.dlx crm.outgoing; do
-  kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
-    rabbitmqadmin -u "$RABBIT_USER" -p "$RABBIT_PASS" delete queue name="$q" 2>/dev/null || true
-done
-unset RABBIT_USER RABBIT_PASS
+# FIX: RabbitMQ queue argument mismatch after definitions restore.
+#
+# Root cause: the definitions backup stores queue configurations as they existed
+# on the primary VM (e.g. with or without x-dead-letter-exchange). When services
+# restart and try to redeclare queues with different arguments, RabbitMQ rejects
+# the redeclaration with PRECONDITION_FAILED 406. This affects multiple queues
+# across teams (crm.incoming, kassa.payments, etc.).
+#
+# Fix: delete ALL queues after RabbitMQ loads its definitions. The users, vhosts,
+# and permissions from the definitions are preserved — only the queue objects are
+# removed. Services recreate their queues with the correct arguments on startup.
+RMQADMIN_ARGS="-H localhost -u $(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQ_DEFAULT_USER}' | base64 -d) \
+  -p $(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)"
 
-# Restart CRM so it recreates all queues cleanly
-kubectl delete pod -n shift-festival -l app=integration-crm
+kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
+  bash -c "rabbitmqadmin $RMQADMIN_ARGS list queues name -f tsv | tail -n +2 | \
+  while read q; do rabbitmqadmin $RMQADMIN_ARGS delete queue name=\"\$q\"; done"
+unset RMQADMIN_ARGS
+
+# Restart all services so they recreate their queues cleanly
+kubectl rollout restart deployment -n shift-festival
 ```
 
 ### Step 3.9 — Update Cloudflare Tunnel
