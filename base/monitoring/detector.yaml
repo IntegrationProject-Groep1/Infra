@@ -21,6 +21,29 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
+      initContainers:
+      - name: wait-for-elasticsearch
+        image: curlimages/curl:8.10.1
+        command:
+        - sh
+        - -c
+        - |
+          until curl -sf -u "elastic:${ELASTIC_PASSWORD}" http://elasticsearch-service:9200/_cluster/health; do
+            echo "waiting for elasticsearch..."
+            sleep 5
+          done
+        env:
+        - name: ELASTIC_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ELASTIC_PASSWORD
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
       containers:
       - name: detector
         image: ghcr.io/integrationproject-groep1/monitoring/detector:latest
