@@ -71,6 +71,15 @@ patches:
         path: /spec/rules/0/host
         value: dev-chatbot.desiderius.me
 
+  # ── Skip canary pause on dev — no real traffic, no observation window needed ──
+  - target:
+      kind: Rollout
+    patch: |-
+      - op: replace
+        path: /spec/strategy/canary/steps
+        value:
+          - setWeight: 100
+
   # ── Scale non-essential services to zero ─────────────────────────────────
   - target:
       kind: Rollout
@@ -124,41 +133,6 @@ patches:
   - target:
       kind: Rollout
       name: chatbot-heartbeat
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: frontend-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: kassa-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: facturatie-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: crm-mcp
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 0
-  - target:
-      kind: Rollout
-      name: monitoring-mcp
     patch: |-
       - op: replace
         path: /spec/replicas
@@ -364,6 +338,53 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/env/2/value
         value: "shift-festival-dev"
+
+  # ── MCP + phpmyadmin services — remove NodePorts to avoid cluster-wide conflicts with prod ──
+  - target:
+      kind: Service
+      name: crm-mcp-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      kind: Service
+      name: frontend-mcp-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      kind: Service
+      name: kassa-mcp-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      kind: Service
+      name: facturatie-mcp-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
+  - target:
+      kind: Service
+      name: frontend-phpmyadmin-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+      - op: remove
+        path: /spec/ports/0/nodePort
 
   # ── Reduce CPU requests in dev to free scheduling headroom ───────────────
   - target:
