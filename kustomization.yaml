@@ -40,7 +40,7 @@ images:
   digest: sha256:115553cb609cd763f064742cc3a8df90fc00da1dfb0ccd947bb7d4c68ddec776
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
-  digest: sha256:f2ad44223f9664b8948b73fd8d56ba59295f12a49f97b060cdd11411c788c2aa
+  digest: sha256:7840728afa3dca12abb9847305303ac2125eba86e04be645a01d7af93c57785e
 - name: ghcr.io/integrationproject-groep1/monitoring-mcp
   newName: ghcr.io/integrationproject-groep1/monitoring-mcp
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
