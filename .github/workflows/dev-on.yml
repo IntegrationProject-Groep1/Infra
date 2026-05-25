@@ -237,7 +237,7 @@ jobs:
 
             echo "Re-enabling ArgoCD sync..."
             kubectl patch application shift-festival-dev -n argocd \
-              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":true,"selfHeal":false}}}}' 2>/dev/null || true
+              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}' 2>/dev/null || true
 
             echo ""
             echo "✅ Dev environment is UP"
