@@ -202,9 +202,6 @@ jobs:
             set -euo pipefail
             cd /home/ehbstudent/shiftfestival
 
-            echo "Recreating ArgoCD Application..."
-            kubectl apply -f /home/ehbstudent/shiftfestival/dev-app.yaml
-
             # Delete NodePort services that share ports with prod — kustomize will recreate them as ClusterIP
             kubectl delete service crm-mcp-service kassa-mcp-service frontend-mcp-service \
               facturatie-mcp-service frontend-phpmyadmin-service \
@@ -283,6 +280,19 @@ jobs:
             echo "Kassa:      https://dev-kassa.desiderius.me"
             echo "Facturatie: https://dev-facturatie.desiderius.me"
             echo "Chatbot:    https://dev-chatbot.desiderius.me"
+
+      - name: Register dev environment with ArgoCD
+        if: steps.dev_status.outputs.running == 'false'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            echo "Registering with ArgoCD after startup — resources already in place, minimal reconciliation work..."
+            kubectl apply -f /home/ehbstudent/shiftfestival/dev-app.yaml
+            echo "✅ ArgoCD Application created"
 
       - name: Mark deployment active
         if: always() && steps.deployment.outputs.id != ''
