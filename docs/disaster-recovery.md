@@ -284,7 +284,7 @@ kubectl apply -k argocd/
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
 
-### Step 3.6 — Wait for ArgoCD to sync, then wait for database pods
+### Step 3.6 — Wait for ArgoCD to sync, then disable auto-sync and scale down ELK
 
 ```bash
 # Check ArgoCD sync status (target: Synced / Healthy)
@@ -292,6 +292,19 @@ kubectl get application shift-festival-prod -n argocd
 
 # If SYNC STATUS stays "Unknown" after 2 minutes, unblock with a direct apply:
 kubectl apply -k .
+
+# IMPORTANT: Disable ArgoCD auto-sync immediately after the initial sync.
+# Without this, ArgoCD will revert every manual scale-down you make.
+kubectl patch application shift-festival-prod -n argocd --type=merge \
+  -p='{"spec":{"syncPolicy":null}}'
+
+# IMPORTANT: Scale down the ELK stack right away.
+# The backup VM has fewer CPU/RAM resources than the primary VM.
+# Elasticsearch alone needs 1–2 GB of JVM heap. If it stays up, it will
+# starve the application pods and cause Pending / OOMKilled states.
+kubectl scale deployment elasticsearch-deployment logstash-deployment \
+  kibana-deployment elastic-agent-deployment heartbeat-deployment \
+  --replicas=0 -n shift-festival
 
 # Watch until all *-db pods show Running (3–5 minutes while images pull)
 kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
@@ -309,9 +322,18 @@ ls ~/backups/databases/
 bash scripts/restore-databases.sh 2026-05-22 ~/backups/databases/2026-05-22
 ```
 
-### Step 3.8 — Restart application pods
+### Step 3.8 — Restart application pods and verify RabbitMQ definitions loaded
 
 ```bash
+kubectl rollout restart deployment rabbitmq-broker -n shift-festival
+kubectl rollout status deployment rabbitmq-broker -n shift-festival
+
+# After RabbitMQ is back up, restart the services that connect to it.
+# They may have crashed before RabbitMQ had its definitions loaded.
+kubectl rollout restart deployment \
+  facturatie-connector integration-crm integration-planning mailing-service \
+  -n shift-festival 2>/dev/null || true   # some may be Rollouts — ignore errors
+
 kubectl rollout restart deployment -n shift-festival
 ```
 
@@ -414,14 +436,25 @@ kubectl apply -k argocd/
 kubectl get application shift-festival-prod -n argocd
 # Target: SYNC STATUS = Synced, HEALTH STATUS = Healthy
 #
-# If SYNC STATUS stays "Unknown" after 2 minutes, ArgoCD has a field-ownership
-# conflict (common on first deploy). Unblock it by applying manifests directly:
+# If SYNC STATUS stays "Unknown" after 2 minutes, unblock with a direct apply:
 kubectl apply -k .
-# ArgoCD will reconcile and take over management from here.
+
+# 6b. Disable auto-sync immediately to prevent ArgoCD from reverting scale-downs
+kubectl patch application shift-festival-prod -n argocd --type=merge \
+  -p='{"spec":{"syncPolicy":null}}'
+
+# 6c. Scale down ELK — the backup VM cannot handle Elasticsearch alongside the app stack
+kubectl scale deployment elasticsearch-deployment logstash-deployment \
+  kibana-deployment elastic-agent-deployment heartbeat-deployment \
+  --replicas=0 -n shift-festival
 
 # 7. Watch database pods come up (required before restore)
 kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
 # Wait until all show Running — this can take 3–5 minutes while images pull.
+
+# 7b. Restart RabbitMQ so it loads the definitions secret, then restart dependents
+kubectl rollout restart deployment rabbitmq-broker -n shift-festival
+kubectl rollout status deployment rabbitmq-broker -n shift-festival
 
 # 8. Restore databases (use most recent backup date)
 ls ~/backups/databases/       # pick a date
@@ -433,7 +466,9 @@ kubectl delete namespace shift-festival
 rm -rf ~/Infra-test
 ```
 
-Expected result: all pods Running, databases restored, Cloudflare tunnel up.
+Expected result: all *-db pods Running, databases restored, cloudflared Running, frontend reachable. ELK is intentionally scaled to 0 (insufficient CPU on backup VM).
+
+> **Note on missing keys in shift-secrets:** If a pod reports `couldn't find key X in Secret shift-secrets`, the key was probably added to `.env` on the primary VM after the last GPG backup run. Cross-check with the primary VM's `shift-secrets` if it is still reachable, or wait for the next backup.yml run to capture the updated `.env`.
 
 ---
 
@@ -545,7 +580,10 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ Restore cloudflare-tunnel-secret: CF_TOKEN=$(gpg --batch --passphrase "$GPG_PASS" --decrypt ~/secrets/cloudflare-tunnel.gpg) && kubectl create secret generic cloudflare-tunnel-secret --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" -n shift-festival && unset CF_TOKEN GPG_PASS
 □ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
 □ Install ArgoCD + apply argocd/ manifests: kubectl create namespace argocd && kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml && kubectl apply -k argocd/
+□ Disable ArgoCD auto-sync: kubectl patch application shift-festival-prod -n argocd --type=merge -p='{"spec":{"syncPolicy":null}}'
+□ Scale down ELK: kubectl scale deployment elasticsearch-deployment logstash-deployment kibana-deployment elastic-agent-deployment heartbeat-deployment --replicas=0 -n shift-festival
 □ Wait for *-db pods to be Running
+□ Restart RabbitMQ so it loads definitions: kubectl rollout restart deployment rabbitmq-broker -n shift-festival && kubectl rollout status deployment rabbitmq-broker -n shift-festival
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
 □ Verify tunnel: kubectl logs -n shift-festival -l app=cloudflared --tail=20
