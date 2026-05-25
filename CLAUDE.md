@@ -68,6 +68,7 @@ Most team workloads follow the pattern: application container + heartbeat sideca
 
 **Namespaces:**
 - `shift-festival` — main application namespace
+- `shift-festival-dev` — ephemeral dev environment (exists only when dev is ON)
 - `argocd` — ArgoCD controller and Image Updater
 - `kube-system` — metrics-server
 
@@ -92,6 +93,15 @@ Secrets are not managed by kustomize — ArgoCD does not have filesystem access 
 ./scripts/create-secret.sh setup/.env shift-festival
 ```
 Re-run whenever `setup/.env` changes.
+
+**Dev environment lifecycle (`shift-festival-dev`):**
+The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is created and deleted by the GitHub Actions workflows:
+- `dev-on.yml` — SCPs `dev-app.yaml` to the VM and applies it via `kubectl apply -f`. Also SCPs the overlay and runs the phased startup.
+- `dev-off.yml` — Removes the Application finalizer and deletes it so ArgoCD stops all reconciliation for the dev namespace. This is intentional: keeping the Application alive when dev is off causes the ArgoCD controller to reconcile ~100 resources continuously, spiking CPU to 1000m+.
+
+Do **not** use `git pull` on the VM. Files are delivered via SCP in the workflows.
+
+When making changes to `dev-app.yaml`, the new version will be applied automatically on the next `dev-on` run (it gets SCPd fresh each time).
 
 ## Rollback and Recovery
 

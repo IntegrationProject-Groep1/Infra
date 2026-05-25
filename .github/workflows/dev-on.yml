@@ -121,6 +121,18 @@ jobs:
           target: "/home/ehbstudent/shiftfestival/overlays/dev"
           strip_components: 2
 
+      - name: Copy ArgoCD Application manifest to VM
+        if: steps.dev_status.outputs.running == 'false'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          source: "argocd/applications/dev/dev-app.yaml"
+          target: "/home/ehbstudent/shiftfestival/"
+          strip_components: 3
+
       - name: Ensure namespace and secrets exist
         if: steps.dev_status.outputs.running == 'false'
         uses: appleboy/ssh-action@v1.0.3
@@ -190,9 +202,8 @@ jobs:
             set -euo pipefail
             cd /home/ehbstudent/shiftfestival
 
-            echo "Pausing ArgoCD sync during phased startup..."
-            kubectl patch application shift-festival-dev -n argocd \
-              --type=merge -p '{"spec":{"syncPolicy":{"automated":null}}}' 2>/dev/null || true
+            echo "Recreating ArgoCD Application..."
+            kubectl apply -f /home/ehbstudent/shiftfestival/dev-app.yaml
 
             # Delete NodePort services that share ports with prod — kustomize will recreate them as ClusterIP
             kubectl delete service crm-mcp-service kassa-mcp-service frontend-mcp-service \
