@@ -46,8 +46,8 @@ The dev ArgoCD Application ignores the following fields to prevent false sync co
 
 ### Application CRD management
 
-The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is created and deleted entirely by the GitHub Actions workflows:
-- `dev-on` SCPs `dev-app.yaml` to the VM and runs `kubectl apply -f` after Phase 2 completes. The `skip-reconcile` annotation is then removed so ArgoCD starts reconciling.
+The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is managed entirely by the GitHub Actions workflows:
+- `dev-on` SCPs `dev-app.yaml` to the VM and runs `kubectl apply -f dev-app.yaml` after Phase 2 completes. The `skip-reconcile` annotation is then removed so ArgoCD starts reconciling.
 - `dev-off` adds `argocd.argoproj.io/skip-reconcile: "true"` to pause reconciliation.
 
 When making changes to `dev-app.yaml`, the updated file is SCPd and applied automatically on the next `dev-on` run.

@@ -105,7 +105,7 @@ The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** m
   6. Phase 1: start RabbitMQ + databases, create dev vhost
   7. Phase 2: start all application pods
   8. **After Phase 2:** `kubectl apply -f dev-app.yaml` — register with ArgoCD last, so it sees resources already in correct state → minimal reconciliation work → no CPU spike
-- `dev-off.yml` — Scales all workloads to 0, then removes the Application finalizer and deletes the Application entirely. This is intentional: keeping the Application alive when dev is off causes the ArgoCD controller to reconcile ~100 resources continuously, spiking CPU by 400–500m.
+- `dev-off.yml` — Scales all workloads to 0, then annotates the Application with `argocd.argoproj.io/skip-reconcile: "true"` to pause reconciliation. This is intentional: keeping the Application active without this annotation causes the ArgoCD controller to reconcile ~100 resources continuously, spiking CPU by 400–500m. The Application is kept alive (not deleted) so ArgoCD Image Updater continues watching for new `:latest-dev` image digests and can trigger `dev-on` automatically.
 
 **CPU characteristics of this VM (4-core EPYC):**
 - Dev OFF: ~50% CPU (prod + ArgoCD + ELK)
