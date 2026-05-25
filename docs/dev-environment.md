@@ -23,12 +23,12 @@
 
 ArgoCD auto-sync is enabled with `prune: false` and `selfHeal: false`. This means:
 - ArgoCD **will** sync when Image Updater commits a new image digest to `overlays/dev/kustomization.yaml` (required for image updates to reach the cluster)
-- ArgoCD **will not** delete resources (`prune: false`) — pods scaled to 0 stay scaled to 0
-- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden
+- ArgoCD **will not** delete cluster resources that are removed from Git (`prune: false`) — prevents accidental deletion of manually managed resources
+- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden. Pods staying at 0 replicas after `dev-off` is handled by `ignoreDifferences` on `/spec/replicas`, not by `prune`
 
 The phased startup in `dev-on` temporarily pauses ArgoCD sync to prevent all pods starting simultaneously (CPU spike risk on single-node VM), then re-enables it after the phases complete.
 
-> **ArgoCD OutOfSync after dev-off is expected.** When `dev-off` scales all pods to 0, ArgoCD shows the app as OutOfSync because the live state differs from Git. This is by design. Use ArgoCD only to check pod status, not sync state.
+> **Note:** Scaling pods to 0 via `dev-off` does **not** cause OutOfSync — replica counts are excluded via `ignoreDifferences`. OutOfSync only occurs when Image Updater commits a new image digest to Git and ArgoCD has not yet applied it.
 
 ### ignoreDifferences
 
@@ -211,8 +211,8 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 - [x] RabbitMQ default vhost queue cleanup — automated in `dev-on` Phase 1 to prevent AMQP 406 conflicts
 - [x] Cloudflare Tunnel route for `dev-rabbitmq.desiderius.me`
 - [x] Kassa image alias (`kassa-odoo`) — separates Odoo image updates from kassa integration image updates in Image Updater
-- [x] Chatbot RabbitMQ vhost override — JSON patch at env index 2 (`RABBITMQ_VHOST: shift-festival-dev`)
-- [x] Kassa RabbitMQ vhost override — JSON patch at env index 13 (`RABBIT_VHOST: shift-festival-dev`)
+- [x] Chatbot RabbitMQ vhost override — JSON patch at env index 2 (`RABBITMQ_VHOST: shift-festival-dev`). Index-based because Kustomize strategic merge does not work for Argo Rollout CRDs — if env var order changes in the base manifest, this index must be updated accordingly.
+- [x] Kassa RabbitMQ vhost override — JSON patch at env index 13 (`RABBIT_VHOST: shift-festival-dev`). Same caveat as above.
 - [x] ArgoCD `ignoreDifferences` for PVC storageClassName/volumeName, shift-secrets data, and Rollout replicas
 - [x] `RespectIgnoreDifferences: true` in syncOptions — prevents ArgoCD from patching ignored fields during sync
 - [x] `prune: false` + `selfHeal: false` — ArgoCD only syncs image updates, never deletes or overrides manual scaling
