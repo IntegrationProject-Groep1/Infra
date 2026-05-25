@@ -257,22 +257,29 @@ kubectl create secret generic cloudflare-tunnel-secret \
   --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" \
   -n shift-festival
 
-# Install ArgoCD
+# Install Argo Rollouts controller (must exist before ArgoCD syncs Rollout resources)
+kubectl apply -k argocd/rollouts/
+
+# Install ArgoCD + Image Updater + Application CR
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
-
-# Deploy the full stack
 kubectl apply -k argocd/
 ```
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
 
-### Step 3.6 — Wait for database pods
+### Step 3.6 — Wait for ArgoCD to sync, then wait for database pods
 
 ```bash
-# Watch until all *-db pods show Running
-kubectl get pods -n shift-festival -w | grep "\-db"
+# Check ArgoCD sync status (target: Synced / Healthy)
+kubectl get application shift-festival-prod -n argocd
+
+# If SYNC STATUS stays "Unknown" after 2 minutes, unblock with a direct apply:
+kubectl apply -k .
+
+# Watch until all *-db pods show Running (3–5 minutes while images pull)
+kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
 ```
 
 ### Step 3.7 — Restore all databases
@@ -370,18 +377,32 @@ kubectl create secret generic cloudflare-tunnel-secret \
   --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$TUNNEL_TOKEN" \
   -n shift-festival
 
+# Install Argo Rollouts controller (must exist before ArgoCD syncs Rollout resources)
+kubectl apply -k argocd/rollouts/
+
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
 
-# 6. Watch pods come up
-kubectl get pods -n shift-festival -w
+# 6. Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
+kubectl get application shift-festival-prod -n argocd
+# Target: SYNC STATUS = Synced, HEALTH STATUS = Healthy
+#
+# If SYNC STATUS stays "Unknown" after 2 minutes, ArgoCD has a field-ownership
+# conflict (common on first deploy). Unblock it by applying manifests directly:
+kubectl apply -k .
+# ArgoCD will reconcile and take over management from here.
 
-# 7. Restore databases (use most recent backup date)
+# 7. Watch database pods come up (required before restore)
+kubectl get pods -n shift-festival -l 'app in (postgredb,kassa-db,chatbot-db,frontend-db,facturatie-db,crm-db)'
+# Wait until all show Running — this can take 3–5 minutes while images pull.
+
+# 8. Restore databases (use most recent backup date)
+ls ~/backups/databases/       # pick a date
 bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 
-# 8. Cleanup after test (delete the test namespace, uninstall k3s if not needed)
+# 9. Cleanup after test
 kubectl delete namespace shift-festival
 /usr/local/bin/k3s-uninstall.sh
 rm -rf ~/Infra-test
@@ -489,7 +510,8 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ Decrypt .env: gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
 □ Apply shift-secrets: bash scripts/create-secret.sh base/setup/.env shift-festival
 □ Apply cloudflare-tunnel-secret (see Step 3.5 — separate secret!)
-□ Install ArgoCD + apply argocd/ manifests
+□ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
+□ Install ArgoCD + apply argocd/ manifests: kubectl apply -k argocd/
 □ Wait for *-db pods to be Running
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
@@ -506,7 +528,8 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ git clone new repo → ~/Infra
 □ Install k3s
 □ Decrypt .env and apply secrets (same as Scenario A)
-□ Install ArgoCD + apply argocd/ manifests
+□ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
+□ Install ArgoCD + apply argocd/ manifests: kubectl apply -k argocd/
 □ Update ArgoCD repoURL to new repo (kubectl edit application shift-festival-prod -n argocd)
 □ Restore databases: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Verify: kubectl get pods -n shift-festival
