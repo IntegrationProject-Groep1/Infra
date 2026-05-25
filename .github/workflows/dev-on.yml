@@ -42,14 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          DEPLOYMENT_ID=$(gh api repos/${{ github.repository }}/deployments \
-            --method POST \
-            -f ref=main \
-            -f environment=shift-festival-dev \
-            -f description="Dev environment starting" \
-            -F auto_merge=false \
-            -F required_contexts='[]' \
-            --jq '.id')
+          DEPLOYMENT_ID=$(echo '{"ref":"main","environment":"shift-festival-dev","description":"Dev environment starting","auto_merge":false,"required_contexts":[]}' | \
+            gh api repos/${{ github.repository }}/deployments --method POST --input - --jq '.id')
           echo "id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
       - name: Enable dev-off schedule
@@ -126,6 +120,18 @@ jobs:
           source: "overlays/dev/*"
           target: "/home/ehbstudent/shiftfestival/overlays/dev"
           strip_components: 2
+
+      - name: Copy ArgoCD Application manifest to VM
+        if: steps.dev_status.outputs.running == 'false'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          source: "argocd/applications/dev/dev-app.yaml"
+          target: "/home/ehbstudent/shiftfestival/"
+          strip_components: 3
 
       - name: Ensure namespace and secrets exist
         if: steps.dev_status.outputs.running == 'false'

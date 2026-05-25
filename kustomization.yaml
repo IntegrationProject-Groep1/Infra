@@ -7,7 +7,7 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:f91e94686655664433c15616b3738a36ed2b407a7ea3bb4742c4704fca1382dd
+  digest: sha256:806064a7a7df8e4f3d05207d019c9e3c26e13ed4ac271700ea9476e64f8e8913
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
@@ -16,43 +16,43 @@ images:
   digest: sha256:fc9ec0756d69bf680e1887d04ee0b70143c6a5e14172eabcb112c7d2c8983ed4
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
-  digest: sha256:d6f681cd699ce87e24a1e0143ae0484905b819b75f74e33d4df8929ea8ff8fb4
+  digest: sha256:ba02e3d41b63f5a58a45688ab2c530930acb6492820d3987f546876ac211448c
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:f9fcfbd32468420242745625220a6721fe8687eff630a6b7e79866455eebb765
+  digest: sha256:01677d022e3b16afa67f9cff98fa22e0a8567c5d18fce4d7335a33964d6a9db9
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
-  digest: sha256:8cae0264907a5558c885f94102d74ba6580c4ed2c282741d0872b5f6296b87cf
+  digest: sha256:047d52dad453aa2d3bdc806cc7b4c8947c8c25c0fa7886c449131d1b21b8e20b
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
-  digest: sha256:0370209978f6b7d46422f16639d39e229fd6ac1c433cbbf47e6750b830f4de92
+  digest: sha256:7ddbad389f723bf8d3fc88c9c3d0213a0bb551e3c9fc74dfc30bb225d759bbe5
 - name: ghcr.io/integrationproject-groep1/heartbeat
   newName: ghcr.io/integrationproject-groep1/heartbeat
   digest: sha256:db7c5ebb58708e031c404ac225bcdb04fac0f0d0c420b45c981fd409ab8799e6
 - name: ghcr.io/integrationproject-groep1/mailing
   newName: ghcr.io/integrationproject-groep1/mailing
-  digest: sha256:433e792a3a72cbc852bc5cd9a1cb69666e74393943b7962b676f46e7c4a32a3d
+  digest: sha256:9b2fc91fbbf3f36df47c10a5935810a2729f253f360f2e83abb90b7e8b4ead70
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:73c2de935ee6bbb16ed2723c80ab6578d08b012be5576cacc14fdedc3987387e
+  digest: sha256:6f78b98f45aee8c1fdeec94f27ae5a24eb96c71d36935b3b3416381c63e734b1
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
-  digest: sha256:7b4a703b9a78d88a3cb9044e49eeb9829ebb4a34c44f4d0e3ce68d2354c765ab
+  digest: sha256:99c98243c0dd48cade28bf2e74f75f8c48aa617393888e530b3e6e02ea95118f
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
-  digest: sha256:f1558f53562ffb383c0c3aceff540c4ffa680ad04c40639182521e1378c9ad2c
+  digest: sha256:0705eeb1d5a5d290e3dfa551c4600239f8969a43b20d6cba4aa7e561fcafd7bc
 - name: ghcr.io/integrationproject-groep1/monitoring-mcp
   newName: ghcr.io/integrationproject-groep1/monitoring-mcp
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
 - name: ghcr.io/integrationproject-groep1/facturatie-mcp
   newName: ghcr.io/integrationproject-groep1/facturatie-mcp
-  digest: sha256:1e16b33e5c74d55ce3f4f386959f8a08fc252ba4ba808e98313865fa189a0f18
+  digest: sha256:5b800474e68cb8146c09a928fa8f6a15454fa791d99178bc271e7f2b9100803f
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
-  digest: sha256:6b9369f36e5fa7e95d740d8d1918106be215e965d892c159854b27daf9c96bdb
+  digest: sha256:93eddbc3e3e70e7072d9fde42d04cf05913d53f903e9e86f974bc9aaf97043f6
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:ffe4efc82484ba6d30f060ee1b4712881ffda886270568cd5d04953ce8a0fcff
+  digest: sha256:a0d1f2806552f98d147fa9183f79ea0eb7eaf808ddbb6e4dff527509b3576a10
 patches:
 - target:
     kind: Rollout

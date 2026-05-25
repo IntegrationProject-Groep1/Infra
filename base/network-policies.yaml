@@ -139,6 +139,12 @@ spec:
         - podSelector:
             matchLabels:
               app: heartbeat-monitor
+        - podSelector:
+            matchLabels:
+              app: detector
+        - podSelector:
+            matchLabels:
+              app: monitoring-agent
       ports:
         - port: 9200
         - port: 9300

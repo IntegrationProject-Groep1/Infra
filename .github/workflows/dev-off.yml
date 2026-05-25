@@ -77,8 +77,8 @@ jobs:
           script: |
             set -euo pipefail
 
-            if ! kubectl get application shift-festival-dev -n argocd &>/dev/null; then
-              echo "ArgoCD app shift-festival-dev does not exist — nothing to do"
+            if ! kubectl get namespace shift-festival-dev &>/dev/null; then
+              echo "Dev namespace does not exist — nothing to do"
               exit 0
             fi
 
@@ -93,6 +93,11 @@ jobs:
             done
 
             kubectl delete configmap dev-last-active -n shift-festival-dev 2>/dev/null || true
+
+            echo "Deleting ArgoCD Application to stop reconciliation while dev is off..."
+            kubectl patch application shift-festival-dev -n argocd \
+              --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]' 2>/dev/null || true
+            kubectl delete application shift-festival-dev -n argocd 2>/dev/null || true
 
             echo ""
             echo "✅ Dev environment is DOWN"

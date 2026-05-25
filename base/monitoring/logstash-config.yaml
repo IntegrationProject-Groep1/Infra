@@ -125,14 +125,14 @@ stringData:
         }
 
         if "heartbeats" in [tags] {
-          if [system] not in ["planning", "crm", "kassa", "facturatie", "monitoring", "frontend", "mailing", "identity-service", "chatbot", "frontend-mcp", "kassa-mcp", "facturatie-mcp", "crm-mcp", "monitoring-mcp"] {
+          if [system] not in ["planning", "crm", "kassa", "facturatie", "monitoring", "frontend", "mailing", "identity-service", "chatbot", "rabbitmq", "frontend-mcp", "kassa-mcp", "facturatie-mcp", "crm-mcp", "monitoring-mcp"] {
             mutate {
               add_field => { "parse_error" => "unknown_system" }
               add_tag   => ["quarantine", "unknown_system"]
             }
           }
         } else if "logs" in [tags] {
-          if [system] not in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service"] {
+          if [system] not in ["crm", "kassa", "facturatie", "frontend", "planning", "mailing", "identity-service", "chatbot", "monitoring"] {
             mutate {
               add_field => { "parse_error" => "unknown_system" }
               add_tag   => ["quarantine", "unknown_system"]

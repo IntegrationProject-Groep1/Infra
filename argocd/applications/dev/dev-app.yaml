@@ -89,3 +89,15 @@ spec:
       kind: Rollout
       jsonPointers:
         - /spec/replicas
+    # HPA live state (currentReplicas, conditions) drifts constantly — ignore to avoid false OutOfSync
+    - group: autoscaling
+      kind: HorizontalPodAutoscaler
+      jsonPointers:
+        - /spec/minReplicas
+    # elasticsearch StatefulSet replicas managed by dev overlay patch — ignore drift
+    - group: apps
+      kind: StatefulSet
+      name: elasticsearch
+      namespace: shift-festival-dev
+      jsonPointers:
+        - /spec/replicas
