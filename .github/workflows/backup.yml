@@ -90,6 +90,33 @@ jobs:
             rm /tmp/env.gpg
             echo "Secrets synced to backup VM"
 
+  backup-images:
+    name: Export GHCR images → backup VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run image backup script on primary VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            export BACKUP_VM_HOST="${{ secrets.BACKUP_VM_HOST }}"
+            export BACKUP_VM_USER="${{ secrets.BACKUP_VM_USER }}"
+            export BACKUP_VM_KEY="$HOME/.ssh/backup_key"
+
+            SCRIPT="$HOME/shiftfestival/scripts/backup-images.sh"
+
+            if [[ ! -f "$SCRIPT" ]]; then
+              echo "backup-images.sh not found at $SCRIPT — has deploy.yml run yet?"
+              exit 1
+            fi
+
+            bash "$SCRIPT"
+
   sync-git-mirror:
     name: Update Git mirror on backup VM
     runs-on: ubuntu-latest

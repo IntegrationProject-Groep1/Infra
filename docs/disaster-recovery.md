@@ -87,7 +87,7 @@ Add these three secrets:
 | `BACKUP_VM_USER` | `groep1` |
 | `BACKUP_SSH_KEY` | Run `cat ~/.ssh/backup_key` on the primary VM, paste the full output |
 
-Once these secrets are added, the `backup.yml` workflow runs automatically every night at 02:00 UTC and handles both the database dumps and the Git mirror sync. No cron job on the VM is needed.
+Once these secrets are added, the `backup.yml` workflow runs automatically every night at 02:00 UTC and handles database dumps, the Git mirror sync, and image exports. No cron job on the VM is needed.
 
 ### Step 1.5 — Test the backup manually
 
@@ -98,10 +98,14 @@ export BACKUP_VM_USER=groep1
 export BACKUP_VM_HOST=integration.switzerlandnorth.cloudapp.azure.com
 export BACKUP_VM_KEY=~/.ssh/backup_key
 cd ~/shiftfestival
+
 bash scripts/backup-databases.sh
+bash scripts/backup-images.sh
 ```
 
-Expected result: 6 `.sql.gz` files on the backup VM under `~/backups/databases/<today>/`.
+Expected result:
+- 6 `.sql.gz` files on the backup VM under `~/backups/databases/<today>/`
+- `.tar` files on the backup VM under `~/backups/images/` (one per unique GHCR image)
 
 ---
 
@@ -289,8 +293,7 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
 | RabbitMQ messages | In-flight messages are transient | Accept message loss; queues recreated by ArgoCD |
 | pgAdmin config | UI-only tool | Reconnect manually after restore |
 | Drupal file uploads | TODO: add to backup script if needed | Re-upload via Drupal admin |
-| **Container images** | Hosted on GHCR under the GitHub org | **If org is gone: images are gone too — see Part 5** |
-| **Application source repos** | Only the Infra repo is mirrored | **If org is gone: need image backup or rebuild from scratch** |
+| Application source repos | Only the Infra repo is mirrored | Images are backed up separately — source code is not needed for recovery |
 
 ---
 
@@ -350,9 +353,7 @@ Expected result: all pods Running, databases restored, Cloudflare tunnel up.
 
 ### Scenario B — Everything gone (VM + GitHub org deleted)
 
-> **Important limitation:** if the GitHub org is deleted, the container images on GHCR (`ghcr.io/integrationproject-groep1/...`) are also gone. Infrastructure pods (RabbitMQ, PostgreSQL, Nginx, etc.) will start normally because they use public Docker Hub images. **Team application pods (Drupal, Odoo, FossBilling, CRM, Planning, Identity) will fail with `ImagePullBackOff`** until images are available again.
->
-> To close this gap, see the image backup steps at the end of this section.
+Images are backed up daily to `~/backups/images/` on the backup VM via `backup-images.sh`, so all custom GHCR images are available even if the org is gone.
 
 ```bash
 # 1. SSH into backup VM — this is now your only machine
@@ -363,19 +364,26 @@ curl -sfL https://get.k3s.io | sh -
 sudo chmod 644 /etc/rancher/k3s/k3s.yaml
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-# 3. Create a new GitHub repo on a personal account (do this in the browser first)
+# 3. Import backed-up images into k3s before deploying
+for tar in ~/backups/images/*.tar; do
+  echo "Importing $tar"
+  sudo ctr images import "$tar"
+done
+sudo ctr images list | grep ghcr.io   # verify
+
+# 4. Create a new empty GitHub repo on a personal account (do this in the browser)
 #    e.g. https://github.com/<your-username>/Infra
 
-# 4. Push the local mirror to the new repo
+# 5. Push the local mirror to the new repo
 cd ~/git-mirrors/infra.git
 git remote add new-origin https://<your-username>:<GITHUB_PAT>@github.com/<your-username>/Infra.git
 git push new-origin --mirror
 
-# 5. Clone from the new repo
+# 6. Clone from the new repo
 git clone https://github.com/<your-username>/Infra.git ~/Infra
 cd ~/Infra
 
-# 6. Decrypt secrets and deploy (same as Scenario A steps 4–7)
+# 7. Decrypt secrets and deploy (same as Scenario A steps 4–7)
 gpg --decrypt ~/secrets/shift-festival.env.gpg > base/setup/.env
 kubectl create namespace shift-festival
 bash scripts/create-secret.sh base/setup/.env shift-festival
@@ -387,71 +395,15 @@ kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/st
 kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=180s
 kubectl apply -k argocd/
 
-# 7. Update ArgoCD to point to the new repo URL
+# 8. Update ArgoCD to point to the new repo URL
 kubectl edit application shift-festival-prod -n argocd
 # Change: spec.source.repoURL → https://github.com/<your-username>/Infra.git
 
-# 8. Watch which pods fail — infrastructure pods should be Running,
-#    team app pods will show ImagePullBackOff if images are gone
-kubectl get pods -n shift-festival
-
-# 9. Restore databases for the pods that are running
+# 9. Restore databases
 bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
-```
 
-#### Closing the image gap — back up images to the backup VM
-
-Run this **on the primary VM** to export all team images as tar files and transfer them to the backup VM. Add this to a cron job or run it after each deploy.
-
-```bash
-#!/usr/bin/env bash
-# Save all custom team images from the running cluster to the backup VM.
-# Run on the primary VM. Requires: BACKUP_VM_USER, BACKUP_VM_HOST, BACKUP_VM_KEY
-
-set -euo pipefail
-
-NAMESPACE="shift-festival"
-BACKUP_VM_USER="${BACKUP_VM_USER:?}"
-BACKUP_VM_HOST="${BACKUP_VM_HOST:?}"
-BACKUP_VM_KEY="${BACKUP_VM_KEY:-$HOME/.ssh/backup_key}"
-DEST="$HOME/backups/images"
-SSH_OPTS="-i $BACKUP_VM_KEY -o StrictHostKeyChecking=no"
-
-ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" "mkdir -p $DEST"
-
-# Get all unique images from running pods that are from GHCR (custom-built)
-IMAGES=$(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].spec.containers[*].image}' \
-  | tr ' ' '\n' | grep 'ghcr.io/integrationproject' | sort -u)
-
-for image in $IMAGES; do
-  name=$(echo "$image" | tr '/:' '_')
-  echo "Exporting $image → $name.tar"
-  # Pull and save via ctr (k3s uses containerd)
-  sudo ctr images pull "$image"
-  sudo ctr images export "/tmp/$name.tar" "$image"
-  scp $SSH_OPTS "/tmp/$name.tar" "$BACKUP_VM_USER@$BACKUP_VM_HOST:$DEST/$name.tar"
-  rm "/tmp/$name.tar"
-done
-
-echo "Images saved to $BACKUP_VM_USER@$BACKUP_VM_HOST:$DEST"
-```
-
-#### Restoring images from tar files (when GHCR is unavailable)
-
-```bash
-# On the backup VM — import all saved images into k3s
-for tar in ~/backups/images/*.tar; do
-  echo "Importing $tar"
-  sudo ctr images import "$tar"
-done
-
-# Verify they are available
-sudo ctr images list | grep ghcr.io
-```
-
-After importing, the `ImagePullBackOff` pods will resolve on the next restart:
-```bash
-kubectl rollout restart deployment -n shift-festival
+# 10. Verify everything is running
+kubectl get pods -n shift-festival
 ```
 
 ---
@@ -477,14 +429,14 @@ kubectl rollout restart deployment -n shift-festival
 **Scenario B — VM gone AND GitHub org deleted:**
 ```
 □ SSH into backup VM
+□ Import images: for tar in ~/backups/images/*.tar; do sudo ctr images import "$tar"; done
 □ Create new empty GitHub repo on personal account
-□ Push mirror: cd ~/git-mirrors/infra.git && git push new-origin --mirror
+□ Push mirror: cd ~/git-mirrors/infra.git && git remote add new-origin <url> && git push new-origin --mirror
 □ git clone new repo → ~/Infra
 □ Install k3s
 □ Decrypt .env and apply secrets (same as Scenario A)
-□ Install ArgoCD + update repoURL in ArgoCD application to new repo
-□ Import saved images: sudo ctr images import ~/backups/images/*.tar
-□ Apply argocd/ manifests
-□ Restore databases
-□ Verify: kubectl get pods -n shift-festival (check for ImagePullBackOff)
+□ Install ArgoCD + apply argocd/ manifests
+□ Update ArgoCD repoURL to new repo (kubectl edit application shift-festival-prod -n argocd)
+□ Restore databases: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
+□ Verify: kubectl get pods -n shift-festival
 ```
