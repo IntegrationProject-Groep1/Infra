@@ -6,13 +6,14 @@
 #   Starts OR updates the dev environment.
 #   - If dev is already running (active in last 4h): resets the inactivity
 #     timer so the environment stays up. ArgoCD handles the image update.
-#   - If dev is off: pauses ArgoCD, starts services in phases to avoid CPU
-#     spikes on the single-node VM, then re-enables ArgoCD sync.
+#   - If dev is off: starts services in phases to avoid CPU spikes on the
+#     single-node VM.
 #
 # TRIGGERS:
 #   - Manual (workflow_dispatch)
 #   - Automatically when ArgoCD Image Updater detects a new :dev image
 #     and updates overlays/dev/kustomization.yaml on main
+#     (skipped if the commit author is not argocd-image-updater)
 # =============================================================================
 
 name: Dev Environment — ON
@@ -29,10 +30,28 @@ jobs:
   dev-on:
     name: Start shift-festival-dev
     runs-on: ubuntu-latest
+    # Only run on push if triggered by ArgoCD Image Updater — skip infra merges
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.author.name, 'argocd-image-updater')
     permissions:
       actions: write
+      deployments: write
 
     steps:
+      - name: Create GitHub deployment
+        id: deployment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEPLOYMENT_ID=$(gh api repos/${{ github.repository }}/deployments \
+            --method POST \
+            -f ref=main \
+            -f environment=shift-festival-dev \
+            -f description="Dev environment starting" \
+            -F auto_merge=false \
+            -F required_contexts='[]' \
+            --jq '.id')
+          echo "id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
+
       - name: Enable dev-off schedule
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -248,13 +267,22 @@ jobs:
 
             kubectl scale deployment frontend-proxy kassa-proxy facturatie-proxy chatbot-proxy -n shift-festival-dev --replicas=1
 
-            echo "Re-enabling ArgoCD sync..."
-            kubectl patch application shift-festival-dev -n argocd \
-              --type=merge -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":false}}}}' 2>/dev/null || true
-
             echo ""
             echo "✅ Dev environment is UP"
             echo "Frontend:   https://dev.desiderius.me"
             echo "Kassa:      https://dev-kassa.desiderius.me"
             echo "Facturatie: https://dev-facturatie.desiderius.me"
             echo "Chatbot:    https://dev-chatbot.desiderius.me"
+
+      - name: Mark deployment active
+        if: always() && steps.deployment.outputs.id != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          STATE=$([[ "${{ job.status }}" == "success" ]] && echo "success" || echo "failure")
+          DESCRIPTION=$([[ "$STATE" == "success" ]] && echo "Dev environment is ON" || echo "Dev environment failed to start")
+          gh api repos/${{ github.repository }}/deployments/${{ steps.deployment.outputs.id }}/statuses \
+            --method POST \
+            -f state=$STATE \
+            -f description="$DESCRIPTION" \
+            -f environment_url=https://dev.desiderius.me

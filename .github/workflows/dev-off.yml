@@ -26,6 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+      deployments: write
 
     steps:
       - name: Check inactivity
@@ -95,6 +96,20 @@ jobs:
 
             echo ""
             echo "✅ Dev environment is DOWN"
+
+      - name: Mark deployment inactive
+        if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          DEPLOYMENT_ID=$(gh api "repos/${{ github.repository }}/deployments?environment=shift-festival-dev&per_page=1" \
+            --jq '.[0].id' 2>/dev/null || echo "")
+          if [[ -n "$DEPLOYMENT_ID" && "$DEPLOYMENT_ID" != "null" ]]; then
+            gh api repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses \
+              --method POST \
+              -f state=inactive \
+              -f description="Dev environment is OFF"
+          fi
 
       - name: Disable dev-off schedule until next dev-on
         if: github.event_name == 'workflow_dispatch' || steps.inactivity.outputs.skip == 'false'
