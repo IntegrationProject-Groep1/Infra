@@ -78,8 +78,12 @@ jobs:
           script: |
             set -euo pipefail
 
+            echo "Pausing ArgoCD reconciliation while dev is off..."
+            kubectl annotate application shift-festival-dev -n argocd \
+              argocd.argoproj.io/skip-reconcile=true --overwrite 2>/dev/null || true
+
             if ! kubectl get namespace shift-festival-dev &>/dev/null; then
-              echo "Dev namespace does not exist — nothing to do"
+              echo "Dev namespace does not exist — nothing to scale down"
               exit 0
             fi
 
@@ -94,10 +98,6 @@ jobs:
             done
 
             kubectl delete configmap dev-last-active -n shift-festival-dev 2>/dev/null || true
-
-            echo "Pausing ArgoCD reconciliation while dev is off..."
-            kubectl annotate application shift-festival-dev -n argocd \
-              argocd.argoproj.io/skip-reconcile=true --overwrite 2>/dev/null || true
 
             echo ""
             echo "✅ Dev environment is DOWN"
