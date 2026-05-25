@@ -1,11 +1,6 @@
- # =============================================================
+# =============================================================
 # Environment & Secrets - CRITICAL: Contains passwords & API keys
 # =============================================================
-
-# Allow .env.example files as templates (must come before ignore patterns)
-!overlays/prod/.env.example
-!overlays/dev/.env.example
-!base/setup/.env.example
 
 .env
 .env.local
@@ -19,6 +14,11 @@ overlays/prod/.env
 overlays/dev/.env
 base/setup/.env
 base/setup/.env*
+!base/setup/.env.example
+
+# Allow .env.example files as templates (negations must come after the blocking rules)
+!overlays/prod/.env.example
+!overlays/dev/.env.example
 !base/setup/.env.example
 
 # Kubernetes secrets (contain credentials)
