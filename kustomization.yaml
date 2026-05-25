@@ -49,7 +49,7 @@ images:
   digest: sha256:1e16b33e5c74d55ce3f4f386959f8a08fc252ba4ba808e98313865fa189a0f18
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
-  digest: sha256:06f819cc36cd1af83d6e2edeb313f85ae6e47f8481766a2d929c4332d4026bcd
+  digest: sha256:a050226a18dd5a6a9f7c8bae9e724d225090d274e969e23f0f1ddb53ee3b0010
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
   digest: sha256:cbf19fb08f8e23b88d977c160f3c2b1d3ded36fc921e384321fef313680b8b9b
