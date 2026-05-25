@@ -45,7 +45,22 @@ ssh-copy-id -i ~/.ssh/backup_key.pub groep1@integration.switzerlandnorth.cloudap
 ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com "echo OK"
 ```
 
-### Step 1.2 — Encrypt and transfer the secrets file
+### Step 1.2 — Allow passwordless sudo for ctr on the primary VM
+
+`backup-images.sh` uses `ctr` (containerd CLI) to pull and export images. `ctr` requires root. The script runs non-interactively via GitHub Actions, so sudo must not prompt for a password.
+
+Run this **once on the primary VM**:
+
+```bash
+echo "ehbstudent ALL=(ALL) NOPASSWD: /usr/local/bin/ctr" \
+  | sudo tee /etc/sudoers.d/ctr-backup
+sudo chmod 440 /etc/sudoers.d/ctr-backup
+
+# Verify — this must return without a password prompt
+sudo -n ctr version
+```
+
+### Step 1.3 — Encrypt and transfer the secrets file
 
 Run these commands **on the primary VM** from inside the Infra repo directory:
 
@@ -63,7 +78,7 @@ rm /tmp/env.gpg
 
 Re-run this step whenever `base/setup/.env` changes.
 
-### Step 1.3 — Set up the Git mirror on the backup VM
+### Step 1.4 — Set up the Git mirror on the backup VM
 
 SSH into the backup VM and run:
 
@@ -75,7 +90,7 @@ git clone --mirror https://tombomeke-ehb:<GITHUB_PAT>@github.com/IntegrationProj
 exit
 ```
 
-### Step 1.4 — Add GitHub Actions secrets
+### Step 1.5 — Add GitHub Actions secrets
 
 In the GitHub repository: **Settings → Secrets and variables → Actions → New repository secret**
 
@@ -89,7 +104,7 @@ Add these three secrets:
 
 Once these secrets are added, the `backup.yml` workflow runs automatically every night at 02:00 UTC and handles database dumps, the Git mirror sync, and image exports. No cron job on the VM is needed.
 
-### Step 1.5 — Run the first image backup (one-time, requires primary VM)
+### Step 1.6 — Run the first image backup (one-time, requires primary VM)
 
 The `backup-images.sh` script runs on the primary VM because it needs access to the running k3s cluster to know which images to export. Run this once manually to populate `~/backups/images/` on the backup VM. After this, the `backup.yml` workflow keeps it up to date automatically.
 
@@ -111,7 +126,7 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
   "ls -lh ~/backups/images/"
 ```
 
-### Step 1.6 — Test the full backup
+### Step 1.7 — Test the full backup
 
 Either trigger the workflow from GitHub Actions (Actions → Backup Databases & Sync Git Mirror → Run workflow), or run on the primary VM:
 

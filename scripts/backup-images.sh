@@ -4,6 +4,7 @@
 # Usage: ./scripts/backup-images.sh
 # Required env vars: BACKUP_VM_USER, BACKUP_VM_HOST
 # Optional env vars: BACKUP_VM_KEY (default: ~/.ssh/backup_key)
+# Prerequisite: passwordless sudo for ctr on the primary VM — see docs/disaster-recovery.md Step 1.2
 set -euo pipefail
 
 NAMESPACE="shift-festival"
@@ -18,7 +19,8 @@ fail() { echo "[$(date +%T)] ERROR: $*" >&2; exit 1; }
 
 kubectl cluster-info --request-timeout=5s > /dev/null 2>&1 || fail "Cannot reach Kubernetes cluster"
 
-ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" "mkdir -p \$HOME/$REMOTE_DIR"
+# Use relative path — rsync resolves user@host:relative/path relative to remote home dir
+ssh $SSH_OPTS "$BACKUP_VM_USER@$BACKUP_VM_HOST" "mkdir -p $REMOTE_DIR"
 
 IMAGES=$(kubectl get pods -n "$NAMESPACE" \
   -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{"\n"}{end}{end}' \
@@ -37,14 +39,15 @@ for image in $IMAGES; do
   tmp="/tmp/${name}.tar"
 
   log "Pulling $image"
-  sudo ctr images pull "$image" || fail "Failed to pull $image"
+  # sudo -n fails immediately if a password would be required (catches missing NOPASSWD config early)
+  sudo -n ctr images pull "$image" || fail "Failed to pull $image — ensure NOPASSWD is configured for ctr (see docs/disaster-recovery.md Step 1.2)"
 
   log "Exporting → $tmp"
-  sudo ctr images export "$tmp" "$image" || fail "Failed to export $image"
+  sudo -n ctr images export "$tmp" "$image" || fail "Failed to export $image"
 
   log "Transferring to backup VM"
   rsync -az --progress -e "ssh $SSH_OPTS" \
-    "$tmp" "$BACKUP_VM_USER@$BACKUP_VM_HOST:\$HOME/$REMOTE_DIR/${name}.tar"
+    "$tmp" "$BACKUP_VM_USER@$BACKUP_VM_HOST:$REMOTE_DIR/${name}.tar"
 
   rm -f "$tmp"
   log "Done: $image"
