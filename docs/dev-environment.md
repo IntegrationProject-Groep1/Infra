@@ -14,17 +14,20 @@
 | RabbitMQ | Separate vhost `shift-festival-dev`, created automatically on `dev-on` |
 | Scaling | Manual via GitHub Actions + automatic shutdown after 4 hours of inactivity |
 | Images | `:latest-dev` tags via ArgoCD Image Updater |
-| Management | ArgoCD auto-sync enabled (`prune: false`, `selfHeal: false`) — Image Updater commits trigger syncs, manual scaling via GitHub Actions |
+| Management | ArgoCD reconciliation triggered by `dev-on` workflow — no automated sync; Image Updater commits to Git trigger `dev-on` via GitHub Actions |
 | Monitoring | ArgoCD UI (`argocd.desiderius.me`) for read-only pod status, Kibana for logs |
 
 ---
 
 ## ArgoCD sync behaviour for dev
 
-ArgoCD auto-sync is enabled with `prune: false` and `selfHeal: false`. This means:
-- ArgoCD **will** sync when Image Updater commits a new image digest to `overlays/dev/kustomization.yaml` (required for image updates to reach the cluster)
-- ArgoCD **will not** delete cluster resources that are removed from Git (`prune: false`) — prevents accidental deletion of manually managed resources
-- ArgoCD **will not** continuously re-sync drift (`selfHeal: false`) — manual scaling via `dev-on`/`dev-off` is not overridden
+The dev ArgoCD Application has **no `automated:` sync policy** — ArgoCD does not watch Git and sync on its own. Reconciliation is triggered explicitly:
+- When `dev-on` runs, it applies `dev-app.yaml` and removes the `skip-reconcile` annotation → ArgoCD reconciles once against the current state of `overlays/dev/kustomization.yaml` (which already contains the latest image digest committed by Image Updater)
+- When dev is already running and Image Updater commits a new image, `dev-on` triggers via GitHub Actions and applies the updated overlay with `kubectl apply -k` directly — ArgoCD sees it on the next reconciliation
+
+`prune: false` and `selfHeal: false` are set as safeguards:
+- `prune: false` — ArgoCD will not delete cluster resources that are removed from Git
+- `selfHeal: false` — ArgoCD will not override manual replica scaling done by `dev-on`/`dev-off`
 
 **When dev is OFF**, the ArgoCD Application is annotated with `argocd.argoproj.io/skip-reconcile: "true"`. This tells the ArgoCD controller to skip the reconciliation loop for that Application entirely — no sync attempts, no OutOfSync evaluation, no CPU overhead. The Application object stays alive so ArgoCD Image Updater can still read its annotations and watch for new `:latest-dev` image digests. When `dev-on` runs, it removes the annotation and reconciliation resumes.
 
