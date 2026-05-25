@@ -24,6 +24,8 @@ GitHub Actions (backup.yml)
                                                          │                                        │
                                                          │ ~/git-mirrors/infra.git (bare mirror)  │
                                                          │ ~/secrets/shift-festival.env.gpg       │
+                                                         │ ~/secrets/rabbitmq-definitions.gpg     │
+                                                         │ ~/secrets/cloudflare-tunnel.gpg        │
                                                          └───────────────────────────────────────┘
 ```
 
@@ -272,6 +274,15 @@ gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
   | kubectl create secret generic rabbitmq-definitions \
       --from-file=definitions.json=/dev/stdin \
       -n shift-festival
+
+# Restore the Cloudflare tunnel secret.
+# The tunnel token is set via CI pipeline and is NOT stored in the .env file.
+# The .env contains a placeholder only — always use this backup.
+CF_TOKEN=$(gpg --batch --decrypt ~/secrets/cloudflare-tunnel.gpg)
+kubectl create secret generic cloudflare-tunnel-secret \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
+  -n shift-festival
+unset CF_TOKEN
 ```
 
 ArgoCD detects the Git repo and syncs the full stack automatically.
@@ -397,6 +408,13 @@ gpg --batch --decrypt ~/secrets/rabbitmq-definitions.gpg \
   | kubectl create secret generic rabbitmq-definitions \
       --from-file=definitions.json=/dev/stdin \
       -n shift-festival
+
+# Restore Cloudflare tunnel secret (token is set via CI, not stored in .env)
+CF_TOKEN=$(gpg --batch --decrypt ~/secrets/cloudflare-tunnel.gpg)
+kubectl create secret generic cloudflare-tunnel-secret \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$CF_TOKEN" \
+  -n shift-festival
+unset CF_TOKEN
 
 # 6. Wait for ArgoCD to sync (usually 1–2 minutes after step 5)
 kubectl get application shift-festival-prod -n argocd

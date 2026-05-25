@@ -112,6 +112,30 @@ jobs:
               echo "WARNING: rabbitmq-definitions secret not found — skipping"
             fi
 
+            # Back up the cloudflare-tunnel-secret.
+            # This secret is set via CI pipeline, not from .env — so the .env backup
+            # alone is not sufficient to restore cloudflared after DR.
+            CF_TOKEN=$(kubectl get secret cloudflare-tunnel-secret -n shift-festival \
+              -o jsonpath='{.data.CLOUDFLARE_TUNNEL_TOKEN}' 2>/dev/null | base64 -d || true)
+
+            if [[ -n "$CF_TOKEN" ]]; then
+              echo "$CF_TOKEN" \
+                | gpg --batch --yes \
+                    --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+                    --symmetric --cipher-algo AES256 \
+                    --output /tmp/cloudflare-tunnel.gpg
+
+              scp -i "$HOME/.ssh/backup_key" \
+                -o StrictHostKeyChecking=no \
+                /tmp/cloudflare-tunnel.gpg \
+                "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/cloudflare-tunnel.gpg"
+
+              rm /tmp/cloudflare-tunnel.gpg
+              echo "cloudflare-tunnel-secret synced to backup VM"
+            else
+              echo "WARNING: cloudflare-tunnel-secret not found — skipping"
+            fi
+
             echo "Secrets synced to backup VM"
 
   backup-images:

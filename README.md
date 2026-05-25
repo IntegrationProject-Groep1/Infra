@@ -780,12 +780,21 @@ All 6 databases are backed up daily to a separate backup VM via the `backup.yml`
 | What | Frequency | Location |
 |---|---|---|
 | 6 databases (pg_dump / mysqldump) | Daily 02:00 UTC | `integration.switzerlandnorth.cloudapp.azure.com:~/backups/databases/` |
-| Git mirror | Daily 03:00 UTC | `~/git-mirrors/infra.git` |
-| Secrets (`.env`, GPG-encrypted) | Manual, on every change | `~/secrets/shift-festival.env.gpg` |
+| Git mirror | Daily 02:00 UTC | `~/git-mirrors/infra.git` |
+| Secrets (`.env`, GPG-encrypted) | Daily 02:00 UTC | `~/secrets/shift-festival.env.gpg` |
+| RabbitMQ definitions (GPG-encrypted) | Daily 02:00 UTC | `~/secrets/rabbitmq-definitions.gpg` |
+| Cloudflare tunnel token (GPG-encrypted) | Daily 02:00 UTC | `~/secrets/cloudflare-tunnel.gpg` |
 
 **Estimated recovery time after full VM loss: 30–60 minutes.**
 
-See [BACKUP.md](BACKUP.md) for quick commands and [docs/disaster-recovery.md](docs/disaster-recovery.md) for the full step-by-step recovery guide.
+> **Note — ELK Stack on the backup VM:** The backup VM has fewer resources than the primary VM. Elasticsearch requires at least 1 GB of JVM heap and typically uses 2–3 GB of RAM in production. If the backup VM runs out of CPU or memory, start by scaling down ELK first so the application pods can start:
+> ```bash
+> kubectl scale deployment elasticsearch-deployment logstash-deployment kibana-deployment \
+>   elastic-agent-deployment heartbeat-deployment --replicas=0 -n shift-festival
+> ```
+> Logging is unavailable in this reduced mode but all application services (databases, RabbitMQ, team workloads, Cloudflare tunnel) will run normally. Re-enable ELK only if the backup VM has enough headroom.
+
+See [docs/disaster-recovery.md](docs/disaster-recovery.md) for the full step-by-step recovery guide.
 
 ---
 
