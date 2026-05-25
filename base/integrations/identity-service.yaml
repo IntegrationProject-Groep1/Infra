@@ -59,12 +59,12 @@ spec:
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: RABBITMQ_DEFAULT_USER
+              key: IDENTITY_RABBIT_USER
         - name: RABBITMQ_PASSWORD
           valueFrom:
             secretKeyRef:
               name: shift-secrets
-              key: RABBITMQ_DEFAULT_PASS
+              key: IDENTITY_RABBIT_PASS
         - name: RABBITMQ_VHOST
           value: "/"
         - name: TEAMS_WEBHOOK_INFRA
