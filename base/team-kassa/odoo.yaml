@@ -56,6 +56,38 @@ spec:
         volumeMounts:
         - name: extra-addons
           mountPath: /mnt/extra-addons
+      - name: clear-asset-cache
+        image: postgres:15-alpine
+        command: ["sh", "-c"]
+        args:
+        - |
+          PGPASSWORD="$DB_PASSWORD" psql \
+            -h kassa-db-service \
+            -U "$DB_USER" \
+            -d "$DB_NAME" \
+            -c "DELETE FROM ir_attachment WHERE url LIKE '/web/assets/%';" \
+          || echo "DB not reachable or does not exist yet — skipping asset cache clear."
+        env:
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_USER
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: POSTGRES_PASSWORD
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: shift-secrets
+              key: ODOO_DB
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 70
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
       containers:
       - name: odoo
         image: ghcr.io/integrationproject-groep1/kassa-odoo:odoo-latest
