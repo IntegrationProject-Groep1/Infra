@@ -95,7 +95,7 @@ Secrets are not managed by kustomize — ArgoCD does not have filesystem access 
 Re-run whenever `setup/.env` changes.
 
 **Dev environment lifecycle (`shift-festival-dev`):**
-The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is created and deleted by the GitHub Actions workflows:
+The dev ArgoCD Application (`argocd/applications/dev/dev-app.yaml`) is **not** managed by the prod ArgoCD app. It is managed entirely by the GitHub Actions workflows:
 - `dev-on.yml` — Runs a phased startup in this order:
   1. SCP overlay + `dev-app.yaml` to the VM
   2. Create namespace and copy secrets from prod
