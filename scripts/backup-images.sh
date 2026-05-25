@@ -40,10 +40,10 @@ for image in $IMAGES; do
 
   log "Pulling $image"
   # Use absolute path so the sudoers NOPASSWD rule matches regardless of PATH in the SSH session
-  sudo -n /usr/local/bin/ctr images pull "$image" || fail "Failed to pull $image — ensure NOPASSWD is configured for ctr (see docs/disaster-recovery.md Step 1.2)"
+  sudo -n /usr/bin/ctr images pull "$image" || fail "Failed to pull $image — ensure NOPASSWD is configured for ctr (see docs/disaster-recovery.md Step 1.2)"
 
   log "Exporting → $tmp"
-  sudo -n /usr/local/bin/ctr images export "$tmp" "$image" || fail "Failed to export $image"
+  sudo -n /usr/bin/ctr images export "$tmp" "$image" || fail "Failed to export $image"
 
   log "Transferring to backup VM"
   rsync -az --progress -e "ssh $SSH_OPTS" \

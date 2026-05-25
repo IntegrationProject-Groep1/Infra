@@ -54,7 +54,7 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
 Run this **once on the primary VM**:
 
 ```bash
-echo "ehbstudent ALL=(ALL) NOPASSWD: /usr/local/bin/ctr" \
+echo "ehbstudent ALL=(ALL) NOPASSWD: /usr/bin/ctr" \
   | sudo tee /etc/sudoers.d/ctr-backup
 sudo chmod 440 /etc/sudoers.d/ctr-backup
 
