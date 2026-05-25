@@ -49,6 +49,8 @@ ssh -i ~/.ssh/backup_key groep1@integration.switzerlandnorth.cloudapp.azure.com 
 
 `backup-images.sh` uses `ctr` (containerd CLI) to pull and export images. `ctr` requires root. The script runs non-interactively via GitHub Actions, so sudo must not prompt for a password.
 
+> **Security note:** this grants passwordless `ctr` access to `ehbstudent`. Since `ctr` can run arbitrary containers, this is effectively root access for container operations. Acceptable on this managed school VM; do not apply to production systems without further hardening.
+
 Run this **once on the primary VM**:
 
 ```bash
