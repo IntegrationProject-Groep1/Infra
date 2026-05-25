@@ -3,5 +3,6 @@ kind: Kustomization
 
 resources:
   - prod-app.yaml
-  - dev-app.yaml
+  - dev/
   - root-app.yaml
+

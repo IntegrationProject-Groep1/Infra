@@ -102,6 +102,7 @@ spec:
         ports:
         - containerPort: 8080
           name: health
+          protocol: TCP
         resources:
           requests:
             memory: "64Mi"
