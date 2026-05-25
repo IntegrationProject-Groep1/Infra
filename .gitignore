@@ -14,6 +14,7 @@ overlays/prod/.env
 overlays/dev/.env
 base/setup/.env
 base/setup/.env*
+!base/setup/.env.example
 
 # Allow .env.example files as templates (negations must come after the blocking rules)
 !overlays/prod/.env.example

@@ -88,7 +88,123 @@ jobs:
               "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/shift-festival.env.gpg"
 
             rm /tmp/env.gpg
+
+            # Back up the rabbitmq-definitions secret (users, vhosts, permissions).
+            # RabbitMQ cannot start without this secret and it is not in the .env.
+            RABBIT_DEF=$(kubectl get secret rabbitmq-definitions -n shift-festival \
+              -o jsonpath='{.data.definitions\.json}' 2>/dev/null | base64 -d || true)
+
+            if [[ -n "$RABBIT_DEF" ]]; then
+              echo "$RABBIT_DEF" \
+                | gpg --batch --yes \
+                    --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+                    --symmetric --cipher-algo AES256 \
+                    --output /tmp/rabbitmq-definitions.gpg
+
+              scp -i "$HOME/.ssh/backup_key" \
+                -o StrictHostKeyChecking=no \
+                /tmp/rabbitmq-definitions.gpg \
+                "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/rabbitmq-definitions.gpg"
+
+              rm /tmp/rabbitmq-definitions.gpg
+              echo "rabbitmq-definitions synced to backup VM"
+            else
+              echo "WARNING: rabbitmq-definitions secret not found — skipping"
+            fi
+
+            # Back up the cloudflare-tunnel-secret.
+            # This secret is set via CI pipeline, not from .env — so the .env backup
+            # alone is not sufficient to restore cloudflared after DR.
+            CF_TOKEN=$(kubectl get secret cloudflare-tunnel-secret -n shift-festival \
+              -o jsonpath='{.data.CLOUDFLARE_TUNNEL_TOKEN}' 2>/dev/null | base64 -d || true)
+
+            if [[ -n "$CF_TOKEN" ]]; then
+              echo "$CF_TOKEN" \
+                | gpg --batch --yes \
+                    --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+                    --symmetric --cipher-algo AES256 \
+                    --output /tmp/cloudflare-tunnel.gpg
+
+              scp -i "$HOME/.ssh/backup_key" \
+                -o StrictHostKeyChecking=no \
+                /tmp/cloudflare-tunnel.gpg \
+                "${{ secrets.BACKUP_VM_USER }}@${{ secrets.BACKUP_VM_HOST }}:secrets/cloudflare-tunnel.gpg"
+
+              rm /tmp/cloudflare-tunnel.gpg
+              echo "cloudflare-tunnel-secret synced to backup VM"
+            else
+              echo "WARNING: cloudflare-tunnel-secret not found — skipping"
+            fi
+
             echo "Secrets synced to backup VM"
+
+  backup-images:
+    name: Export GHCR images → backup VM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run image backup script on primary VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          script: |
+            set -euo pipefail
+
+            export BACKUP_VM_HOST="${{ secrets.BACKUP_VM_HOST }}"
+            export BACKUP_VM_USER="${{ secrets.BACKUP_VM_USER }}"
+            export BACKUP_VM_KEY="$HOME/.ssh/backup_key"
+
+            SCRIPT="$HOME/shiftfestival/scripts/backup-images.sh"
+
+            if [[ ! -f "$SCRIPT" ]]; then
+              echo "backup-images.sh not found at $SCRIPT — has deploy.yml run yet?"
+              exit 1
+            fi
+
+            # Run in background so the SSH session can close and reopen to check status.
+            # Exporting 16 images takes 20-30 min — longer than any SSH action timeout.
+            LOG="/tmp/backup-images.log"
+            PIDFILE="/tmp/backup-images.pid"
+            nohup bash "$SCRIPT" > "$LOG" 2>&1 &
+            echo $! > "$PIDFILE"
+            echo "Image backup started in background (PID: $!). Check $LOG on the VM for status."
+
+      - name: Wait for image backup to complete
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 60022
+          command_timeout: 60m
+          script: |
+            PIDFILE="/tmp/backup-images.pid"
+            LOG="/tmp/backup-images.log"
+
+            if [[ ! -f "$PIDFILE" ]]; then
+              echo "PID file not found — backup may not have started"
+              exit 1
+            fi
+
+            PID=$(cat "$PIDFILE")
+            echo "Waiting for backup process (PID: $PID) to finish..."
+
+            while kill -0 "$PID" 2>/dev/null; do
+              sleep 30
+            done
+
+            echo "=== backup-images.log ==="
+            cat "$LOG"
+
+            # Check if the log ends with success marker
+            if grep -q "=== Image backup complete ===" "$LOG"; then
+              echo "Image backup completed successfully."
+            else
+              echo "Image backup appears to have failed — see log above."
+              exit 1
+            fi
 
   sync-git-mirror:
     name: Update Git mirror on backup VM
@@ -107,7 +223,7 @@ jobs:
 
             if [[ ! -d "$MIRROR" ]]; then
               echo "Git mirror not found at $MIRROR — run initial setup first."
-              echo "See docs/disaster-recovery.md Step 1.3"
+              echo "See docs/disaster-recovery.md Step 1.4"
               exit 1
             fi
 

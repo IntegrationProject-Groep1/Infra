@@ -7,3 +7,4 @@ resources:
   - namespace.yaml
   - install.yaml
   - image-updater/install.yaml
+  - applications/prod-app.yaml

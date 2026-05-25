@@ -79,15 +79,24 @@ restore_postgres() {
 
 # ──────────────────────────────────────────────
 # MariaDB / MySQL restore
+# MariaDB containers clear MYSQL_USER/MYSQL_PASSWORD after init for security.
+# Read credentials directly from the Kubernetes secret instead.
+# Args: app  dump_file  secret-key-for-user  secret-key-for-pass  secret-key-for-db
 # ──────────────────────────────────────────────
 restore_mysql() {
-  local app="$1" dump_file="$2"
+  local app="$1" dump_file="$2" user_key="$3" pass_key="$4" db_key="$5"
   [[ -f "$LOCAL_DIR/$dump_file" ]] || { log "  SKIP: $dump_file not found"; return; }
-  local pod
+  local pod db_user db_pass db_name
   pod=$(get_pod "$app")
+  db_user=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$user_key}" | base64 -d)
+  db_pass=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$pass_key}" | base64 -d)
+  db_name=$(kubectl get secret shift-secrets -n "$NAMESPACE" \
+    -o jsonpath="{.data.$db_key}" | base64 -d)
   log "  Restoring MariaDB/MySQL: $app ($pod) ← $dump_file"
-  gunzip -c "$LOCAL_DIR/$dump_file" | kubectl exec -i -n "$NAMESPACE" "$pod" -- sh -c \
-    'mysql -u "$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+  gunzip -c "$LOCAL_DIR/$dump_file" | kubectl exec -i -n "$NAMESPACE" "$pod" -- \
+    mysql -u "$db_user" -p"$db_pass" "$db_name" \
     || fail "mysql restore failed for $app"
 }
 
@@ -95,14 +104,15 @@ restore_mysql() {
 # Run all restores
 # ──────────────────────────────────────────────
 log "=== Restoring PostgreSQL databases ==="
-restore_postgres "postgredb"    "central-postgres.sql.gz"
-restore_postgres "kassa-db"     "kassa-postgres.sql.gz"
-restore_postgres "planning-db"  "planning-postgres.sql.gz"
+restore_postgres "postgredb"  "central-postgres.sql.gz"
+restore_postgres "kassa-db"   "kassa-postgres.sql.gz"
+restore_postgres "chatbot-db" "chatbot-postgres.sql.gz"
 
 log "=== Restoring MariaDB / MySQL databases ==="
-restore_mysql "frontend-db"    "frontend-mariadb.sql.gz"
-restore_mysql "facturatie-db"  "facturatie-mariadb.sql.gz"
-restore_mysql "crm-db"         "crm-mysql.sql.gz"
+# Secret keys match the keys in base/setup/.env.example
+restore_mysql "frontend-db"   "frontend-mariadb.sql.gz"   "DRUPAL_DB_USER"      "DRUPAL_DB_PASS"      "DRUPAL_DB_NAME"
+restore_mysql "facturatie-db" "facturatie-mariadb.sql.gz"  "FOSSBILLING_DB_USER" "FOSSBILLING_DB_PASS" "FOSSBILLING_DB_NAME"
+restore_mysql "crm-db"        "crm-mysql.sql.gz"           "MYSQL_USER"          "MYSQL_PASSWORD"      "MYSQL_DATABASE"
 
 log "=== Restore complete ==="
 log "Restart application pods to pick up the restored data:"
