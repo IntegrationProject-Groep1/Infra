@@ -19,7 +19,7 @@ images:
   digest: sha256:d6f681cd699ce87e24a1e0143ae0484905b819b75f74e33d4df8929ea8ff8fb4
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:9d943526da1790ea3c6a84843ec7e4e500feab6b434d3440d82cb3151b8ab187
+  digest: sha256:f9fcfbd32468420242745625220a6721fe8687eff630a6b7e79866455eebb765
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
   digest: sha256:8cae0264907a5558c885f94102d74ba6580c4ed2c282741d0872b5f6296b87cf
@@ -40,7 +40,7 @@ images:
   digest: sha256:7b4a703b9a78d88a3cb9044e49eeb9829ebb4a34c44f4d0e3ce68d2354c765ab
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
-  digest: sha256:4b56a12a407100f20bf052d0f4b844d7235c8473900bd48d0662beb1d46548da
+  digest: sha256:6aef1b9b2861274b3272ffc1db225ad9137302fc4515e5f877a32ea8ddd9fdd6
 - name: ghcr.io/integrationproject-groep1/monitoring-mcp
   newName: ghcr.io/integrationproject-groep1/monitoring-mcp
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
@@ -49,7 +49,7 @@ images:
   digest: sha256:1e16b33e5c74d55ce3f4f386959f8a08fc252ba4ba808e98313865fa189a0f18
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
-  digest: sha256:4a26e7f7c493e630d264380525801a450eba3c4049a337941ff014752e7d9e8e
+  digest: sha256:3cb93ec441a92bf2b84315c1524937cf800ee9ebfeda9b9275202af550a7a873
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
   digest: sha256:ffe4efc82484ba6d30f060ee1b4712881ffda886270568cd5d04953ce8a0fcff
