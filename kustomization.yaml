@@ -7,7 +7,7 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:63c956ae3753729480bc321427f549dd102a661608d295e83c9e9d9643df3f3a
+  digest: sha256:806064a7a7df8e4f3d05207d019c9e3c26e13ed4ac271700ea9476e64f8e8913
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
@@ -16,7 +16,7 @@ images:
   digest: sha256:fc9ec0756d69bf680e1887d04ee0b70143c6a5e14172eabcb112c7d2c8983ed4
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
-  digest: sha256:d6f681cd699ce87e24a1e0143ae0484905b819b75f74e33d4df8929ea8ff8fb4
+  digest: sha256:a402183e105f0754372fcc912c9ca119c00c9911ed08a526a246cb917ce45810
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
   digest: sha256:01677d022e3b16afa67f9cff98fa22e0a8567c5d18fce4d7335a33964d6a9db9
@@ -25,7 +25,7 @@ images:
   digest: sha256:047d52dad453aa2d3bdc806cc7b4c8947c8c25c0fa7886c449131d1b21b8e20b
 - name: ghcr.io/integrationproject-groep1/identity-service
   newName: ghcr.io/integrationproject-groep1/identity-service
-  digest: sha256:404e394516dbc2633df5ac483925496085050cc90e7cfa65b05e60fa91d002e3
+  digest: sha256:7ddbad389f723bf8d3fc88c9c3d0213a0bb551e3c9fc74dfc30bb225d759bbe5
 - name: ghcr.io/integrationproject-groep1/heartbeat
   newName: ghcr.io/integrationproject-groep1/heartbeat
   digest: sha256:db7c5ebb58708e031c404ac225bcdb04fac0f0d0c420b45c981fd409ab8799e6
@@ -46,13 +46,13 @@ images:
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
 - name: ghcr.io/integrationproject-groep1/facturatie-mcp
   newName: ghcr.io/integrationproject-groep1/facturatie-mcp
-  digest: sha256:9af30d621d64acb1fdc3b14986185e9cd250b6b2a2186afe4f66197a31f72597
+  digest: sha256:d14f6ba0d2c60830ac389313628219546fd7c4b95403b8c14d4a4e7152f61502
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
   digest: sha256:93eddbc3e3e70e7072d9fde42d04cf05913d53f903e9e86f974bc9aaf97043f6
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:5ad79e890d784ebdc63f8e8438e5e99ce1ef4034c306e87965dc88ca0346df0c
+  digest: sha256:148e22e713534c46d0261aff6dc9efbabd8e59eab35c4ed7cfdc5159c4ef9a42
 patches:
 - target:
     kind: Rollout
