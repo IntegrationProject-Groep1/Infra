@@ -62,18 +62,15 @@ spec:
     server: https://kubernetes.default.svc
     namespace: shift-festival-dev
   syncPolicy:
-    automated:
-      prune: false
-      selfHeal: false
     syncOptions:
       - CreateNamespace=true
       - RespectIgnoreDifferences=true
     retry:
-      limit: 5
+      limit: 2
       backoff:
         duration: 30s
         factor: 2
-        maxDuration: 10m
+        maxDuration: 2m
   ignoreDifferences:
     # shift-secrets is managed outside ArgoCD (kubectl patch) — ignore data drift
     - group: ""
