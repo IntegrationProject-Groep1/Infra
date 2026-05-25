@@ -219,7 +219,7 @@ Logs for all services are available in Kibana at [kibana.desiderius.me](https://
 
 ### Infrastructure
 - [x] Kustomize overlay created (`overlays/dev/`)
-- [x] ArgoCD Application created (`argocd/applications/dev-app.yaml`)
+- [x] ArgoCD Application created (`argocd/applications/dev/dev-app.yaml`)
 - [x] Dev subdomains added to Ingress patches
 - [x] DNS records created via Cloudflare (`dev-*.desiderius.me`)
 - [x] GitHub Actions `dev-on.yml` workflow (phased startup)
