@@ -168,6 +168,22 @@ spec:
           valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_USER}}
         - name: RABBITMQ_PASS
           valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_PASS}}
+      - name: rabbitmq
+        image: ghcr.io/integrationproject-groep1/heartbeat:latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities: {drop: [ALL]}
+          readOnlyRootFilesystem: true
+        env:
+        - {name: SYSTEM_NAME, value: "rabbitmq"}
+        - {name: TARGETS,     value: "rabbitmq-service:15672"}
+        - {name: RABBITMQ_HOST, value: "rabbitmq-service"}
+        - {name: RABBITMQ_PORT, value: "5672"}
+        - name: RABBITMQ_USER
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_USER}}
+        - name: RABBITMQ_PASS
+          valueFrom: {secretKeyRef: {name: shift-secrets, key: RABBITMQMONITORING_PASS}}
       # ── MCP servers ──────────────────────────────────────────────────────────
       - name: frontend-mcp
         image: ghcr.io/integrationproject-groep1/heartbeat:latest
