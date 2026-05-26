@@ -13,7 +13,7 @@ images:
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
 - name: ghcr.io/integrationproject-groep1/kassa-odoo
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:c3e6c7774440f5732cfa3567ce21e54157c4abde6ee00152bc31983a49b22aa7
+  digest: sha256:ee3e9f0d89c031af79815cc08ebc2ff8683b58e5f7e808a92948764d613e2471
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
   digest: sha256:84fbe3a432ca54d8dc4c7c8c322eeb4a2827c11b4e3cab191a8c0fc0cc73eb65
@@ -34,7 +34,7 @@ images:
   digest: sha256:a6a69e944717a84d3de785c9ea7ddfbca4e97ee7238240003d3cab4c4a644512
 - name: ghcr.io/integrationproject-groep1/monitoring
   newName: ghcr.io/integrationproject-groep1/monitoring
-  digest: sha256:6f78b98f45aee8c1fdeec94f27ae5a24eb96c71d36935b3b3416381c63e734b1
+  digest: sha256:f07eac9d3ab369839d4ad21d99549cb5ea517a06466358b2f0396e36111b5bbb
 - name: ghcr.io/integrationproject-groep1/chatbot
   newName: ghcr.io/integrationproject-groep1/chatbot
   digest: sha256:5a787d8a72801b9fa0393234ef23c9440fab9e8f2cf9333b58ae561f1d40b32c
@@ -52,7 +52,7 @@ images:
   digest: sha256:0b12a6044c31ca8bf1ee883a9580c3578d37142b71f017a32b26252244c8f7fe
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:d9b5a7044b6c321831f696ea83341a2d17fcb04721bc613aeed6903b14b42f81
+  digest: sha256:811bd55ec404e8a3ccda471adf6cddd7b8e4b51bae5a4fa22e5f0115093fb956
 patches:
 - target:
     kind: Rollout
