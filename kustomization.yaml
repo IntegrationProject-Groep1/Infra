@@ -52,7 +52,7 @@ images:
   digest: sha256:0b12a6044c31ca8bf1ee883a9580c3578d37142b71f017a32b26252244c8f7fe
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:811bd55ec404e8a3ccda471adf6cddd7b8e4b51bae5a4fa22e5f0115093fb956
+  digest: sha256:95f4c6870e6ef493693de0a2bc4d433fceadc34d33dec9a9342471ae470dc056
 patches:
 - target:
     kind: Rollout
