@@ -313,13 +313,19 @@ kubectl get secret argocd-initial-admin-secret -n argocd \
 kubectl patch daemonset elastic-agent -n shift-festival \
   -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-existing":"true"}}}}}'
 
-# Scale down Deployments (ELK stack):
-kubectl scale deployment elasticsearch-deployment logstash-deployment \
-  kibana-deployment -n shift-festival --replicas=0
+# Scale down ELK stack.
+# NOTE: Elasticsearch is a StatefulSet named "elasticsearch", NOT a Deployment.
+#       Logstash and Kibana are Deployments named "logstash" and "kibana" (no "-deployment" suffix).
+#       Using wrong names silently returns "not found" and leaves ELK running,
+#       consuming ~1-2 GB RAM and leaving too little memory for business pods (kassa-web goes Pending).
+kubectl scale statefulset elasticsearch -n shift-festival --replicas=0
+kubectl scale deployment logstash kibana -n shift-festival --replicas=0
 
-# Scale down Rollouts (MCP servers, monitoring, chatbot sidecars — not needed in DR):
+# Scale down Rollouts (MCP servers, monitoring, chatbot sidecars, and detector — not needed in DR).
+# detector is included because its init container waits for Elasticsearch; if Elasticsearch is at
+# 0 replicas, detector will be stuck in Init:0/1 forever.
 for name in heartbeat-monitor monitoring-agent monitoring-mcp \
-            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy; do
+            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy detector; do
   kubectl patch rollout "$name" -n shift-festival \
     --type=merge -p='{"spec":{"replicas":0}}' 2>/dev/null || true
 done
@@ -353,8 +359,12 @@ bash scripts/restore-databases.sh 2026-05-22 ~/backups/databases/2026-05-22
 kubectl rollout restart deployment rabbitmq-broker -n shift-festival
 kubectl rollout status deployment rabbitmq-broker -n shift-festival
 
-# After RabbitMQ is back up, restart all application deployments.
-kubectl rollout restart deployment -n shift-festival
+# Wait for RabbitMQ to finish loading its definitions before flushing queues.
+# rollout status returns as soon as the pod is ready, but RabbitMQ needs a few
+# more seconds to import the definitions file. Running exec too early hits the
+# old (terminating) pod and fails with "task not found".
+kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
+  rabbitmqctl await_startup
 
 # FIX: RabbitMQ queue argument mismatch after definitions restore.
 #
@@ -367,28 +377,41 @@ kubectl rollout restart deployment -n shift-festival
 # Fix: delete ALL queues after RabbitMQ loads its definitions. The users, vhosts,
 # and permissions from the definitions are preserved — only the queue objects are
 # removed. Services recreate their queues with the correct arguments on startup.
-RMQADMIN_ARGS="-H localhost -u $(kubectl get secret shift-secrets -n shift-festival \
-  -o jsonpath='{.data.RABBITMQ_DEFAULT_USER}' | base64 -d) \
-  -p $(kubectl get secret shift-secrets -n shift-festival \
-  -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)"
+RMQUSER=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQ_DEFAULT_USER}' | base64 -d)
+RMQPASS=$(kubectl get secret shift-secrets -n shift-festival \
+  -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)
 
 kubectl exec -n shift-festival deployment/rabbitmq-broker -- \
-  bash -c "rabbitmqadmin $RMQADMIN_ARGS list queues name -f tsv | tail -n +2 | \
-  while read q; do rabbitmqadmin $RMQADMIN_ARGS delete queue name=\"\$q\"; done"
-unset RMQADMIN_ARGS
+  bash -c "rabbitmqadmin -H localhost -u '$RMQUSER' -p '$RMQPASS' \
+  list queues name -f tsv | tail -n +2 | \
+  while read q; do rabbitmqadmin -H localhost -u '$RMQUSER' -p '$RMQPASS' \
+  delete queue name=\"\$q\"; done"
+unset RMQUSER RMQPASS
 
-# Restart all services so they recreate their queues cleanly
+# After RabbitMQ is back up, restart all application deployments.
+# Services recreate their queues with the correct arguments on startup.
 kubectl rollout restart deployment -n shift-festival
 ```
 
-### Step 3.9 — Update Cloudflare Tunnel
+### Step 3.9 — Update Cloudflare Tunnel (only if a new tunnel token is needed)
 
-If the backup VM has a different external IP, update the tunnel token in `.env` and re-apply:
+The tunnel token was already restored from the GPG backup in Step 3.5. Skip this step unless
+the backup VM requires a **different** Cloudflare tunnel token (e.g., the old tunnel was deleted
+and a new one was created in the Cloudflare dashboard).
 
 ```bash
-nano base/setup/.env          # update CLOUDFLARE_TUNNEL_TOKEN
-bash scripts/create-secret.sh base/setup/.env shift-festival
+# Replace the tunnel token with a new one (do NOT use nano — non-interactive only).
+NEW_CF_TOKEN="<paste-new-token-here>"
+sed -i "s|^CLOUDFLARE_TUNNEL_TOKEN=.*|CLOUDFLARE_TUNNEL_TOKEN=${NEW_CF_TOKEN}|" base/setup/.env
+
+# Re-create the cloudflare-tunnel-secret and restart cloudflared.
+kubectl delete secret cloudflare-tunnel-secret -n shift-festival --ignore-not-found
+kubectl create secret generic cloudflare-tunnel-secret \
+  --from-literal=CLOUDFLARE_TUNNEL_TOKEN="$NEW_CF_TOKEN" \
+  -n shift-festival
 kubectl rollout restart deployment cloudflared -n shift-festival
+unset NEW_CF_TOKEN
 ```
 
 ---
@@ -494,10 +517,12 @@ kubectl patch application shift-festival-prod -n argocd --type=merge \
 # 6c. Scale down monitoring and non-essential services (backup VM is undersized)
 kubectl patch daemonset elastic-agent -n shift-festival \
   -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-existing":"true"}}}}}'
-kubectl scale deployment elasticsearch-deployment logstash-deployment \
-  kibana-deployment -n shift-festival --replicas=0
+# Elasticsearch is a StatefulSet named "elasticsearch" (NOT a Deployment; no "-deployment" suffix)
+kubectl scale statefulset elasticsearch -n shift-festival --replicas=0
+kubectl scale deployment logstash kibana -n shift-festival --replicas=0
+# detector has an init container that waits for Elasticsearch; scale it to 0 or it hangs forever
 for name in heartbeat-monitor monitoring-agent monitoring-mcp \
-            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy; do
+            kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy detector; do
   kubectl patch rollout "$name" -n shift-festival \
     --type=merge -p='{"spec":{"replicas":0}}' 2>/dev/null || true
 done
@@ -527,7 +552,19 @@ rm -rf ~/Infra-test
 
 Expected result: all *-db pods Running, databases restored, cloudflared Running, frontend reachable. ELK is intentionally scaled to 0 (insufficient CPU on backup VM).
 
-> **Note on missing keys in shift-secrets:** If a pod reports `couldn't find key X in Secret shift-secrets`, the key was probably added to `.env` on the primary VM after the last GPG backup run. Cross-check with the primary VM's `shift-secrets` if it is still reachable, or wait for the next backup.yml run to capture the updated `.env`.
+> **Note on missing keys in shift-secrets — `CreateContainerConfigError`:** If a pod shows `CreateContainerConfigError` and events say `couldn't find key X in Secret shift-festival/shift-secrets`, the root cause is almost always that the key has an **empty value** in `.env` (e.g. `ADMIN_CREDENTIALS=` with nothing after the `=`). `kubectl create secret generic --from-env-file` silently skips keys with empty values — they do not appear in the secret at all.
+>
+> Known affected pods:
+> - `chatbot` — needs `ADMIN_CREDENTIALS` to have a non-empty value
+> - `facturatie-connector` — needs `BILLING_WEB_URL` to have a non-empty value  
+> - `kibana` — needs `XPACK_ENCRYPTEDSAVEDOBJECTS_ENCRYPTIONKEY` (less critical; kibana is not running in DR mode)
+>
+> Fix: patch the secret manually with the correct value, then restart the pod:
+> ```bash
+> kubectl patch secret shift-secrets -n shift-festival --type=merge \
+>   -p='{"stringData":{"ADMIN_CREDENTIALS":"<value>","BILLING_WEB_URL":"https://facturatie.desiderius.me"}}'
+> kubectl rollout restart rollout/chatbot rollout/facturatie-connector -n shift-festival
+> ```
 
 ---
 
@@ -698,9 +735,9 @@ The backup VM is now a clean standby again — ready for the next test or a real
 □ Install Argo Rollouts: kubectl apply -k argocd/rollouts/
 □ Install ArgoCD + apply argocd/ manifests: kubectl create namespace argocd && kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml && kubectl apply -k argocd/
 □ Disable ArgoCD auto-sync: kubectl patch application shift-festival-prod -n argocd --type=merge -p='{"spec":{"syncPolicy":null}}'
-□ Scale down ELK: kubectl scale deployment elasticsearch-deployment logstash-deployment kibana-deployment elastic-agent-deployment heartbeat-deployment --replicas=0 -n shift-festival
+□ Scale down ELK + detector: kubectl patch daemonset elastic-agent -n shift-festival -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-existing":"true"}}}}}' && kubectl scale statefulset elasticsearch -n shift-festival --replicas=0 && kubectl scale deployment logstash kibana -n shift-festival --replicas=0 && for name in heartbeat-monitor monitoring-agent monitoring-mcp kassa-mcp crm-mcp facturatie-mcp frontend-mcp chatbot-proxy detector; do kubectl patch rollout "$name" -n shift-festival --type=merge -p='{"spec":{"replicas":0}}' 2>/dev/null || true; done
 □ Wait for *-db pods to be Running
-□ Restart RabbitMQ so it loads definitions: kubectl rollout restart deployment rabbitmq-broker -n shift-festival && kubectl rollout status deployment rabbitmq-broker -n shift-festival
+□ Restart RabbitMQ and wait for startup: kubectl rollout restart deployment rabbitmq-broker -n shift-festival && kubectl rollout status deployment rabbitmq-broker -n shift-festival && kubectl exec -n shift-festival deployment/rabbitmq-broker -- rabbitmqctl await_startup
 □ Run restore: bash scripts/restore-databases.sh <date> ~/backups/databases/<date>
 □ Restart apps: kubectl rollout restart deployment -n shift-festival
 □ Verify tunnel: kubectl logs -n shift-festival -l app=cloudflared --tail=20
