@@ -582,11 +582,12 @@ sudo chmod 644 /etc/rancher/k3s/k3s.yaml
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # 3. Import backed-up images into k3s before deploying
+# k3s uses /run/k3s/containerd/containerd.sock and the k8s.io namespace
 for tar in ~/backups/images/*.tar; do
   echo "Importing $tar"
-  sudo ctr images import "$tar"
+  sudo ctr --address /run/k3s/containerd/containerd.sock --namespace k8s.io images import "$tar"
 done
-sudo ctr images list | grep ghcr.io   # verify
+sudo ctr --address /run/k3s/containerd/containerd.sock --namespace k8s.io images list | grep ghcr.io   # verify
 
 # 4. Create a new empty GitHub repo on a personal account (do this in the browser)
 #    e.g. https://github.com/<your-username>/Infra
@@ -747,7 +748,7 @@ The backup VM is now a clean standby again — ready for the next test or a real
 **Scenario B — VM gone AND GitHub org deleted:**
 ```
 □ SSH into backup VM
-□ Import images: for tar in ~/backups/images/*.tar; do sudo ctr images import "$tar"; done
+□ Import images: for tar in ~/backups/images/*.tar; do sudo ctr --address /run/k3s/containerd/containerd.sock --namespace k8s.io images import "$tar"; done
 □ Create new empty GitHub repo on personal account
 □ Push mirror: cd ~/git-mirrors/infra.git && git remote add new-origin <url> && git push new-origin --mirror
 □ git clone new repo → ~/Infra
