@@ -7,7 +7,7 @@ resources:
 images:
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend
-  digest: sha256:806064a7a7df8e4f3d05207d019c9e3c26e13ed4ac271700ea9476e64f8e8913
+  digest: sha256:5f5a8b0fd5ddabc8592ef963675bf2ab1feab7fbcdd1bcd520e6a4d973fb478b
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
@@ -52,7 +52,7 @@ images:
   digest: sha256:f97e6ae8fe0d63a245c26581144ea0bd36ff35e0c23b1b55a5a12dfc8bb55097
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:d637a817f453500021f443ab90ec07476f818a8f4a4f0c31a1fa907cbf8f518a
+  digest: sha256:b160e6829cb6cf48d4248dd0816a383c5d41a22441d06ebeb7d3fb47ee9436d0
 patches:
 - target:
     kind: Rollout
