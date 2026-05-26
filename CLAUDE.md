@@ -90,7 +90,7 @@ ArgoCD Image Updater polls GHCR every 1 minute. When a new tag is detected, it c
 **Secrets Bootstrap:**
 Secrets are not managed by kustomize — ArgoCD does not have filesystem access to `.env` files. Run once on the VM:
 ```bash
-./scripts/create-secret.sh setup/.env shift-festival
+./scripts/create-secret.sh base/setup/.env shift-festival
 ```
 Re-run whenever `setup/.env` changes.
 
