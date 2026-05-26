@@ -13,13 +13,13 @@ images:
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
 - name: ghcr.io/integrationproject-groep1/kassa-odoo
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:4e88a0b8fbb452750637aaa56f90ef55d164c176858ddbf537d1131de0d01722
+  digest: sha256:8fde77835e558a65bf41f00c9f2226447e0042963f81fa988afe1bba5fb65740
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
   digest: sha256:6c093ee3c9e5ba8bd8f020a7be16bec9a34d8aa5d408b352bd643c589e2a6c79
 - name: ghcr.io/integrationproject-groep1/crm
   newName: ghcr.io/integrationproject-groep1/crm
-  digest: sha256:01677d022e3b16afa67f9cff98fa22e0a8567c5d18fce4d7335a33964d6a9db9
+  digest: sha256:2389c67b69f7594712f8d0604c2b1469a704b6d80b0e067f2940b1dd4b8e89c6
 - name: ghcr.io/integrationproject-groep1/planning
   newName: ghcr.io/integrationproject-groep1/planning
   digest: sha256:047d52dad453aa2d3bdc806cc7b4c8947c8c25c0fa7886c449131d1b21b8e20b
@@ -40,13 +40,13 @@ images:
   digest: sha256:4f0f0d0207a40428dbcb80e1b507f6df1d967609042d1c6b1221b3885d1915d5
 - name: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
   newName: ghcr.io/integrationproject-groep1/ip-groep1-frontend-mcp
-  digest: sha256:3516f3e687d3f9516dc8586a17f2efc49e7193400d23e43bbc61efde2dc8804b
+  digest: sha256:f563eae93f8556fb0835ea8bb45e0218f1b8dc0f779f09870f6056a4f30670ed
 - name: ghcr.io/integrationproject-groep1/monitoring-mcp
   newName: ghcr.io/integrationproject-groep1/monitoring-mcp
   digest: sha256:b296d845828ad2b51d620c729d6048d0389cabe45cf0e4e8b3c35cb831504d30
 - name: ghcr.io/integrationproject-groep1/facturatie-mcp
   newName: ghcr.io/integrationproject-groep1/facturatie-mcp
-  digest: sha256:a5affb2c5119bd652fcb37783ea3ff5302ddb5d8a1e2c2525492413e18e865e1
+  digest: sha256:dc4273d259abd5f4d745073eb864b7c2c6de28f8a557590d162b222b5f9cde04
 - name: ghcr.io/integrationproject-groep1/crm-mcp
   newName: ghcr.io/integrationproject-groep1/crm-mcp
   digest: sha256:649f310129a52280649c3e7e1e53830ec885c728629f2e22a9e3764bbe894ddb
