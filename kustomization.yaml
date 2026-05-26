@@ -13,7 +13,7 @@ images:
   digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
 - name: ghcr.io/integrationproject-groep1/kassa-odoo
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:8fde77835e558a65bf41f00c9f2226447e0042963f81fa988afe1bba5fb65740
+  digest: sha256:eba8de3f2cb3450aac28c7798e4da0240756ddc4c0aff0c3d291804430e9ef8b
 - name: ghcr.io/integrationproject-groep1/facturatie
   newName: ghcr.io/integrationproject-groep1/facturatie
   digest: sha256:6c537aa7b3ed6ef73a44b95e455e7684e4df92974b11899d7af2407088932123
@@ -52,7 +52,7 @@ images:
   digest: sha256:075f651b7ba5ac92c3ceead97ebba03e5fabf860173e2d3751e160d23c03e041
 - name: ghcr.io/integrationproject-groep1/kassa-mcp
   newName: ghcr.io/integrationproject-groep1/kassa-mcp
-  digest: sha256:62aa1112debb792e0e317a99b7e201b86da18f71e50297c6ee5e28f32865e823
+  digest: sha256:a2ab66924eaf2003c2bbbcf6f6e1dc03e6289a95828d8a36ff409034dbafc21a
 patches:
 - target:
     kind: Rollout
