@@ -10,7 +10,7 @@ images:
   digest: sha256:13dc5fd508c1e153a0196ce5cadc138f18505db03d8b4f8063c83456a8d7e080
 - name: ghcr.io/integrationproject-groep1/kassa
   newName: ghcr.io/integrationproject-groep1/kassa
-  digest: sha256:5bacfbd5cba5d3e0180d44d4ccfc83f72be4a9f8850da984394abacdf5a9dac1
+  digest: sha256:b72fc416505d9f10c27a7c7b006da556782c2d508a840af11894bfb7624f506f
 - name: ghcr.io/integrationproject-groep1/kassa-odoo
   newName: ghcr.io/integrationproject-groep1/kassa
   digest: sha256:669ea3f554ad88c89853b0c614b5031a41a96a4603786f3bc3cd24740c823931
